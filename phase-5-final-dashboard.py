@@ -12,32 +12,23 @@ import plotly.express as px
 import base64
 import tempfile
 import os
+import json
 
+firebase_key_b64 = os.getenv("FIREBASE_KEY_B64")
+
+if firebase_key_b64:
+    decoded_json = base64.b64decode(firebase_key_b64).decode('utf-8')
+    with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as f:
+        f.write(decoded_json)
+        firebase_cred_path = f.name
+    cred = credentials.Certificate(firebase_cred_path)
+else:
+    st.error("❌ Firebase credentials not found. Please set FIREBASE_KEY_B64 in environment variables.")
+        
 # Load Real Crop Labels from CSV
 crop_df = pd.read_csv("cleaned_sensor_data.csv")  # Make sure this file exists in the same directory
 all_crop_labels = sorted(crop_df['label'].unique().tolist())
 crop_dummies = pd.get_dummies(pd.Series(all_crop_labels), prefix='crop')
-
-if not firebase_admin._apps:
-    firebase_key_b64 = os.getenv("FIREBASE_KEY_B64")
-    
-    if firebase_key_b64:
-        # Render Deployment: Decode the base64 key
-        firebase_json = base64.b64decode(firebase_key_b64).decode("utf-8")
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as f:
-            f.write(firebase_json.encode())
-            f.flush()
-            cred = credentials.Certificate(f.name)
-            firebase_admin.initialize_app(cred, {
-                'databaseURL': 'https://agriastrax-website-default-rtdb.firebaseio.com/'
-            })
-    else:
-        # Local Fallback
-        cred = credentials.Certificate("agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json")
-        firebase_admin.initialize_app(cred, {
-            'databaseURL': 'https://agriastrax-website-default-rtdb.firebaseio.com/'
-        })
-
 
 # --- Load AI Model ---
 model = tf.keras.models.load_model("tdann_pnsm_model.keras")
