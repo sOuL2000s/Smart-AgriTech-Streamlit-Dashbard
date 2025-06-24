@@ -13,6 +13,11 @@ import base64
 import tempfile
 import os
 
+# Load Real Crop Labels from CSV
+crop_df = pd.read_csv("cleaned_sensor_data.csv")  # Make sure this file exists in the same directory
+all_crop_labels = sorted(crop_df['label'].unique().tolist())
+crop_dummies = pd.get_dummies(pd.Series(all_crop_labels), prefix='crop')
+
 if not firebase_admin._apps:
     firebase_key_b64 = os.getenv("FIREBASE_KEY_B64")
     
@@ -50,24 +55,33 @@ def fetch_sensor_data():
     return df.reset_index(drop=True)
 
 # --- Predict Growth (Soil Moisture Proxy) ---
-def predict_growth(df):
-    # 7 required features (based on model training input)
-    features = ['N', 'P', 'K', 'ph', 'rainfall', 'temperature', 'humidity']
-    
-    if not all(col in df.columns for col in features):
-        return None  # Model can't work if any feature is missing
+def predict_growth(df, crop_type):
+    base_features = ['N', 'P', 'K', 'ph', 'rainfall', 'temperature', 'humidity']
 
-    data = df[features].copy()
+    if not all(col in df.columns for col in base_features):
+        return None
+
+    # Scale sensor data
+    data = df[base_features].copy()
     scaled = scaler.fit_transform(data)
-    
+
     lookback = 5
     if len(scaled) < lookback:
         return None
-    
-    X = np.array([scaled[-lookback:]])  # Shape: (1, 5, 7)
+
+    # One-hot encode the selected crop
+    crop_input = pd.DataFrame([[1 if c.lower().endswith(crop_type.lower()) else 0 for c in crop_dummies.columns]],
+                              columns=crop_dummies.columns)
+
+    # Repeat crop input for lookback steps
+    crop_matrix = np.repeat(crop_input.values, lookback, axis=0)
+
+    # Combine scaled sensor data with crop matrix
+    full_input = np.hstack((scaled[-lookback:], crop_matrix))
+
+    X = np.array([full_input])  # Shape: (1, 5, 7 + crop_count)
+
     prediction = model.predict(X)
-    
-    # Only inverse the predicted feature (e.g., temperature, moisture, etc.)
     return round(prediction[0][0], 2)
 
 # --- Crop Care Advice Function ---
@@ -144,22 +158,22 @@ else:
 
 
         with col2:
-            st.subheader("🤖 AI-Based Growth Prediction")
-            pred = predict_growth(df)
-            if pred:
-                st.success(f"📊 Predicted Soil Moisture: {round(pred, 2)}%")
-            else:
-                st.info("Not enough data to make prediction.")
-
             # ✅ 🌿 CROP CARE RECOMMENDATION SECTION
             st.subheader("🌿 Crop Care Recommendations")
-            crop_type = st.selectbox("Select Growing Crop", ["Wheat", "Rice", "Maize", "Millet", "Sorghum"])
+            crop_type = st.selectbox("Select Growing Crop", all_crop_labels)
             if df is not None and not df.empty:
                 care_tips = crop_care_advice(df, crop_type)
                 latest = df.iloc[-1]
                 st.write("📊 Latest Data:", latest.to_dict())
                 for tip in care_tips:
                     st.write(tip)
+
+            st.subheader("🤖 AI-Based Growth Prediction")
+            pred = predict_growth(df, crop_type)
+            if pred:
+                st.success(f"📊 Predicted Soil Moisture: {round(pred, 2)}%")
+            else:
+                st.info("Not enough data to make prediction.")
 
             # 🌾 CROP SUGGESTION SECTION
             st.subheader("🌾 Crop Suggestion")

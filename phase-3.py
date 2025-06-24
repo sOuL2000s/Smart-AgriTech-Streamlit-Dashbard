@@ -9,13 +9,17 @@ from sklearn.preprocessing import MinMaxScaler
 import matplotlib.pyplot as plt
 
 # --- Load & Prepare Data ---
+crop_dummies = pd.get_dummies(df['label'])  # One-hot encode crop
+df = pd.concat([df, crop_dummies], axis=1)
 df = pd.read_csv("cleaned_sensor_data.csv")  # Exported from Phase 2
 df['timestamp'] = pd.to_datetime(df['timestamp'])
 df = df.set_index('timestamp')
 
-features = ['soil_moisture', 'temperature', 'humidity', 'pH', 'light_intensity']
+base_features = ['N', 'P', 'K', 'temperature', 'humidity', 'ph', 'rainfall']
+features = base_features + crop_dummies.columns.tolist()
 scaler = MinMaxScaler()
 data_scaled = scaler.fit_transform(df[features])
+X, y = create_sequences(data_scaled)
 
 # --- Time-Delay Setup (TDANN: lookback window) ---
 def create_sequences(data, lookback):
@@ -46,4 +50,5 @@ plt.legend()
 plt.show()
 
 # --- Save Model ---
-model.save("tdann_pnsm_model.h5")
+model.fit(...)
+model.save("tdann_pnsm_model.keras")
