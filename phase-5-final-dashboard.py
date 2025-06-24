@@ -22,6 +22,9 @@ if firebase_key_b64:
         f.write(decoded_json)
         firebase_cred_path = f.name
     cred = credentials.Certificate(firebase_cred_path)
+    firebase_admin.initialize_app(cred, {
+    'databaseURL': 'https://agriastrax-website-default-rtdb.firebaseio.com/'  # Replace this with your actual Firebase DB URL
+})
 else:
     st.error("❌ Firebase credentials not found. Please set FIREBASE_KEY_B64 in environment variables.")
         
