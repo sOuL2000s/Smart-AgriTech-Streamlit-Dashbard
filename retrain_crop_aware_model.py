@@ -52,7 +52,7 @@ history = model.fit(X, y, epochs=30, batch_size=16, validation_split=0.2)
 
 # --- Save ---
 model.save("tdann_pnsm_model.keras")
-print("✅ New model trained and saved as tdann_pnsm_model.keras")
+print("New model trained and saved as tdann_pnsm_model.keras")
 
 # --- Optional: Plot Loss ---
 plt.plot(history.history['loss'], label='Train Loss')
