@@ -14,6 +14,8 @@ import tempfile
 import os
 import json
 import joblib # For saving/loading scalers
+import time
+from streamlit_autorefresh import st_autorefresh
 
 # For Voice Alerts
 from gtts import gTTS
@@ -29,6 +31,8 @@ except ImportError:
                "For cloud deployment, consider embedding HTML audio.")
 except Exception as e:
     st.warning(f"Error importing playsound: {e}. Voice alerts might not work.")
+
+
 
 # --- Firebase Secure Setup (Render-Compatible) ---
 firebase_key_b64 = os.getenv("FIREBASE_KEY_B64")
@@ -449,7 +453,7 @@ def crop_care_advice(df, crop_type):
         if ct == 'wheat':
             if temp > 32: tips.append(f"🌡️ **Temperature is high ({temp:.1f}°C)**: Provide shade or irrigate in evening – temp is too high for wheat.")
         elif ct == 'rice':
-            if temp > 38: tips.append(f"🌡️ **Temperature is high ({temp:.1f}°C)**: Too hot for rice. Consider evening irrigation or shade.")
+            if temp > 38: tips.append(f"🌡️ **Temperature is high ({temp:.1f}ºC)**: Too hot for rice. Consider evening irrigation or shade.")
         elif ct == 'maize':
             if temp < 20: tips.append(f"🌡️ **Temperature is low ({temp:.1f}°C)**: Maize prefers warm weather (20–30°C).")
         elif ct == 'banana':
@@ -576,7 +580,7 @@ def recommend_seeds(ph, temperature, rainfall, soil_moisture=None):
         temperature (float): Current temperature in Celsius.
         rainfall (float): Recent rainfall in mm.
         soil_moisture (float, optional): Current soil moisture percentage.
-                                        If available, provides more specific advice.
+        If available, provides more specific advice.
     Returns:
         str: Recommended crops or general advice.
     """
@@ -743,9 +747,22 @@ else:
         else:
             st.info("Predicted soil moisture is out of typical range or not available, hindering specific crop suggestions.")
 
+    # --- Real-Time Plant Monitoring (Simulated) ---
+    st.subheader("🌿 Real-Time Plant Monitoring (Simulated)")
+    try:
+        with open("simulated_growth_data.json") as f:
+            simulated_data = json.load(f)
+            st.write(f"🕒 Timestamp: {simulated_data['timestamp']}")
+            st.success(f"📈 Growth Stage: {simulated_data['stage']}")
+            st.warning(f"⚠️ Advisory: {simulated_data['alert']}")
+    except FileNotFoundError:
+        st.error("❌ No simulation data found. Run `dummy_camera_simulator.py` to start simulation.")
+
     st.markdown("---")
     st.subheader("📋 Latest Sensor Readings (Raw Data)")
     if not df.empty:
         st.dataframe(df.tail(10))
     else:
         st.info("No sensor data to display.")
+    # Auto-refresh every 10 seconds
+    st_autorefresh(interval=10 * 1000, key="growth_sim_refresh")
