@@ -1,0 +1,1560 @@
+import random
+import streamlit as st
+import pandas as pd
+import numpy as np
+import tensorflow as tf
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
+from sklearn.linear_model import LinearRegression
+import firebase_admin
+from firebase_admin import credentials, db
+import datetime
+import plotly.express as px
+import plotly.graph_objects as go # Import for gauge charts
+import base64
+import tempfile
+import os
+import json
+import joblib # For saving/loading scalers
+import time
+from streamlit_autorefresh import st_autorefresh
+
+# For Voice Alerts
+from gtts import gTTS
+
+# Check for playsound availability
+PLAYSOUND_AVAILABLE = False
+try:
+    import playsound
+    PLAYSOUND_AVAILABLE = True
+except ImportError:
+    st.warning("`playsound` library not found. Voice alerts will be generated but not played. "
+               "Install with `pip install playsound` for local playback. "
+               "For cloud deployment, consider embedding HTML audio.")
+except Exception as e:
+    st.warning(f"Error importing playsound: {e}. Voice alerts might not work.")
+
+
+# --- Firebase Secure Setup (Render-Compatible) ---
+firebase_key_b64 = os.getenv("FIREBASE_KEY_B64")
+firebase_cred_path = None # Initialize to None
+
+try:
+    if firebase_key_b64:
+        decoded_json = base64.b64decode(firebase_key_b64).decode('utf-8')
+        with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as f:
+            f.write(decoded_json)
+        firebase_cred_path = f.name
+        cred = credentials.Certificate(firebase_cred_path)
+    else:
+        # Fallback for local development if environment variable is not set
+        # Ensure 'agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json' is in your project root
+        cred = credentials.Certificate("agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json")
+
+    # Prevent double initialization
+    if not firebase_admin._apps:
+        firebase_admin.initialize_app(cred, {
+            'databaseURL': 'https://agriastrax-website-default-rtdb.firebaseio.com/'
+        })
+    st.success("✅ Firebase initialized successfully.")
+except Exception as e:
+    st.error(f"❌ Firebase initialization failed: {e}")
+    st.stop() # Stop the app if Firebase fails to initialize
+finally:
+    # Clean up the temporary file if created from environment variable
+    if firebase_key_b64 and firebase_cred_path and os.path.exists(firebase_cred_path):
+        os.remove(firebase_cred_path)
+
+# --- Load Real Crop Labels from CSV ---
+all_crop_labels = []
+crop_encoder = None
+try:
+    crop_df_for_labels = pd.read_csv("cleaned_sensor_data.csv")
+    all_crop_labels = sorted(crop_df_for_labels['label'].unique().tolist())
+    
+    # Initialize OneHotEncoder for crop type for consistent encoding
+    crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+    crop_encoder.fit(np.array(all_crop_labels).reshape(-1, 1)) # Fit with all known crop labels
+    st.success(f"✅ Crop labels loaded: {len(all_crop_labels)} unique crops found.")
+except FileNotFoundError:
+    st.error("❌ 'cleaned_sensor_data.csv' not found. Please ensure it's in the same directory.")
+    all_crop_labels = [] # Initialize as empty to prevent errors later
+    # Fallback encoder, might not be fully representative without actual data
+    crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False) 
+except Exception as e:
+    st.error(f"❌ Error loading 'cleaned_sensor_data.csv': {e}")
+    all_crop_labels = []
+    # Fallback encoder
+    crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False) 
+
+# --- Load AI Model ---
+model = None
+try:
+    model = tf.keras.models.load_model("tdann_pnsm_model.keras")
+    st.success("✅ AI model (tdann_pnsm_model.keras) loaded successfully.")
+except Exception as e:
+    st.error(f"❌ Error loading AI model (tdann_pnsm_model.keras): {e}")
+    st.stop() # Stop the app if the model cannot be loaded
+
+# --- Load Scalers ---
+# IMPORTANT: These scalers MUST be the ones fitted during the model training phase.
+input_scaler = None
+output_scaler = None
+try:
+    input_scaler = joblib.load('tdann_input_scaler.joblib')
+    output_scaler = joblib.load('tdann_output_scaler.joblib')
+    st.success("✅ Input and Output scalers loaded successfully.")
+except FileNotFoundError:
+    st.error("❌ Scaler files (tdann_input_scaler.joblib, tdann_output_scaler.joblib) not found. "
+             "The model predictions might be inaccurate without the correct scalers. "
+             "Please ensure they are saved during model training and placed in the same directory.")
+    # In a real production environment, you might want to stop the app here or handle robustly.
+    input_scaler = MinMaxScaler() # Fallback: Initialize new scalers, but warn the user.
+    output_scaler = MinMaxScaler() # Fallback: Initialize new scalers, but warn the user.
+    st.warning("⚠️ Proceeding with newly initialized scalers. Predictions may be inaccurate.")
+except Exception as e:
+    st.error(f"❌ Error loading scalers: {e}")
+    input_scaler = MinMaxScaler() # Fallback
+    output_scaler = MinMaxScaler() # Fallback
+    st.warning("⚠️ Proceeding with newly initialized scalers. Predictions may be inaccurate.")
+
+
+# --- Market Price Predictor Setup ---
+# Simulate Market Price Data
+def generate_market_price_data(num_samples=1000):
+    data = []
+    crops = all_crop_labels if all_crop_labels else ['wheat', 'rice', 'maize']
+    
+    for _ in range(num_samples):
+        crop_type = random.choice(crops)
+        N = random.uniform(50, 150)
+        P = random.uniform(20, 60)
+        K = random.uniform(50, 200)
+        temperature = random.uniform(20, 35)
+        humidity = random.uniform(30, 80)
+        
+        base_price = 100
+        
+        if crop_type == 'wheat':
+            price = base_price * 1.2
+        elif crop_type == 'rice':
+            price = base_price * 1.5
+        elif crop_type == 'maize':
+            price = base_price * 1.1
+        else: 
+            price = base_price * 1.0
+            
+        price += (N / 10) + (P / 5) + (K / 10)
+        price += (temperature - 25) * 2
+        price += (humidity - 50) * 1.5
+        
+        price += random.uniform(-10, 10)
+        price = max(50, price)
+        
+        data.append([N, P, K, temperature, humidity, crop_type, price])
+        
+    df_prices = pd.DataFrame(data, columns=['N', 'P', 'K', 'temperature', 'humidity', 'crop_type', 'price'])
+    return df_prices
+
+@st.cache_data 
+def train_market_price_model():
+    if crop_encoder is None:
+        st.error("Cannot train market price model: Crop encoder not initialized.")
+        return None, None, None
+
+    df_prices = generate_market_price_data(num_samples=2000)
+    
+    market_price_features = ['N', 'P', 'K', 'temperature', 'humidity']
+    
+    # Ensure crop_encoder is fitted with 'crop_type' if it's used here
+    # The `all_crop_labels` used to fit the main crop_encoder should be sufficient.
+    X_categorical = crop_encoder.transform(df_prices[['crop_type']])
+    X_categorical_df = pd.DataFrame(X_categorical, columns=crop_encoder.get_feature_names_out(['crop_type']))
+    
+    X_numerical = df_prices[market_price_features]
+    
+    X_train_market = pd.concat([X_numerical, X_categorical_df], axis=1)
+    y_train_market = df_prices['price']
+    
+    market_model = LinearRegression()
+    market_model.fit(X_train_market, y_train_market)
+    
+    return market_model, crop_encoder, market_price_features
+
+market_price_model, market_crop_encoder, market_price_features = train_market_price_model()
+if market_price_model:
+    st.success("✅ Market price prediction model trained (simulated data).")
+else:
+    st.error("❌ Market price prediction model could not be trained.")
+
+
+# --- Fetch Live Sensor Data ---
+@st.cache_data(ttl=10) # Cache data for 10 seconds to reduce Firebase reads
+def fetch_sensor_data():
+    """Fetches sensor data from Firebase Realtime Database."""
+    ref = db.reference('sensors/farm1')
+    snapshot = ref.get()
+    if not snapshot:
+        return pd.DataFrame()
+    
+    # Firebase data often comes as a dict of dicts, where keys are timestamps
+    # Convert to a list of dicts, then DataFrame
+    if isinstance(snapshot, dict):
+        data_list = []
+        for key, value in snapshot.items():
+            if isinstance(value, dict):
+                data_list.append(value)
+            else:
+                st.warning(f"Skipping non-dict entry in Firebase: {key}: {value}")
+        df = pd.DataFrame(data_list)
+    else: # If snapshot is already a list of dicts or single dict
+        df = pd.DataFrame(snapshot)
+
+    if df.empty:
+        return pd.DataFrame()
+
+    # Convert relevant columns to numeric, coercing errors
+    # Note: 'pH' is used here as per Firebase, 'ph' was used in training script
+    # Ensure consistency or handle both if they might appear.
+    numeric_cols = ['N', 'P', 'K', 'pH', 'rainfall', 'temperature', 'humidity', 
+                    'soil_moisture', 'light_intensity', 'growth_factor', 'growth_trigger']
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        else:
+            df[col] = np.nan # Ensure missing columns are added as NaN to align with expected features
+    
+    # Handle 'pH' column name consistency: Firebase might send 'pH', trainer expects 'ph'
+    # Do this early to ensure subsequent processing uses 'ph'
+    if 'pH' in df.columns and 'ph' not in df.columns:
+        df['ph'] = df['pH']
+    if 'pH' in df.columns: # Optionally drop the 'pH' column if 'ph' is preferred
+        df = df.drop(columns=['pH'])
+
+    # --- NEW: Impute specific problematic columns if NaN with a sensible default ---
+    # Apply this AFTER initial numeric conversion and pH/ph mapping
+    if 'ph' in df.columns and df['ph'].isnull().any():
+        # Use a common neutral pH (6.5) as default if NaN
+        df['ph'] = df['ph'].fillna(6.5) 
+        st.warning("pH value missing/NaN from Firebase. Imputing with default pH 6.5 for prediction.")
+    # --- END NEW ---
+
+    df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+    df = df.dropna(subset=['timestamp'])
+    df = df.sort_values('timestamp')
+    return df.reset_index(drop=True)
+
+# --- Predict Growth (Multi-Output TDANN) ---
+def predict_growth(df_latest_data, selected_crop_type):
+    """
+    Predicts soil moisture, light intensity, and nutrient sum using the loaded AI model.
+    Assumes the model was trained with specific input features and multiple outputs.
+    """
+    if model is None or input_scaler is None or output_scaler is None or crop_encoder is None:
+        st.error("AI model or scalers or encoder not loaded. Cannot predict growth.")
+        return None, None, None
+    
+    LOOKBACK_WINDOW = 5
+    
+    # Define input features as per trainer script
+    base_sensor_features = ['N', 'P', 'K', 'temperature', 'humidity', 'ph', 'rainfall']
+    biological_features = ['growth_factor'] # 'growth_trigger' was removed from trainer
+    
+    # Determine which biological features are actually present in the data
+    # Filter out features that are not in the dataframe's columns
+    present_biological_features = [f for f in biological_features if f in df_latest_data.columns]
+
+    final_tdann_input_features = base_sensor_features + present_biological_features
+
+    # Ensure all columns in final_tdann_input_features are in df_latest_data before subsetting
+    available_tdann_features = [f for f in final_tdann_input_features if f in df_latest_data.columns]
+    
+    if len(available_tdann_features) != len(final_tdann_input_features):
+        missing = set(final_tdann_input_features) - set(available_tdann_features)
+        st.error(f"Missing expected TDANN input features in sensor data: {missing}. Cannot predict growth.")
+        st.info("Ensure Firebase is sending all required sensor data: N, P, K, temperature, humidity, pH/ph, rainfall, growth_factor.")
+        return None, None, None
+
+    # Try to get enough data for the lookback window.
+    # Use fillna() with ffill() to propagate last valid observation forward for missing values.
+    # Use bfill() to fill leading NaNs if ffill has nothing to propagate.
+    # IMPORTANT: df_latest_data is already pre-processed by fetch_sensor_data including pH imputation.
+    processed_data_for_prediction = df_latest_data[available_tdann_features].tail(LOOKBACK_WINDOW)
+    
+    # A final fillna(0) as a safeguard, for any remaining NaNs, or if a whole row is NaN initially.
+    # It's better to ensure data quality at the source or during fetch_sensor_data.
+    processed_data_for_prediction = processed_data_for_prediction.fillna(method='ffill').fillna(method='bfill').fillna(0)
+
+
+    if len(processed_data_for_prediction) < LOOKBACK_WINDOW:
+        st.info(f"Not enough complete data points ({len(processed_data_for_prediction)} < {LOOKBACK_WINDOW}) even after filling NaNs. Need at least {LOOKBACK_WINDOW} consecutive entries with non-NaNs initially.")
+        st.info("Please ensure enough historical sensor data is available in Firebase for the lookback window.")
+        return None, None, None
+
+    # Get encoded crop features column names (from the model's crop_encoder)
+    encoded_crop_feature_names = crop_encoder.get_feature_names_out(['label']) # Changed from 'crop_type' to 'label' to match trainer
+    
+    # Combine all input features that the TDANN model expects
+    # This must match the order and number of features during model training
+    expected_full_input_features_order = final_tdann_input_features + encoded_crop_feature_names.tolist()
+
+    full_input_features_sequence = []
+    
+    # One-hot encode the selected crop type once
+    crop_type_input = np.array([selected_crop_type]).reshape(-1, 1)
+    encoded_crop_single = crop_encoder.transform(crop_type_input)
+
+    for i in range(LOOKBACK_WINDOW):
+        # Get numerical features for the current timestep in the window
+        numerical_features_at_timestep = processed_data_for_prediction.iloc[i][available_tdann_features].values
+        
+        # Combine numerical features with the *static* one-hot encoded crop type
+        # Assuming crop type is static for the entire prediction window
+        combined_features_at_timestep = np.hstack((numerical_features_at_timestep, encoded_crop_single[0]))
+        full_input_features_sequence.append(combined_features_at_timestep)
+
+    full_input_features_sequence_np = np.array(full_input_features_sequence)
+
+    # --- Debugging: Print shapes and feature lists ---
+    # st.write(f"DEBUG: Scaler expects {input_scaler.n_features_in_} features.")
+    # st.write(f"DEBUG: Current input sequence shape: {full_input_features_sequence_np.shape}")
+    # st.write(f"DEBUG: Expected full input features order: {expected_full_input_features_order}")
+
+    # Scale the combined input features
+    scaled_input_sequence = input_scaler.transform(full_input_features_sequence_np)
+    
+    # Reshape for LSTM input: (1, lookback, num_features)
+    X_predict = scaled_input_sequence.reshape(1, LOOKBACK_WINDOW, scaled_input_sequence.shape[1])
+    
+    try:
+        predicted_scaled_outputs = model.predict(X_predict)
+        
+        # Inverse transform the predictions to get original scale
+        predicted_raw_outputs = output_scaler.inverse_transform(predicted_scaled_outputs)
+        
+        soil_moisture_pred = round(float(predicted_raw_outputs[0][0]), 2)
+        light_intensity_pred = round(float(predicted_raw_outputs[0][1]), 2)
+        nutrient_sum_pred = round(float(predicted_raw_outputs[0][2]), 2) # Assuming NPK sum is the third output
+        
+        return soil_moisture_pred, light_intensity_pred, nutrient_sum_pred
+    except Exception as e:
+        st.error(f"Error during AI prediction: {e}")
+        st.exception(e) # Display full traceback for debugging
+        return None, None, None
+
+# --- Predict Market Price ---
+def predict_market_price(latest_data, selected_crop_type, market_model, market_crop_encoder, market_price_features):
+    """
+    Predicts the market price based on latest sensor data and crop type.
+    """
+    if market_model is None or market_crop_encoder is None:
+        st.error("Market prediction model or encoder not initialized.")
+        return None
+
+    if not latest_data:
+        return None
+
+    # Prepare input for the market price model
+    input_values = {}
+    for feature in market_price_features:
+        # Use .get() and check for pd.isna as Firebase data might not have all keys or they might be NaN
+        val = latest_data.get(feature)
+        if val is not None and not pd.isna(val):
+            input_values[feature] = val
+        else:
+            st.warning(f"Missing or NaN feature '{feature}' for market price prediction. Imputing with 0.")
+            input_values[feature] = 0 # Impute with 0 for market price model if missing
+    
+    input_df_numerical = pd.DataFrame([input_values])
+    
+    # One-hot encode crop type for prediction
+    crop_type_input = np.array([selected_crop_type]).reshape(-1, 1)
+    encoded_crop = market_crop_encoder.transform(crop_type_input)
+    # Ensure column names match what the market model was trained on
+    encoded_crop_df = pd.DataFrame(encoded_crop, columns=market_crop_encoder.get_feature_names_out(['crop_type']))
+    
+    # Combine all features for prediction
+    X_predict_market = pd.concat([input_df_numerical, encoded_crop_df], axis=1)
+    
+    try:
+        predicted_price = market_model.predict(X_predict_market)[0]
+        return round(predicted_price, 2)
+    except Exception as e:
+        st.error(f"Error during market price prediction: {e}")
+        st.exception(e) # Display full traceback for debugging
+        return None
+
+
+# --- Crop Care Advice Function ---
+# Mapping for advice messages to support multiple languages
+ADVICE_MESSAGES = {
+    'en': {
+        'no_data': "No sensor data available to provide advice.",
+        'npk_low': "🌱 **{nutrient} is low ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient} is high ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **Soil Moisture is low ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **Soil Moisture is high ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **Temperature is low ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **Temperature is high ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **Humidity is low ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **Humidity is high ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **pH is low ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **pH is high ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **pH is off ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **Light Intensity is low ({light:.1f} lux)**: {message}",
+        'light_high': "☀️ **Light Intensity is high ({light:.1f} lux)**: {message}",
+        'rainfall_low': "🌧️ **Rainfall is low ({rain:.1f} mm)**: {message}",
+        'rainfall_high': "🌧️ **Rainfall is high ({rain:.1f} mm)**: {message}",
+        'all_good': "✅ All major parameters look good! Keep monitoring regularly for optimal growth.",
+        'npk_n_low': "Consider applying nitrogen-rich fertilizer.",
+        'npk_n_high': "Excess nitrogen can promote leafy growth over fruit/flower development.",
+        'npk_p_low': "Consider applying phosphorus fertilizer for root development.",
+        'npk_p_high': "High phosphorus can lock up other nutrients.",
+        'npk_k_low': "Consider applying potassium fertilizer for overall plant health and fruit quality.",
+        'npk_k_high': "Excess potassium can interfere with calcium and magnesium uptake.",
+        'wheat_sm_low': "Irrigate lightly – wheat needs 35–50% soil moisture.",
+        'rice_sm_low': "Rice needs high moisture. Ensure proper irrigation.",
+        'maize_sm_low': "Maize needs moderate soil moisture levels.",
+        'banana_sm_low': "Keep soil consistently moist for banana.",
+        'mango_sm_high': "Avoid waterlogging. Mango needs well-drained soil.",
+        'grapes_sm_high': "Grapes prefer drier soil – avoid overwatering.",
+        'cotton_sm_low': "Cotton requires moderate moisture during flowering.",
+        'millet_sorghum_sm_low': "These are drought-resistant crops but still need minimal moisture.",
+        'jute_sm_low': "Jute requires ample moisture during growth.",
+        'pomegranate_sm_high': "Avoid overwatering pomegranate.",
+        'melon_sm_low': "Melons need consistent watering, especially during fruiting.",
+        'coconut_sm_low': "Coconut palms need high moisture levels.",
+        'mothbeans_sm_low': "Mothbeans are drought-tolerant but need minimal irrigation during flowering.",
+        'mungbean_sm_low': "Ensure regular irrigation during flowering and pod formation.",
+        'blackgram_sm_low': "Maintain moderate moisture especially during flowering.",
+        'lentil_sm_low': "Lentils need low to moderate moisture.",
+        'general_sm_low': "General advice: Consider irrigation to prevent drought stress.",
+        'general_sm_high': "General advice: Ensure good drainage to prevent waterlogging.",
+        'wheat_temp_high': "Provide shade or irrigate in evening – temp is too high for wheat.",
+        'rice_temp_high': "Too hot for rice. Consider evening irrigation or shade.",
+        'maize_temp_low': "Maize prefers warm weather (20–30°C).",
+        'banana_temp_low': "Banana is sensitive to cold – ensure warm conditions.",
+        'mango_temp_low': "Mango requires warmer temperatures (>20°C).",
+        'cotton_temp_low': "Cotton thrives in warm temperatures.",
+        'millet_sorghum_temp_low': "Warm climate is ideal for millet/sorghum.",
+        'coffee_temp_low': "Coffee thrives in 18–24°C range.",
+        'jute_temp_low': "Jute grows well in 25–30°C.",
+        'papaya_temp_low': "Papaya prefers 21–33°C range.",
+        'pomegranate_temp_low': "Ideal temperature is above 20°C.",
+        'melon_temp_low': "Ensure temperature is warm (>25°C).",
+        'coconut_temp_low': "Ideal temperature for coconut is above 25°C.",
+        'mothbeans_temp_low': "Temperature should be above 22°C.",
+        'mungbean_temp_low': "Mungbean requires warm conditions for optimal growth.",
+        'blackgram_temp_low': "Ideal temperature range is 25–35°C.",
+        'lentil_temp_low': "Lentils grow well in 18–30°C.",
+        'general_temp_low': "General advice: Cold temperatures can stunt growth. Consider protective measures.",
+        'general_temp_high': "General advice: High temperatures can cause heat stress. Ensure adequate water and shade.",
+        'wheat_hum_high': "Watch out for fungal infections – ensure airflow.",
+        'rice_hum_low': "Increase ambient humidity or use mulch.",
+        'banana_hum_low': "Banana requires high humidity. Consider misting or mulching.",
+        'grapes_hum_high': "High humidity may lead to fungal infections.",
+        'coffee_hum_low': "Coffee prefers high humidity.",
+        'orange_hum_high': "Prune trees to improve airflow and prevent fungal issues.",
+        'general_hum_low': "General advice: Low humidity can cause wilting. Consider misting or increasing soil moisture.",
+        'general_hum_high': "General advice: High humidity increases risk of fungal diseases. Ensure good ventilation.",
+        'wheat_ph_low': "Slightly acidic – consider applying lime to raise pH.",
+        'rice_ph_off': "Maintain slightly acidic soil for rice (pH 5.5–6.5).",
+        'maize_ph_off': "Maintain soil pH between 5.8–7.0.",
+        'papaya_ph_low': "Slightly acidic to neutral soil is best for papaya.",
+        'orange_ph_off': "Ideal soil pH for orange is 6.0–7.5.",
+        'general_ph_very_low': "General advice: Soil is too acidic. Apply lime to increase pH and improve nutrient availability.",
+        'general_ph_very_high': "General advice: Soil is too alkaline. Apply sulfur or organic matter to decrease pH.",
+        'general_ph_off': "General advice: Optimal pH range for most crops is 5.5-7.5. Adjust as needed.",
+        'wheat_light_low': "Ensure the crop gets enough sunlight.",
+        'rice_light_low': "Ensure rice gets full sun exposure.",
+        'general_light_low': "General advice: Insufficient light can hinder photosynthesis. Consider supplemental lighting or pruning.",
+        'general_light_high': "General advice: Excessive light can cause scorching. Consider shading during peak hours.",
+        'rainfall_low_msg': "Consider supplementary irrigation, especially for water-intensive crops.",
+        'rainfall_high_msg': "Ensure good drainage to prevent waterlogging and root rot."
+    },
+    'hi': {
+        'no_data': "सलाह देने के लिए कोई सेंसर डेटा उपलब्ध नहीं है।",
+        'npk_low': "🌱 **{nutrient} कम है ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient} अधिक है ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **मिट्टी की नमी कम है ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **मिट्टी की नमी अधिक है ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **तापमान कम है ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **तापमान अधिक है ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **आर्द्रता कम है ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **आर्द्रता अधिक है ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **पीएच कम है ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **पीएच अधिक है ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **पीएच सही नहीं है ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **प्रकाश की तीव्रता कम है ({light:.1f} लक्स)**: {message}",
+        'light_high': "☀️ **प्रकाश की तीव्रता अधिक है ({light:.1f} लक्स)**: {message}",
+        'rainfall_low_msg': "🌧️ **वर्षा कम है ({rain:.1f} मिमी)**: {message}",
+        'rainfall_high_msg': "🌧️ **वर्षा अधिक है ({rain:.1f} मिमी)**: {message}",
+        'all_good': "✅ सभी मुख्य पैरामीटर ठीक दिख रहे हैं! इष्टतम विकास के लिए नियमित रूप से निगरानी करते रहें।",
+        'npk_n_low': "नाइट्रोजन युक्त उर्वरक डालने पर विचार करें।",
+        'npk_n_high': "अतिरिक्त नाइट्रोजन फल/फूल के विकास के बजाय पत्तों के विकास को बढ़ावा दे सकता है।",
+        'npk_p_low': "जड़ के विकास के लिए फास्फोरस उर्वरक डालने पर विचार करें।",
+        'npk_p_high': "उच्च फास्फोरस अन्य पोषक तत्वों को अवरुद्ध कर सकता है।",
+        'npk_k_low': "पौधे के समग्र स्वास्थ्य और फल की गुणवत्ता के लिए पोटेशियम उर्वरक डालने पर विचार करें।",
+        'npk_k_high': "अतिरिक्त पोटेशियम कैल्शियम और मैग्नीशियम के अवशोषण में हस्तक्षेप कर सकता है।",
+        'wheat_sm_low': "हल्की सिंचाई करें – गेहूं को 35-50% मिट्टी की नमी की आवश्यकता होती है।",
+        'rice_sm_low': "चावल को अधिक नमी की आवश्यकता होती है। उचित सिंचाई सुनिश्चित करें।",
+        'maize_sm_low': "मक्का को मध्यम मिट्टी की नमी के स्तर की आवश्यकता होती है।",
+        'banana_sm_low': "केले के लिए मिट्टी को लगातार नम रखें।",
+        'mango_sm_high': "जलभराव से बचें। आम को अच्छी जल निकासी वाली मिट्टी की आवश्यकता होती है।",
+        'grapes_sm_high': "अंगूर सूखी मिट्टी पसंद करते हैं – अधिक पानी देने से बचें।",
+        'cotton_sm_low': "कपास को फूल आने के दौरान मध्यम नमी की आवश्यकता होती है।",
+        'millet_sorghum_sm_low': "ये सूखे प्रतिरोधी फसलें हैं लेकिन फिर भी न्यूनतम नमी की आवश्यकता होती है।",
+        'jute_sm_low': "जूट को विकास के दौरान पर्याप्त नमी की आवश्यकता होती है।",
+        'pomegranate_sm_high': "अनार को अधिक पानी देने से बचें।",
+        'melon_sm_low': "तरबूज को लगातार पानी की आवश्यकता होती है, खासकर फल लगने के दौरान।",
+        'coconut_sm_low': "नारियल के पेड़ों को उच्च नमी के स्तर की आवश्यकता होती है।",
+        'mothbeans_sm_low': "मोठबीन सूखे को सहन करने वाली फसलें हैं लेकिन फूल आने के दौरान न्यूनतम सिंचाई की आवश्यकता होती है।",
+        'mungbean_sm_low': "फूल आने और फली बनने के दौरान नियमित सिंचाई सुनिश्चित करें।",
+        'blackgram_sm_low': "विशेष रूप से फूल आने के दौरान मध्यम नमी बनाए रखें।",
+        'lentil_sm_low': "मसूर को कम से मध्यम नमी की आवश्यकता होती है।",
+        'general_sm_low': "सामान्य सलाह: सूखे के तनाव को रोकने के लिए सिंचाई पर विचार करें।",
+        'general_sm_high': "सामान्य सलाह: जलभराव को रोकने के लिए अच्छी जल निकासी सुनिश्चित करें।",
+        'wheat_temp_high': "शाम को छाया प्रदान करें या सिंचाई करें – गेहूं के लिए तापमान बहुत अधिक है।",
+        'rice_temp_high': "चावल के लिए बहुत गर्म है। शाम को सिंचाई या छाया पर विचार करें।",
+        'maize_temp_low': "मक्का गर्म मौसम (20-30°C) पसंद करता है।",
+        'banana_temp_low': "केला ठंड के प्रति संवेदनशील है – गर्म स्थिति सुनिश्चित करें।",
+        'mango_temp_low': "आम को गर्म तापमान (>20°C) की आवश्यकता होती है।",
+        'cotton_temp_low': "कपास गर्म तापमान में पनपती है।",
+        'millet_sorghum_temp_low': "बाजरा/ज्वार के लिए गर्म जलवायु आदर्श है।",
+        'coffee_temp_low': "कॉफी 18-24°C रेंज में पनपती है।",
+        'jute_temp_low': "जूट 25-30°C में अच्छी तरह उगता है।",
+        'papaya_temp_low': "पपीता 21-33°C रेंज पसंद करता है।",
+        'pomegranate_temp_low': "आदर्श तापमान 20°C से ऊपर है।",
+        'melon_temp_low': "सुनिश्चित करें कि तापमान गर्म (>25°C) हो।",
+        'coconut_temp_low': "नारियल के लिए आदर्श तापमान 25°C से ऊपर है।",
+        'mothbeans_temp_low': "तापमान 22°C से ऊपर होना चाहिए।",
+        'mungbean_temp_low': "मूंग को इष्टतम विकास के लिए गर्म परिस्थितियों की आवश्यकता होती है।",
+        'blackgram_temp_low': "आदर्श तापमान सीमा 25-35°C है।",
+        'lentil_temp_low': "मसूर 18-30°C में अच्छी तरह उगती है।",
+        'general_temp_low': "सामान्य सलाह: ठंडा तापमान विकास को रोक सकता है। सुरक्षात्मक उपायों पर विचार करें।",
+        'general_temp_high': "सामान्य सलाह: उच्च तापमान से गर्मी का तनाव हो सकता है। पर्याप्त पानी और छाया सुनिश्चित करें।",
+        'wheat_hum_high': "कवक संक्रमण से सावधान रहें – वायु प्रवाह सुनिश्चित करें।",
+        'rice_hum_low': "आसपास की आर्द्रता बढ़ाएँ या पलवार का उपयोग करें।",
+        'banana_hum_low': "केले को उच्च आर्द्रता की आवश्यकता होती है। धुंध या पलवार पर विचार करें।",
+        'grapes_hum_high': "उच्च आर्द्रता से कवक संक्रमण हो सकता है।",
+        'coffee_hum_low': "कॉफी उच्च आर्द्रता पसंद करती है।",
+        'orange_hum_high': "वायु प्रवाह में सुधार और कवक संबंधी समस्याओं को रोकने के लिए पेड़ों की छंटाई करें।",
+        'general_hum_low': "सामान्य सलाह: कम आर्द्रता से मुरझाना हो सकता है। धुंध या मिट्टी की नमी बढ़ाने पर विचार करें।",
+        'general_hum_high': "सामान्य सलाह: उच्च आर्द्रता से कवक रोगों का खतरा बढ़ जाता है। अच्छा वेंटिलेशन सुनिश्चित करें।",
+        'wheat_ph_low': "थोड़ा अम्लीय – पीएच बढ़ाने के लिए चूना डालने पर विचार करें।",
+        'rice_ph_off': "चावल के लिए थोड़ी अम्लीय मिट्टी बनाए रखें (पीएच 5.5-6.5)।",
+        'maize_ph_off': "मिट्टी का पीएच 5.8-7.0 के बीच बनाए रखें।",
+        'papaya_ph_low': "पपीते के लिए थोड़ी अम्लीय से तटस्थ मिट्टी सबसे अच्छी होती है।",
+        'orange_ph_off': "संतरे के लिए आदर्श मिट्टी का पीएच 6.0-7.5 है।",
+        'general_ph_very_low': "सामान्य सलाह: मिट्टी बहुत अम्लीय है। पीएच बढ़ाने और पोषक तत्वों की उपलब्धता में सुधार के लिए चूना डालें।",
+        'general_ph_very_high': "सामान्य सलाह: मिट्टी बहुत क्षारीय है। पीएच कम करने के लिए सल्फर या जैविक पदार्थ डालें।",
+        'general_ph_off': "सामान्य सलाह: अधिकांश फसलों के लिए इष्टतम पीएच रेंज 5.5-7.5 है। आवश्यकतानुसार समायोजित करें।",
+        'wheat_light_low': "सुनिश्चित करें कि फसल को पर्याप्त धूप मिले।",
+        'rice_light_low': "सुनिश्चित करें कि चावल को पूरी धूप मिले।",
+        'general_light_low': "सामान्य सलाह: अपर्याप्त प्रकाश प्रकाश संश्लेषण में बाधा डाल सकता है। पूरक प्रकाश या छंटाई पर विचार करें।",
+        'general_light_high': "सामान्य सलाह: अत्यधिक प्रकाश से झुलसना हो सकता है। चरम घंटों के दौरान छाया पर विचार करें।"
+    }
+}
+
+def crop_care_advice(df, crop_type, lang='en'):
+    """Provides crop-specific care advice based on latest sensor readings."""
+    messages = ADVICE_MESSAGES.get(lang, ADVICE_MESSAGES['en']) # Fallback to English
+
+    if df.empty:
+        return [messages['no_data']]
+    
+    latest = df.iloc[-1].to_dict()
+    tips = []
+    
+    ct = crop_type.lower()
+
+    npk_advice = {
+        'N': {'min': 50, 'max': 150, 'low_msg': messages['npk_n_low'], 'high_msg': messages['npk_n_high']},
+        'P': {'min': 20, 'max': 60, 'low_msg': messages['npk_p_low'], 'high_msg': messages['npk_p_high']},
+        'K': {'min': 50, 'max': 200, 'low_msg': messages['npk_k_low'], 'high_msg': messages['npk_k_high']},
+    }
+
+    for nutrient, thresholds in npk_advice.items():
+        if nutrient in latest and not pd.isna(latest.get(nutrient)):
+            value = latest[nutrient]
+            if value < thresholds['min']:
+                tips.append(messages['npk_low'].format(nutrient=nutrient, value=value, message=thresholds['low_msg']))
+            elif value > thresholds['max']:
+                tips.append(messages['npk_high'].format(nutrient=nutrient, value=value, message=thresholds['high_msg']))
+
+    # Specific crop advice
+    if 'soil_moisture' in latest and not pd.isna(latest.get('soil_moisture')):
+        sm = latest['soil_moisture']
+        if ct == 'wheat':
+            if sm < 35: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['wheat_sm_low']))
+        elif ct == 'rice':
+            if sm < 60: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['rice_sm_low']))
+        elif ct == 'maize':
+            if sm < 40: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['maize_sm_low']))
+        elif ct == 'banana':
+            if sm < 50: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['banana_sm_low']))
+        elif ct == 'mango':
+            if sm > 60: tips.append(messages['soil_moisture_high'].format(sm=sm, message=messages['mango_sm_high']))
+        elif ct == 'grapes':
+            if sm > 50: tips.append(messages['soil_moisture_high'].format(sm=sm, message=messages['grapes_sm_high']))
+        elif ct == 'cotton':
+            if sm < 30: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['cotton_sm_low']))
+        elif ct == 'millet' or ct == 'sorghum':
+            if sm < 25: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['millet_sorghum_sm_low']))
+        elif ct == 'jute':
+            if sm < 50: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['jute_sm_low']))
+        elif ct == 'pomegranate':
+            if sm > 50: tips.append(messages['soil_moisture_high'].format(sm=sm, message=messages['pomegranate_sm_high']))
+        elif ct == 'muskmelon' or ct == 'watermelon':
+            if sm < 30: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['melon_sm_low']))
+        elif ct == 'coconut':
+            if sm < 50: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['coconut_sm_low']))
+        elif ct == 'mothbeans':
+            if sm < 25: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['mothbeans_sm_low']))
+        elif ct == 'mungbean':
+            if sm < 30: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['mungbean_sm_low']))
+        elif ct == 'blackgram':
+            if sm < 35: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['blackgram_sm_low']))
+        elif ct == 'lentil':
+            if sm < 25: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['lentil_sm_low']))
+        # General advice if not crop-specific
+        if sm < 30: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['general_sm_low']))
+        elif sm > 70: tips.append(messages['soil_moisture_high'].format(sm=sm, message=messages['general_sm_high']))
+
+    if 'temperature' in latest and not pd.isna(latest.get('temperature')):
+        temp = latest['temperature']
+        if ct == 'wheat':
+            if temp > 32: tips.append(messages['temp_high'].format(temp=temp, message=messages['wheat_temp_high']))
+        elif ct == 'rice':
+            if temp > 38: tips.append(messages['temp_high'].format(temp=temp, message=messages['rice_temp_high']))
+        elif ct == 'maize':
+            if temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['maize_temp_low']))
+        elif ct == 'banana':
+            if temp < 15: tips.append(messages['temp_low'].format(temp=temp, message=messages['banana_temp_low']))
+        elif ct == 'mango':
+            if temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['mango_temp_low']))
+        elif ct == 'cotton':
+            if temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['cotton_temp_low']))
+        elif ct == 'millet' or ct == 'sorghum':
+            if temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['millet_sorghum_temp_low']))
+        elif ct == 'coffee':
+            if temp < 18: tips.append(messages['temp_low'].format(temp=temp, message=messages['coffee_temp_low']))
+        elif ct == 'jute':
+            if temp < 25: tips.append(messages['temp_low'].format(temp=temp, message=messages['jute_temp_low']))
+        elif ct == 'papaya':
+            if temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['papaya_temp_low']))
+        elif ct == 'pomegranate':
+            if temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['pomegranate_temp_low']))
+        elif ct == 'muskmelon' or ct == 'watermelon':
+            if temp < 25: tips.append(messages['temp_low'].format(temp=temp, message=messages['melon_temp_low']))
+        elif ct == 'coconut':
+            if temp < 25: tips.append(messages['temp_low'].format(temp=temp, message=messages['coconut_temp_low']))
+        elif ct == 'mothbeans':
+            if temp < 22: tips.append(messages['temp_low'].format(temp=temp, message=messages['mothbeans_temp_low']))
+        elif ct == 'mungbean':
+            if temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['mungbean_temp_low']))
+        elif ct == 'blackgram':
+            if temp < 18: tips.append(messages['temp_low'].format(temp=temp, message=messages['blackgram_temp_low']))
+        elif ct == 'lentil':
+            if temp < 15: tips.append(messages['temp_low'].format(temp=temp, message=messages['lentil_temp_low']))
+        # General advice
+        if temp < 18: tips.append(messages['temp_low'].format(temp=temp, message=messages['general_temp_low']))
+        elif temp > 35: tips.append(messages['temp_high'].format(temp=temp, message=messages['general_temp_high']))
+
+    if 'humidity' in latest and not pd.isna(latest.get('humidity')):
+        hum = latest['humidity']
+        if ct == 'wheat':
+            if hum > 70: tips.append(messages['humidity_high'].format(hum=hum, message=messages['wheat_hum_high']))
+        elif ct == 'rice':
+            if hum < 60: tips.append(messages['humidity_low'].format(hum=hum, message=messages['rice_hum_low']))
+        elif ct == 'banana':
+            if hum < 60: tips.append(messages['humidity_low'].format(hum=hum, message=messages['banana_hum_low']))
+        elif ct == 'grapes':
+            if hum > 70: tips.append(messages['humidity_high'].format(hum=hum, message=messages['grapes_hum_high']))
+        elif ct == 'coffee':
+            if hum < 60: tips.append(messages['humidity_low'].format(hum=hum, message=messages['coffee_hum_low']))
+        elif ct == 'orange':
+            if hum > 70: tips.append(messages['humidity_high'].format(hum=hum, message=messages['orange_hum_high']))
+        # General advice
+        if hum < 40: tips.append(messages['humidity_low'].format(hum=hum, message=messages['general_hum_low']))
+        elif hum > 80: tips.append(messages['humidity_high'].format(hum=hum, message=messages['general_hum_high']))
+
+    # Note: Using 'ph' from fetched data after consistency handling
+    if 'ph' in latest and not pd.isna(latest.get('ph')):
+        ph_val = latest['ph']
+        if ct == 'wheat':
+            if ph_val < 6.0: tips.append(messages['ph_low'].format(ph_val=ph_val, message=messages['wheat_ph_low']))
+        elif ct == 'rice':
+            if ph_val < 5.5 or ph_val > 6.5: tips.append(messages['ph_off'].format(ph_val=ph_val, message=messages['rice_ph_off']))
+        elif ct == 'maize':
+            if ph_val < 5.8 or ph_val > 7: tips.append(messages['ph_off'].format(ph_val=ph_val, message=messages['maize_ph_off']))
+        elif ct == 'papaya':
+            if ph_val < 6: tips.append(messages['ph_low'].format(ph_val=ph_val, message=messages['papaya_ph_low']))
+        elif ct == 'orange':
+            if ph_val < 6 or ph_val > 7.5: tips.append(messages['ph_off'].format(ph_val=ph_val, message=messages['orange_ph_off']))
+        # General advice
+        if ph_val < 5.5: tips.append(messages['ph_low'].format(ph_val=ph_val, message=messages['general_ph_very_low']))
+        elif ph_val > 7.5: tips.append(messages['ph_high'].format(ph_val=ph_val, message=messages['general_ph_very_high']))
+        elif not (5.5 <= ph_val <= 7.5): tips.append(messages['ph_off'].format(ph_val=ph_val, message=messages['general_ph_off']))
+
+    if 'light_intensity' in latest and not pd.isna(latest.get('light_intensity')):
+        light = latest['light_intensity']
+        if ct == 'wheat':
+            if light < 400: tips.append(messages['light_low'].format(light=light, message=messages['wheat_light_low']))
+        elif ct == 'rice':
+            if light < 500: tips.append(messages['light_low'].format(light=light, message=messages['rice_light_low']))
+        # General advice
+        if light < 300: tips.append(messages['light_low'].format(light=light, message=messages['general_light_low']))
+        elif light > 800: tips.append(messages['light_high'].format(light=light, message=messages['general_light_high']))
+            
+    if 'rainfall' in latest and not pd.isna(latest.get('rainfall')):
+        rain = latest['rainfall']
+        if rain < 50: 
+            tips.append(messages['rainfall_low_msg'].format(rain=rain, message=messages['rainfall_low_msg']))
+        elif rain > 200: 
+            tips.append(messages['rainfall_high_msg'].format(rain=rain, message=messages['rainfall_high_msg']))
+        
+    return tips if tips else [messages['all_good']]
+
+# --- Voice Alert Function (Updated for Streamlit Cloud + Local) ---
+def speak_tip(tip_text, lang='en'):
+    try:
+        with st.spinner(f"Generating voice alert in {lang.upper()}..."):
+            tts = gTTS(text=tip_text, lang=lang)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+                file_path = f.name
+                tts.save(file_path)
+            
+            if PLAYSOUND_AVAILABLE:
+                try:
+                    playsound.playsound(file_path)
+                except Exception as e:
+                    st.error(f"Error playing voice alert with playsound: {e}. Attempting in-browser playback.")
+                    # Fallback to in-browser playback if playsound fails
+                    audio_file = open(file_path, "rb")
+                    audio_bytes = audio_file.read()
+                    st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+            else:
+                audio_file = open(file_path, "rb")
+                audio_bytes = audio_file.read()
+                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+    except Exception as e:
+        st.error(f"Error generating or playing voice alert: {e}")
+        st.info("This might be due to missing audio backend (e.g., `ffplay` on Linux) or `playsound` limitations on web servers.")
+    finally:
+        if 'file_path' in locals() and os.path.exists(file_path):
+            os.remove(file_path) # Clean up the temporary file
+
+# --- Seed Recommender Function ---
+# Adding multilingual support for seed recommendations
+SEED_RECOMMENDATIONS_MESSAGES = {
+    'en': {
+        'intro': "Based on current conditions, you might consider: ",
+        'outro': ". Please consult local agricultural experts for precise recommendations.",
+        'acid_tolerant': "acid-tolerant crops like blueberries, potatoes, or specific rice varieties",
+        'alkaline_tolerant': "alkaline-tolerant crops such as asparagus, spinach, or specific varieties of alfalfa",
+        'neutral_ph': "a wide range of crops thrive in neutral to slightly acidic pH (5.5-7.5), including wheat, maize, and most vegetables",
+        'heat_tolerant': "heat-tolerant crops like millet, sorghum, cotton, or some varieties of beans",
+        'cold_hardy': "cold-hardy crops such as wheat (winter varieties), barley, oats, or peas",
+        'warm_season': "warm-season crops like maize, rice (tropical), most vegetables, and fruits",
+        'drought_resistant': "drought-resistant crops like millet, sorghum, chickpeas, or certain types of beans (e.g., mothbeans)",
+        'water_loving': "water-loving crops such as rice, sugarcane, jute, or crops that tolerate temporary waterlogging",
+        'moderate_rainfall': "crops suitable for moderate rainfall, including wheat, maize, and many vegetables",
+        'very_dry': "very drought-tolerant crops (e.g., desert-adapted melons or some herbs)",
+        'very_wet': "semi-aquatic crops or those highly tolerant to waterlogging (e.g., taro, some rice varieties if poorly drained)",
+        'no_specific': "No specific recommendations, as current conditions are unusual or general."
+    },
+    'hi': {
+        'intro': "वर्तमान परिस्थितियों के आधार पर, आप विचार कर सकते हैं: ",
+        'outro': ". सटीक सिफारिशों के लिए कृपया स्थानीय कृषि विशेषज्ञों से सलाह लें।",
+        'acid_tolerant': "अम्ल-सहिष्णु फसलें जैसे ब्लूबेरी, आलू, या चावल की विशिष्ट किस्में",
+        'alkaline_tolerant': "क्षार-सहिष्णु फसलें जैसे शतावरी, पालक, या अल्फाल्फा की विशिष्ट किस्में",
+        'neutral_ph': "गेहूं, मक्का, और अधिकांश सब्जियों सहित तटस्थ से थोड़े अम्लीय पीएच (5.5-7.5) में फसलों की एक विस्तृत श्रृंखला पनपती है",
+        'heat_tolerant': "गर्मी-सहिष्णु फसलें जैसे बाजरा, ज्वार, कपास, या कुछ प्रकार की फलियां",
+        'cold_hardy': "ठंड-सहिष्णु फसलें जैसे गेहूं (शीतकालीन किस्में), जौ, जई, या मटर",
+        'warm_season': "गर्मियों की फसलें जैसे मक्का, चावल (उष्णकटिबंधीय), अधिकांश सब्जियां, और फल",
+        'drought_resistant': "सूखे प्रतिरोधी फसलें जैसे बाजरा, ज्वार, चना, या कुछ प्रकार की फलियां (जैसे मोठबीन)",
+        'water_loving': "पानी पसंद करने वाली फसलें जैसे चावल, गन्ना, जूट, या वे फसलें जो अस्थायी जलभराव को सहन करती हैं",
+        'moderate_rainfall': "मध्यम वर्षा के लिए उपयुक्त फसलें, जिनमें गेहूं, मक्का, और कई सब्जियां शामिल हैं",
+        'very_dry': "बहुत सूखा-सहिष्णु फसलें (जैसे रेगिस्तान-अनुकूलित तरबूज या कुछ जड़ी-बूटियाँ)",
+        'very_wet': "अर्ध-जलीय फसलें या वे जो जलभराव के प्रति अत्यधिक सहिष्णु हैं (जैसे तारो, चावल की कुछ किस्में यदि खराब जल निकासी हो)",
+        'no_specific': "कोई विशिष्ट सिफारिश नहीं, क्योंकि वर्तमान परिस्थितियाँ असामान्य या सामान्य हैं।"
+    }
+}
+
+def recommend_seeds(ph, temperature, rainfall, soil_moisture=None, lang='en'):
+    """
+    Suggests suitable crops based on environmental conditions.
+    Args:
+        ph (float): Current pH value of the soil.
+        temperature (float): Current temperature in Celsius.
+        rainfall (float): Recent rainfall in mm.
+        soil_moisture (float, optional): Current soil moisture percentage.
+        If available, provides more specific advice.
+        lang (str): Language for recommendations ('en' for English, 'hi' for Hindi).
+    Returns:
+        str: Recommended crops or general advice.
+    """
+    messages = SEED_RECOMMENDATIONS_MESSAGES.get(lang, SEED_RECOMMENDATIONS_MESSAGES['en'])
+    recommendations = []
+
+    # pH based recommendations
+    if ph < 5.5:
+        recommendations.append(messages['acid_tolerant'])
+    elif ph > 7.5:
+        recommendations.append(messages['alkaline_tolerant'])
+    else:
+        recommendations.append(messages['neutral_ph'])
+
+    # Temperature based recommendations
+    if temperature > 35:
+        recommendations.append(messages['heat_tolerant'])
+    elif temperature < 15:
+        recommendations.append(messages['cold_hardy'])
+    else:
+        recommendations.append(messages['warm_season'])
+
+    # Rainfall based recommendations
+    if rainfall < 50: # Low rainfall
+        recommendations.append(messages['drought_resistant'])
+    elif rainfall > 200: # High rainfall, potentially waterlogging
+        recommendations.append(messages['water_loving'])
+    else:
+        recommendations.append(messages['moderate_rainfall'])
+
+    # Soil Moisture based recommendations (more granular if available)
+    if soil_moisture is not None:
+        if soil_moisture < 30: # Very dry
+            recommendations.append(messages['very_dry'])
+        elif soil_moisture > 80: # Very wet, prone to waterlogging
+            recommendations.append(messages['very_wet'])
+
+    if not recommendations:
+        return messages['no_specific']
+    
+    return messages['intro'] + ", ".join(recommendations) + messages['outro']
+
+
+# --- Streamlit UI ---
+st.set_page_config(layout="wide", page_title="Smart AgriTech Dashboard", page_icon="🌿")
+
+st.title("🌿 Smart AgriTech Dashboard")
+
+# Refresh button and language selector in a row
+col_refresh, col_lang = st.columns([0.15, 0.85])
+with col_refresh:
+    if st.button("🔄 Refresh Data"):
+        st.cache_data.clear() # Clear cache to fetch fresh data
+        st.rerun()
+with col_lang:
+    voice_lang = st.selectbox("Choose Alert Language", ["en", "hi"], index=0, help="English (en) or Hindi (hi)")
+
+# --- Load and Display Sensor Data ---
+df = fetch_sensor_data()
+
+if df.empty:
+    st.warning("No data available from Firebase. Please ensure your sensor sends data or check Firebase connection.")
+else:
+    # Get latest sensor data for gauges and current readings
+    latest_data = df.iloc[-1].to_dict()
+
+    st.markdown("---")
+    st.subheader("📊 Current Sensor Readings")
+    # Display key metrics using gauge charts
+    gauge_cols = st.columns(4)
+
+    # Helper to create a gauge chart
+    def create_gauge(title, value, max_value, suffix, color='green', threshold=None):
+        fig = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=value,
+            title={'text': title},
+            gauge={
+                'axis': {'range': [None, max_value], 'tickwidth': 1, 'tickcolor': "darkblue"},
+                'bar': {'color': color},
+                'bgcolor': "white",
+                'borderwidth': 2,
+                'bordercolor': "gray",
+                'steps': [
+                    {'range': [0, max_value * 0.3], 'color': "lightgray"},
+                    {'range': [max_value * 0.3, max_value * 0.7], 'color': "gray"},
+                    {'range': [max_value * 0.7, max_value], 'color': "darkgray"}
+                ],
+                'threshold': {
+                    'line': {'color': "red", 'width': 4},
+                    'thickness': 0.75,
+                    'value': threshold if threshold is not None else value # If no threshold, just show current value
+                }
+            }
+        ))
+        fig.update_layout(height=250, margin=dict(l=10, r=10, t=50, b=10), font={'color': "darkblue", 'family': "Arial"})
+        return fig
+
+    # Soil Moisture Gauge
+    soil_moisture_val = latest_data.get('soil_moisture')
+    if soil_moisture_val is not None and not pd.isna(soil_moisture_val):
+        with gauge_cols[0]:
+            st.plotly_chart(create_gauge("Soil Moisture (%)", soil_moisture_val, 100, "%", 'rgba(0,128,0,0.8)'), use_container_width=True)
+    else:
+        with gauge_cols[0]: st.info("Soil Moisture N/A")
+
+    # Temperature Gauge
+    temp_val = latest_data.get('temperature')
+    if temp_val is not None and not pd.isna(temp_val):
+        with gauge_cols[1]:
+            st.plotly_chart(create_gauge("Temperature (°C)", temp_val, 40, "°C", 'rgba(255,165,0,0.8)'), use_container_width=True)
+    else:
+        with gauge_cols[1]: st.info("Temperature N/A")
+
+    # pH Gauge
+    ph_val = latest_data.get('ph') # Use 'ph' after processing
+    if ph_val is not None and not pd.isna(ph_val):
+        with gauge_cols[2]:
+            st.plotly_chart(create_gauge("pH", ph_val, 14, "", 'rgba(0,0,255,0.8)'), use_container_width=True)
+    else:
+        with gauge_cols[2]: st.info("pH N/A")
+
+    # Humidity Gauge
+    humidity_val = latest_data.get('humidity')
+    if humidity_val is not None and not pd.isna(humidity_val):
+        with gauge_cols[3]:
+            st.plotly_chart(create_gauge("Humidity (%)", humidity_val, 100, "%", 'rgba(128,0,128,0.8)'), use_container_width=True)
+    else:
+        with gauge_cols[3]: st.info("Humidity N/A")
+
+    st.markdown("---")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("📈 Sensor Trends Over Time")
+        # Ensure 'ph' is used for plotting if it was consistently mapped from 'pH'
+        plot_features = ['soil_moisture', 'temperature', 'humidity', 'ph', 'light_intensity', 'N', 'P', 'K', 'rainfall', 'growth_factor'] # Removed 'growth_trigger' as per trainer
+        existing_plot_features = [f for f in plot_features if f in df.columns]
+        
+        plot_df_melted = df.dropna(subset=existing_plot_features + ['timestamp']).melt(
+            id_vars=['timestamp'], 
+            value_vars=existing_plot_features,
+            var_name='Sensor Metric',
+            value_name='Reading'
+        )
+
+        if not plot_df_melted.empty and len(existing_plot_features) > 0:
+            try:
+                fig = px.line(
+                    plot_df_melted,
+                    x='timestamp',
+                    y='Reading',
+                    color='Sensor Metric', 
+                    labels={'Reading': 'Sensor Reading', 'timestamp': 'Time'},
+                    title="Historical Sensor Readings",
+                    template="plotly_dark" # Professional theme
+                )
+                fig.update_layout(
+                    hovermode="x unified",
+                    xaxis_title="Time",
+                    yaxis_title="Sensor Reading",
+                    legend_title="Metric",
+                    font=dict(family="Inter", size=12, color="#ffffff"), # Consistent font
+                    margin=dict(l=40, r=40, t=60, b=40) # Adjust margins
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                st.error(f"Error plotting sensor trends: {e}")
+                st.warning("⚠️ Could not plot all sensor trends. Check data types or missing values, or if the data is too sparse.")
+        else:
+            st.warning("⚠️ Not enough complete data available for plotting sensor trends. Check if sensors are reporting data for these features.")
+
+    with col2:
+        st.subheader("🌿 Crop Care Recommendations")
+        selected_crop_type = st.selectbox("Select Growing Crop", all_crop_labels if all_crop_labels else ["No crops found"], key="crop_select")
+        
+        if df is not None and not df.empty and selected_crop_type:
+            care_tips = crop_care_advice(df, selected_crop_type, lang=voice_lang) # Pass selected language
+            st.markdown("---")
+            for tip in care_tips:
+                st.write(tip)
+            
+            if st.button(f"🔊 Play Top Alerts ({'Hindi' if voice_lang=='hi' else 'English'})"):
+                if care_tips:
+                    for i, tip in enumerate(care_tips[:2]): # Play up to 2 alerts
+                        # Remove markdown for better speech, and also remove emojis
+                        clean_tip = tip.replace('**', '').replace('🌱', '').replace('💧', '').replace('🌡️', '').replace('💨', '').replace('🧪', '').replace('☀️', '').replace('🌧️', '').replace('✅', '').strip()
+                        if clean_tip: # Only play if there's actual text after cleaning
+                            st.info(f"Playing alert {i+1}: {clean_tip}")
+                            speak_tip(clean_tip, lang=voice_lang)
+                else:
+                    st.info("No specific alerts to play.")
+
+        elif not selected_crop_type:
+            st.info("Please select a crop to get recommendations.")
+        else:
+            st.info("No sensor data available for crop care recommendations.")
+
+        st.subheader("🤖 AI-Based Growth Prediction")
+        soil_moisture_pred, light_intensity_pred, nutrient_sum_pred = None, None, None
+        if df is not None and not df.empty and selected_crop_type and model is not None and input_scaler is not None and output_scaler is not None and crop_encoder is not None:
+            soil_moisture_pred, light_intensity_pred, nutrient_sum_pred = predict_growth(df, selected_crop_type)
+            if soil_moisture_pred is not None:
+                if 0 <= soil_moisture_pred <= 100:
+                    st.success(f"📊 Predicted Soil Moisture: **{soil_moisture_pred:.2f}%**")
+                else:
+                    st.warning(f"📊 Predicted Soil Moisture: **{soil_moisture_pred:.2f}%**. This value seems unusual (Expected between 0-100%).")
+                st.info(f"💡 Predicted Light Intensity: **{light_intensity_pred:.2f} lux**")
+                st.info(f"🌿 Predicted NPK Nutrient Sum: **{nutrient_sum_pred:.2f}**")
+            else:
+                st.info("Not enough data or issue with model prediction. Check logs above for details.")
+        else:
+            st.info("Select a crop, ensure sensor data is available, and all AI components are loaded for prediction.")
+
+        st.subheader("📉 Market Price Forecast")
+        if df is not None and not df.empty and selected_crop_type and market_price_model is not None and market_crop_encoder is not None:
+            latest_sensor_data_for_price = df.iloc[-1].to_dict()
+            predicted_price = predict_market_price(latest_sensor_data_for_price, selected_crop_type, market_price_model, market_crop_encoder, market_price_features)
+            if predicted_price is not None:
+                st.success(f"💰 Estimated Market Price for {selected_crop_type}: **₹ {predicted_price:.2f} / unit**")
+            else:
+                st.info("Cannot forecast market price. Ensure all required sensor data is available and market model is trained.")
+        else:
+            st.info("Select a crop, ensure sensor data is available, and market model is trained for market price forecast.")
+
+
+        st.subheader("🌾 Crop Suggestion Based on Predicted Conditions")
+        if soil_moisture_pred is not None and not pd.isna(soil_moisture_pred) and 0 <= soil_moisture_pred <= 100:
+            latest_sensor_data_for_suggestion = df.iloc[-1].to_dict()
+            # Ensure 'ph' is used from the processed data for the recommender
+            current_ph = latest_sensor_data_for_suggestion.get('ph') 
+            current_temp = latest_sensor_data_for_suggestion.get('temperature')
+            current_rainfall = latest_sensor_data_for_suggestion.get('rainfall')
+
+            if all(v is not None and not pd.isna(v) for v in [current_ph, current_temp, current_rainfall]):
+                seed_recommendation = recommend_seeds(current_ph, current_temp, current_rainfall, soil_moisture_pred, lang=voice_lang) # Pass selected language
+                st.write(seed_recommendation)
+            else:
+                st.info("Missing essential current sensor data (pH, temperature, rainfall) for crop suggestions.")
+        else:
+            st.info("Predicted soil moisture is out of typical range or not available, hindering specific crop suggestions.")
+
+    # --- Real-Time Plant Monitoring (Simulated) ---
+    st.subheader("🌿 Real-Time Plant Monitoring (Simulated)")
+    try:
+        with open("simulated_growth_data.json") as f:
+            simulated_data = json.load(f)
+            st.write(f"🕒 Timestamp: {simulated_data['timestamp']}")
+            st.success(f"📈 Growth Stage: {simulated_data['stage']}")
+            st.warning(f"⚠️ Advisory: {simulated_data['alert']}")
+    except FileNotFoundError:
+        st.error("❌ No simulation data found. Run `dummy_camera_simulator.py` to start simulation.")
+
+    st.markdown("---")
+    st.subheader("📋 Latest Sensor Readings (Raw Data)")
+    if not df.empty:
+        st.dataframe(df.tail(10))
+    else:
+        st.info("No sensor data to display.")
+    # Auto-refresh every 10 seconds
+    st_autorefresh(interval=10 * 1000, key="growth_sim_refresh")
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+import pandas as pd
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Input, LSTM, Dropout, Dense
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
+import matplotlib.pyplot as plt
+import os
+import joblib
+
+# Ensure reproducible results (optional)
+tf.random.set_seed(42)
+np.random.seed(42)
+
+# --- Configuration ---
+DATA_FILE = "cleaned_sensor_data.csv"
+MODEL_SAVE_PATH = "tdann_pnsm_model.keras"
+INPUT_SCALER_SAVE_PATH = "tdann_input_scaler.joblib"
+OUTPUT_SCALER_SAVE_PATH = "tdann_output_scaler.joblib"
+CROP_ENCODER_SAVE_PATH = "tdann_crop_encoder.joblib"
+LOOKBACK_WINDOW = 5
+EPOCHS = 50
+BATCH_SIZE = 32
+VALIDATION_SPLIT = 0.2
+
+# --- Load Your Full Crop Dataset ---
+try:
+    df = pd.read_csv(DATA_FILE)
+    print(f"Data loaded from {DATA_FILE}")
+except FileNotFoundError:
+    print(f"Error: {DATA_FILE} not found. Please ensure the CSV file is in the same directory.")
+    exit()
+except Exception as e:
+    print(f"Error loading data: {e}")
+    exit()
+
+# --- Preprocessing ---
+
+# Ensure 'timestamp' index
+if 'timestamp' not in df.columns:
+    print("'timestamp' column not found. Generating synthetic timestamps.")
+    df['timestamp'] = pd.date_range(start='2024-01-01', periods=len(df), freq='h')
+df.set_index('timestamp', inplace=True)
+
+# Ensure 'label' column exists for crop awareness
+if 'label' not in df.columns:
+    print("Error: 'label' (crop type) column not found. Cannot perform crop-aware training.")
+    print("Please ensure your CSV has a 'label' column indicating crop types.")
+    exit()
+
+# Convert label to lowercase and strip whitespace
+df['label'] = df['label'].str.lower().str.strip()
+
+# One-Hot Encode Crop Labels using sklearn's OneHotEncoder
+crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+# Fit the encoder on the unique crop labels present in the training data
+crop_encoder.fit(df[['label']])
+joblib.dump(crop_encoder, CROP_ENCODER_SAVE_PATH) # Save the fitted encoder
+print(f"Crop encoder saved to {CROP_ENCODER_SAVE_PATH}")
+
+# Transform the 'label' column into one-hot encoded features
+crop_encoded_data = crop_encoder.transform(df[['label']])
+# Create a DataFrame from the encoded data with meaningful column names
+crop_dummies = pd.DataFrame(crop_encoded_data, columns=crop_encoder.get_feature_names_out(['label']), index=df.index)
+df = pd.concat([df, crop_dummies], axis=1)
+print(f"Generated {len(crop_dummies.columns)} crop dummy variables using OneHotEncoder.")
+
+
+# --- Define Features and Targets ---
+
+# Input Features for the TDANN model (these must match the dashboard's `predict_growth` inputs)
+base_sensor_features = ['N', 'P', 'K', 'temperature', 'humidity', 'ph', 'rainfall']
+additional_features = []
+if 'growth_factor' in df.columns:
+    additional_features.append('growth_factor')
+# if 'growth_trigger' in df.columns: # Commented out to align with 30 features currently from Firebase
+#     additional_features.append('growth_trigger')
+
+# Use the column names generated by the OneHotEncoder
+final_input_features = base_sensor_features + additional_features + crop_encoder.get_feature_names_out(['label']).tolist()
+
+
+# Target Features for Multi-task output
+target_columns = ['soil_moisture', 'light_intensity']
+if 'N' in df.columns and 'P' in df.columns and 'K' in df.columns:
+    df['npk_sum'] = df['N'] + df['P'] + df['K']
+    target_columns.append('npk_sum')
+else:
+    print("N, P, or K columns missing. NPK sum target will not be used.")
+
+# Ensure all selected features and targets exist in the DataFrame
+missing_inputs = [f for f in final_input_features if f not in df.columns]
+missing_targets = [t for t in target_columns if t not in df.columns]
+
+if missing_inputs:
+    print(f"Missing input features in CSV: {missing_inputs}. Please check your data.")
+    exit()
+if missing_targets:
+    print(f"Missing target features in CSV: {missing_targets}. Please check your data.")
+    exit()
+
+print(f"Input features: {final_input_features}")
+print(f"Target features: {target_columns}")
+
+# Drop rows with any NaN values in the selected features or targets
+df_cleaned = df[final_input_features + target_columns].dropna()
+print(f"Original rows: {len(df)}. Rows after dropping NaNs: {len(df_cleaned)}")
+
+if df_cleaned.empty:
+    print("No clean data available after dropping NaNs for training. Exiting.")
+    exit()
+
+# --- Scaling ---
+# Input Scaler
+input_scaler = MinMaxScaler()
+data_scaled_inputs = input_scaler.fit_transform(df_cleaned[final_input_features])
+joblib.dump(input_scaler, INPUT_SCALER_SAVE_PATH)
+print(f"Input scaler saved to {INPUT_SCALER_SAVE_PATH}")
+
+# Output Scaler (separate scaler for targets is crucial for multi-output inverse transform)
+output_scaler = MinMaxScaler()
+data_scaled_targets = output_scaler.fit_transform(df_cleaned[target_columns])
+joblib.dump(output_scaler, OUTPUT_SCALER_SAVE_PATH)
+print(f"Output scaler saved to {OUTPUT_SCALER_SAVE_PATH}")
+
+
+# --- Sequence Generation for Multi-Output ---
+def create_sequences_multi_output(inputs, targets, lookback=5):
+    X, y = [], []
+    for i in range(lookback, len(inputs)):
+        X.append(inputs[i-lookback:i])
+        y.append(targets[i])
+    return np.array(X), np.array(y)
+
+X, y = create_sequences_multi_output(data_scaled_inputs, data_scaled_targets, LOOKBACK_WINDOW)
+
+print(f"Generated sequences: X.shape={X.shape}, y.shape={y.shape}")
+
+if X.shape[0] == 0:
+    print(f"Not enough data to create sequences with lookback window {LOOKBACK_WINDOW}. Need more than {LOOKBACK_WINDOW} rows.")
+    exit()
+
+# --- Build TDANN (LSTM-based) Model with Multi-Output ---
+model = Sequential()
+model.add(Input(shape=(X.shape[1], X.shape[2])))
+model.add(LSTM(128, return_sequences=True, activation='relu'))
+model.add(Dropout(0.3))
+model.add(LSTM(64, activation='relu'))
+model.add(Dropout(0.3))
+model.add(Dense(len(target_columns), activation='linear'))
+model.compile(optimizer='adam', loss='mse')
+model.summary()
+
+# --- Train ---
+print(f"\n--- Training Model for {EPOCHS} Epochs ---")
+history = model.fit(X, y, epochs=EPOCHS, batch_size=BATCH_SIZE, validation_split=VALIDATION_SPLIT, verbose=1)
+
+# --- Save Model ---
+model.save(MODEL_SAVE_PATH)
+print(f"New multi-output model trained and saved as {MODEL_SAVE_PATH}")
+
+# --- Optional: Plot Loss ---
+plt.figure(figsize=(10, 6))
+plt.plot(history.history['loss'], label='Train Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+plt.title("TDANN Training Loss (Multi-Output)")
+plt.xlabel("Epoch")
+plt.ylabel("Mean Squared Error")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+# ==============================================================================
+# 🌾 New Component Suggestion: Seed Recommender (Already in your dashboard, just for completeness)
+# This part is a standalone function that can be integrated into your Streamlit dashboard.
+# It doesn't require retraining the TDANN model itself.
+# ==============================================================================
+
+def recommend_seeds(ph, temperature, rainfall, soil_moisture=None):
+    """
+    Suggests suitable crops based on environmental conditions.
+    Args:
+        ph (float): Current pH value of the soil.
+        temperature (float): Current temperature in Celsius.
+        rainfall (float): Recent rainfall in mm.
+        soil_moisture (float, optional): Current soil moisture percentage.
+                                        If available, provides more specific advice.
+    Returns:
+        str: Recommended crops or general advice.
+    """
+    recommendations = []
+
+    # pH based recommendations
+    if ph < 5.5:
+        recommendations.append("acid-tolerant crops like blueberries, potatoes, or specific rice varieties")
+    elif ph > 7.5:
+        recommendations.append("alkaline-tolerant crops such as asparagus, spinach, or specific varieties of alfalfa")
+    else:
+        recommendations.append("a wide range of crops thrive in neutral to slightly acidic pH (5.5-7.5), including wheat, maize, and most vegetables")
+
+    # Temperature based recommendations
+    if temperature > 35:
+        recommendations.append("heat-tolerant crops like millet, sorghum, cotton, or some varieties of beans")
+    elif temperature < 15:
+        recommendations.append("cold-hardy crops such as wheat (winter varieties), barley, oats, or peas")
+    else:
+        recommendations.append("warm-season crops like maize, rice (tropical), most vegetables, and fruits")
+
+    # Rainfall based recommendations
+    if rainfall < 50: # Low rainfall
+        recommendations.append("drought-resistant crops like millet, sorghum, chickpeas, or certain types of beans (e.g., mothbeans)")
+    elif rainfall > 200: # High rainfall, potentially waterlogging
+        recommendations.append("water-loving crops such as rice, sugarcane, jute, or crops that tolerate temporary waterlogging")
+    else:
+        recommendations.append("crops suitable for moderate rainfall, including wheat, maize, and many vegetables")
+
+    # Soil Moisture based recommendations (more granular if available)
+    if soil_moisture is not None:
+        if soil_moisture < 30: # Very dry
+            recommendations.append("very drought-tolerant crops (e.g., desert-adapted melons or some herbs)")
+        elif soil_moisture > 80: # Very wet, prone to waterlogging
+            recommendations.append("semi-aquatic crops or those highly tolerant to waterlogging (e.g., taro, some rice varieties if poorly drained)")
+
+    # Consolidate advice
+    if not recommendations:
+        return "No specific recommendations, as current conditions are unusual or general."
+    return "Based on your conditions, consider: " + ", ".join(recommendations) + ". Please consult local agricultural experts for precise recommendations."
+
+if __name__ == "__main__":
+    print("\n--- Seed Recommender Test ---")
+    # Simulate some current conditions
+    current_ph = 6.2
+    current_temp = 28.5
+    current_rainfall = 75
+    current_soil_moisture = 55 # Optional
+
+    print(f"Conditions: pH={current_ph}, Temp={current_temp}°C, Rainfall={current_rainfall}mm, Soil Moisture={current_soil_moisture}%")
+    recommended = recommend_seeds(current_ph, current_temp, current_rainfall, current_soil_moisture)
+    print(f"Recommendation: {recommended}")
+
+    current_ph_dry = 5.8
+    current_temp_dry = 32
+    current_rainfall_dry = 20
+    current_soil_moisture_dry = 25
+    print(f"\nConditions: pH={current_ph_dry}, Temp={current_temp_dry}°C, Rainfall={current_rainfall_dry}mm, Soil Moisture={current_soil_moisture_dry}%")
+    recommended_dry = recommend_seeds(current_ph_dry, current_temp_dry, current_rainfall_dry, current_soil_moisture_dry)
+    print(f"Recommendation: {recommended_dry}")
+
+    current_ph_wet = 7.0
+    current_temp_wet = 25
+    current_rainfall_wet = 250
+    current_soil_moisture_wet = 90
+    print(f"\nConditions: pH={current_ph_wet}, Temp={current_temp_wet}°C, Rainfall={current_rainfall_wet}mm, Soil Moisture={current_soil_moisture_wet}%")
+    recommended_wet = recommend_seeds(current_ph_wet, current_temp_wet, current_rainfall_wet, current_soil_moisture_wet)
+    print(f"Recommendation: {recommended_wet}")
+
+-----------------------------------------------------------------------------------------------------------
+
+import firebase_admin
+from firebase_admin import credentials, db
+import datetime
+import random
+import time
+import os
+import base64
+import tempfile # For creating temporary files from environment variables
+
+def run(): # Added the run function
+    # --- Firebase Secure Setup (Render-Compatible) ---
+    firebase_cred_path = None # Initialize to None
+    try:
+        firebase_key_b64 = os.getenv("FIREBASE_KEY_B64")
+        if firebase_key_b64:
+            decoded_json = base64.b64decode(firebase_key_b64).decode('utf-8')
+            with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as f:
+                f.write(decoded_json)
+            firebase_cred_path = f.name
+            cred = credentials.Certificate(firebase_cred_path)
+            print("Firebase credentials loaded from environment variable.")
+        else:
+            # Fallback for local development if environment variable is not set
+            # Ensure 'agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json' is in your project root
+            cred = credentials.Certificate("agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json")
+            print("Firebase credentials loaded from local file.")
+
+        # Prevent double initialization in case this script is run multiple times
+        if not firebase_admin._apps:
+            firebase_admin.initialize_app(cred, {
+                'databaseURL': 'https://agriastrax-website-default-rtdb.firebaseio.com/'
+            })
+        print("Firebase initialized successfully for data inserter.")
+    except Exception as e:
+        print(f"❌ Error initializing Firebase for insert-sample-data: {e}")
+        # In a thread, exiting might abruptly stop the main app, consider logging and returning
+        return # Return from run function if Firebase fails to initialize
+    finally:
+        # Clean up the temporary file if created from environment variable
+        if firebase_key_b64 and firebase_cred_path and os.path.exists(firebase_cred_path):
+            os.remove(firebase_cred_path)
+            print(f"Cleaned up temporary Firebase cred file: {firebase_cred_path}")
+
+    ref = db.reference('sensors/farm1')
+
+    # Define possible crop stages
+    CROP_STAGES = ['seed', 'sprout', 'vegetative', 'flowering', 'mature']
+
+    # Insert 10 past samples
+    print("Inserting 10 enhanced dummy sensor readings with all 12 features (including crop_stage and growth_factor)...")
+    for i in range(10):
+        sample_data = {
+            'timestamp': (datetime.datetime.now() - datetime.timedelta(minutes=(10 - i)*5)).isoformat(),
+            'soil_moisture': round(random.uniform(20, 80), 2),
+            'temperature': round(random.uniform(25, 40), 2),
+            'humidity': round(random.uniform(40, 90), 2),
+            'pH': round(random.uniform(5.5, 7.5), 2), # Corrected to 'pH' for consistency with dashboard
+            'light_intensity': random.randint(300, 800),
+            'N': random.randint(0, 120),
+            'P': random.randint(0, 60),
+            'K': random.randint(0, 200),
+            'rainfall': round(random.uniform(0, 200), 2),
+            'crop_stage': random.choice(CROP_STAGES),
+            'growth_factor': round(random.uniform(0.3, 1.0), 2)  # simulating energy/photosynthesis score
+        }
+        try:
+            ref.push(sample_data)
+        except Exception as e:
+            print(f"❌ Error pushing initial sample data to Firebase: {e}")
+            break # Stop inserting if there's an error
+    print("Successfully inserted 10 enhanced dummy sensor readings.")
+
+    # Simulate live updates every 10s
+    print("\nSimulating live updates. New data will be inserted every 10 seconds. Press Ctrl+C to stop.")
+    while True:
+        current_timestamp = datetime.datetime.now().isoformat()
+        
+        # Introduce some realistic variations
+        current_soil_moisture = round(random.uniform(20, 60), 2)
+        current_temperature = round(random.uniform(28, 35), 2)
+        current_humidity = round(random.uniform(50, 80), 2)
+        current_pH = round(random.uniform(6.0, 7.2), 2)
+        current_light_intensity = random.randint(400, 700)
+        current_N = random.randint(20, 100)
+        current_P = random.randint(10, 50)
+        current_K = random.randint(30, 150)
+        current_rainfall = round(random.uniform(0, 120), 2)
+        
+        # Simulate a progression in crop stage over time (very basic simulation)
+        # You might want a more sophisticated logic here based on actual time or growth_factor
+        # For now, it will pick a random stage, but you could make it sequential.
+        current_crop_stage = random.choice(CROP_STAGES) 
+        
+        # Growth factor could be influenced by light, temperature, moisture
+        # A simple example: higher light, temp, and moisture might lead to higher growth_factor
+        current_growth_factor = round(
+            random.uniform(0.3, 1.0) * (current_light_intensity / 800) * (current_temperature / 40) * (current_soil_moisture / 80), 2
+        )
+        # Clamp growth_factor to [0.3, 1.0] if the above calculation goes outside.
+        current_growth_factor = max(0.3, min(1.0, current_growth_factor))
+
+        try:
+            ref.push({
+                'timestamp': current_timestamp,
+                'soil_moisture': current_soil_moisture,
+                'temperature': current_temperature,
+                'humidity': current_humidity,
+                'pH': current_pH, # Corrected to 'pH' for consistency with dashboard
+                'light_intensity': current_light_intensity,
+                'N': current_N,
+                'P': current_P,
+                'K': current_K,
+                'rainfall': current_rainfall,
+                'crop_stage': current_crop_stage,
+                'growth_factor': current_growth_factor
+            })
+            print(f"Inserted real-time enriched sensor data at {current_timestamp}. Data: {current_crop_stage}, {current_growth_factor}")
+        except Exception as e:
+            print(f"❌ Error pushing real-time data to Firebase: {e}")
+            # If continuous errors occur, you might want a more robust error handling
+            # e.g., exponential backoff, or stop trying to push data for a while.
+        time.sleep(10)
+
+if __name__ == "__main__":
+    run() # Call the run function when the script is executed directly
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+# dummy_camera_simulator.py
+
+import time
+import random
+import json
+from datetime import datetime
+import os
+import base64
+import tempfile
+
+# Import Firebase Admin SDK
+import firebase_admin
+from firebase_admin import credentials, db
+
+# Simulated growth stages
+growth_stages = ["Germination", "Vegetative", "Flowering", "Maturity", "Wilting", "Yellowing"]
+
+# --- Firebase Secure Setup (Render-Compatible) ---
+# This part is adapted from your main dashboard script to make it runnable independently.
+# It tries to get the key from an environment variable first, then from a local file.
+firebase_cred_path = None
+try:
+    firebase_key_b64 = os.getenv("FIREBASE_KEY_B64")
+    if firebase_key_b64:
+        decoded_json = base64.b64decode(firebase_key_b64).decode('utf-8')
+        with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as f:
+            f.write(decoded_json)
+        firebase_cred_path = f.name
+        cred = credentials.Certificate(firebase_cred_path)
+        print("Firebase credentials loaded from environment variable.")
+    else:
+        # Fallback for local development if environment variable is not set
+        cred = credentials.Certificate("agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json")
+        print("Firebase credentials loaded from local file.")
+
+    # Prevent double initialization in case this script is run multiple times or in certain environments
+    if not firebase_admin._apps:
+        firebase_admin.initialize_app(cred, {
+            'databaseURL': 'https://agriastrax-website-default-rtdb.firebaseio.com/'
+        })
+    print("Firebase initialized successfully for camera simulator.")
+except Exception as e:
+    print(f"❌ Error initializing Firebase for dummy_camera_simulator: {e}")
+    # It's crucial to handle this error. If Firebase can't init, the script can't push data.
+    # For a simulator, you might just let it run and log errors, but it won't push data.
+    firebase_admin = None # Mark Firebase as not initialized
+
+finally:
+    # Clean up the temporary file if created from environment variable
+    if firebase_key_b64 and firebase_cred_path and os.path.exists(firebase_cred_path):
+        os.remove(firebase_cred_path)
+        print(f"Cleaned up temporary Firebase cred file: {firebase_cred_path}")
+
+
+def generate_dummy_growth_event():
+    event = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "stage": random.choice(growth_stages),
+        "alert": random.choice([
+            "Healthy Growth",
+            "Low Leaf Color Index",
+            "Possible Disease Detected",
+            "Needs Fertilizer",
+            "Check Irrigation"
+        ])
+    }
+    return event
+
+def run():
+    print("Starting dummy camera feed simulation...")
+
+    if firebase_admin is None:
+        print("Firebase is not initialized. Cannot push data to Firebase. Simulation will run but only print locally.")
+        # Fallback to local file if Firebase fails, or just print
+        local_file_only = True
+        # OUTPUT_FILE = "simulated_growth_data.json" # Re-enable if you want local file fallback
+    else:
+        local_file_only = False
+        try:
+            # Get a database reference to store camera data
+            camera_ref = db.reference('camera_feed/farm1')
+            print("Connected to Firebase path: camera_feed/farm1")
+        except Exception as e:
+            print(f"❌ Error getting Firebase database reference: {e}. Falling back to local file.")
+            local_file_only = True
+
+
+    while True:
+        event = generate_dummy_growth_event()
+        
+        if not local_file_only:
+            try:
+                # Push data to Firebase
+                camera_ref.push(event)
+                print(f"Simulated Data pushed to Firebase: {event}")
+            except Exception as e:
+                print(f"❌ Error pushing data to Firebase: {e}. Falling back to local printing.")
+                # If a persistent Firebase error, just print locally
+                local_file_only = True # Stop trying to push to Firebase
+                print("Simulated Data (local print):", event)
+        else:
+            # If Firebase is not initialized or failed, print locally
+            print("Simulated Data (local print):", event)
+            # You can re-enable writing to a local JSON file here if desired as a fallback:
+            # with open(OUTPUT_FILE, "w") as f:
+            #     json.dump(event, f)
+
+        time.sleep(10)  # Generate every 10 seconds
+
+if __name__ == "__main__":
+    run()
+
+-----------------------------------------------------------------------------------------------------------------------------------------
+
+here are all the files in my project.
