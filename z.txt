@@ -29,14 +29,16 @@ try:
 except ImportError:
     st.warning("`playsound` library not found. Voice alerts will be generated but not played. "
                "Install with `pip install playsound` for local playback. "
-               "For cloud deployment, consider embedding HTML audio.")
+               "For cloud deployment, consider embedding HTML audio.", icon="⚠️")
 except Exception as e:
-    st.warning(f"Error importing playsound: {e}. Voice alerts might not work.")
+    st.warning(f"Error importing playsound: {e}. Voice alerts might not work.", icon="⚠️")
 
 
 # --- Firebase Secure Setup (Render-Compatible) ---
 firebase_key_b64 = os.getenv("FIREBASE_KEY_B64")
 firebase_cred_path = None # Initialize to None
+
+firebase_init_status = []
 
 try:
     if firebase_key_b64:
@@ -55,9 +57,10 @@ try:
         firebase_admin.initialize_app(cred, {
             'databaseURL': 'https://agriastrax-website-default-rtdb.firebaseio.com/'
         })
-    st.success("✅ Firebase initialized successfully.")
+    firebase_init_status.append("✅ Firebase initialized successfully.")
 except Exception as e:
-    st.error(f"❌ Firebase initialization failed: {e}")
+    firebase_init_status.append(f"❌ Firebase initialization failed: {e}")
+    st.error(f"❌ Firebase initialization failed: {e}", icon="❌")
     st.stop() # Stop the app if Firebase fails to initialize
 finally:
     # Clean up the temporary file if created from environment variable
@@ -74,14 +77,16 @@ try:
     # Initialize OneHotEncoder for crop type for consistent encoding
     crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
     crop_encoder.fit(np.array(all_crop_labels).reshape(-1, 1)) # Fit with all known crop labels
-    st.success(f"✅ Crop labels loaded: {len(all_crop_labels)} unique crops found.")
+    firebase_init_status.append(f"✅ Crop labels loaded: {len(all_crop_labels)} unique crops found.")
 except FileNotFoundError:
-    st.error("❌ 'cleaned_sensor_data.csv' not found. Please ensure it's in the same directory.")
+    firebase_init_status.append("❌ 'cleaned_sensor_data.csv' not found. Please ensure it's in the same directory.")
+    st.error("❌ 'cleaned_sensor_data.csv' not found. Please ensure it's in the same directory.", icon="❌")
     all_crop_labels = [] # Initialize as empty to prevent errors later
     # Fallback encoder, might not be fully representative without actual data
     crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False) 
 except Exception as e:
-    st.error(f"❌ Error loading 'cleaned_sensor_data.csv': {e}")
+    firebase_init_status.append(f"❌ Error loading 'cleaned_sensor_data.csv': {e}")
+    st.error(f"❌ Error loading 'cleaned_sensor_data.csv': {e}", icon="❌")
     all_crop_labels = []
     # Fallback encoder
     crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False) 
@@ -90,9 +95,10 @@ except Exception as e:
 model = None
 try:
     model = tf.keras.models.load_model("tdann_pnsm_model.keras")
-    st.success("✅ AI model (tdann_pnsm_model.keras) loaded successfully.")
+    firebase_init_status.append("✅ AI model (tdann_pnsm_model.keras) loaded successfully.")
 except Exception as e:
-    st.error(f"❌ Error loading AI model (tdann_pnsm_model.keras): {e}")
+    firebase_init_status.append(f"❌ Error loading AI model (tdann_pnsm_model.keras): {e}")
+    st.error(f"❌ Error loading AI model (tdann_pnsm_model.keras): {e}", icon="❌")
     st.stop() # Stop the app if the model cannot be loaded
 
 # --- Load Scalers ---
@@ -102,20 +108,24 @@ output_scaler = None
 try:
     input_scaler = joblib.load('tdann_input_scaler.joblib')
     output_scaler = joblib.load('tdann_output_scaler.joblib')
-    st.success("✅ Input and Output scalers loaded successfully.")
+    firebase_init_status.append("✅ Input and Output scalers loaded successfully.")
 except FileNotFoundError:
-    st.error("❌ Scaler files (tdann_input_scaler.joblib, tdann_output_scaler.joblib) not found. "
+    firebase_init_status.append("❌ Scaler files (tdann_input_scaler.joblib, tdann_output_scaler.joblib) not found. "
              "The model predictions might be inaccurate without the correct scalers. "
              "Please ensure they are saved during model training and placed in the same directory.")
+    st.error("❌ Scaler files (tdann_input_scaler.joblib, tdann_output_scaler.joblib) not found. "
+             "The model predictions might be inaccurate without the correct scalers. "
+             "Please ensure they are saved during model training and placed in the same directory.", icon="❌")
     # In a real production environment, you might want to stop the app here or handle robustly.
     input_scaler = MinMaxScaler() # Fallback: Initialize new scalers, but warn the user.
     output_scaler = MinMaxScaler() # Fallback: Initialize new scalers, but warn the user.
-    st.warning("⚠️ Proceeding with newly initialized scalers. Predictions may be inaccurate.")
+    st.warning("⚠️ Proceeding with newly initialized scalers. Predictions may be inaccurate.", icon="⚠️")
 except Exception as e:
-    st.error(f"❌ Error loading scalers: {e}")
+    firebase_init_status.append(f"❌ Error loading scalers: {e}")
+    st.error(f"❌ Error loading scalers: {e}", icon="❌")
     input_scaler = MinMaxScaler() # Fallback
     output_scaler = MinMaxScaler() # Fallback
-    st.warning("⚠️ Proceeding with newly initialized scalers. Predictions may be inaccurate.")
+    st.warning("⚠️ Proceeding with newly initialized scalers. Predictions may be inaccurate.", icon="⚠️")
 
 
 # --- Market Price Predictor Setup ---
@@ -158,7 +168,7 @@ def generate_market_price_data(num_samples=1000):
 @st.cache_data 
 def train_market_price_model():
     if crop_encoder is None:
-        st.error("Cannot train market price model: Crop encoder not initialized.")
+        st.error("Cannot train market price model: Crop encoder not initialized.", icon="❌")
         return None, None, None
 
     df_prices = generate_market_price_data(num_samples=2000)
@@ -182,9 +192,10 @@ def train_market_price_model():
 
 market_price_model, market_crop_encoder, market_price_features = train_market_price_model()
 if market_price_model:
-    st.success("✅ Market price prediction model trained (simulated data).")
+    firebase_init_status.append("✅ Market price prediction model trained (simulated data).")
 else:
-    st.error("❌ Market price prediction model could not be trained.")
+    firebase_init_status.append("❌ Market price prediction model could not be trained.")
+    st.error("❌ Market price prediction model could not be trained.", icon="❌")
 
 
 # --- Fetch Live Sensor Data ---
@@ -204,7 +215,7 @@ def fetch_sensor_data():
             if isinstance(value, dict):
                 data_list.append(value)
             else:
-                st.warning(f"Skipping non-dict entry in Firebase: {key}: {value}")
+                st.warning(f"Skipping non-dict entry in Firebase: {key}: {value}", icon="⚠️")
         df = pd.DataFrame(data_list)
     else: # If snapshot is already a list of dicts or single dict
         df = pd.DataFrame(snapshot)
@@ -235,7 +246,7 @@ def fetch_sensor_data():
     if 'ph' in df.columns and df['ph'].isnull().any():
         # Use a common neutral pH (6.5) as default if NaN
         df['ph'] = df['ph'].fillna(6.5) 
-        st.warning("pH value missing/NaN from Firebase. Imputing with default pH 6.5 for prediction.")
+        # Removed st.warning here to make it less intrusive
     # --- END NEW ---
 
     df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
@@ -250,7 +261,7 @@ def predict_growth(df_latest_data, selected_crop_type):
     Assumes the model was trained with specific input features and multiple outputs.
     """
     if model is None or input_scaler is None or output_scaler is None or crop_encoder is None:
-        st.error("AI model or scalers or encoder not loaded. Cannot predict growth.")
+        st.error("AI model or scalers or encoder not loaded. Cannot predict growth.", icon="❌")
         return None, None, None
     
     LOOKBACK_WINDOW = 5
@@ -270,8 +281,8 @@ def predict_growth(df_latest_data, selected_crop_type):
     
     if len(available_tdann_features) != len(final_tdann_input_features):
         missing = set(final_tdann_input_features) - set(available_tdann_features)
-        st.error(f"Missing expected TDANN input features in sensor data: {missing}. Cannot predict growth.")
-        st.info("Ensure Firebase is sending all required sensor data: N, P, K, temperature, humidity, pH/ph, rainfall, growth_factor.")
+        st.error(f"Missing expected TDANN input features in sensor data: {missing}. Cannot predict growth.", icon="❌")
+        st.info("Ensure Firebase is sending all required sensor data: N, P, K, temperature, humidity, pH/ph, rainfall, growth_factor.", icon="ℹ️")
         return None, None, None
 
     # Try to get enough data for the lookback window.
@@ -286,8 +297,8 @@ def predict_growth(df_latest_data, selected_crop_type):
 
 
     if len(processed_data_for_prediction) < LOOKBACK_WINDOW:
-        st.info(f"Not enough complete data points ({len(processed_data_for_prediction)} < {LOOKBACK_WINDOW}) even after filling NaNs. Need at least {LOOKBACK_WINDOW} consecutive entries with non-NaNs initially.")
-        st.info("Please ensure enough historical sensor data is available in Firebase for the lookback window.")
+        st.info(f"Not enough complete data points ({len(processed_data_for_prediction)} < {LOOKBACK_WINDOW}) even after filling NaNs. Need at least {LOOKBACK_WINDOW} consecutive entries with non-NaNs initially.", icon="ℹ️")
+        st.info("Please ensure enough historical sensor data is available in Firebase for the lookback window.", icon="ℹ️")
         return None, None, None
 
     # Get encoded crop features column names (from the model's crop_encoder)
@@ -337,7 +348,7 @@ def predict_growth(df_latest_data, selected_crop_type):
         
         return soil_moisture_pred, light_intensity_pred, nutrient_sum_pred
     except Exception as e:
-        st.error(f"Error during AI prediction: {e}")
+        st.error(f"Error during AI prediction: {e}", icon="❌")
         st.exception(e) # Display full traceback for debugging
         return None, None, None
 
@@ -347,7 +358,7 @@ def predict_market_price(latest_data, selected_crop_type, market_model, market_c
     Predicts the market price based on latest sensor data and crop type.
     """
     if market_model is None or market_crop_encoder is None:
-        st.error("Market prediction model or encoder not initialized.")
+        st.error("Market prediction model or encoder not initialized.", icon="❌")
         return None
 
     if not latest_data:
@@ -361,7 +372,7 @@ def predict_market_price(latest_data, selected_crop_type, market_model, market_c
         if val is not None and not pd.isna(val):
             input_values[feature] = val
         else:
-            st.warning(f"Missing or NaN feature '{feature}' for market price prediction. Imputing with 0.")
+            st.warning(f"Missing or NaN feature '{feature}' for market price prediction. Imputing with 0.", icon="⚠️")
             input_values[feature] = 0 # Impute with 0 for market price model if missing
     
     input_df_numerical = pd.DataFrame([input_values])
@@ -379,10 +390,39 @@ def predict_market_price(latest_data, selected_crop_type, market_model, market_c
         predicted_price = market_model.predict(X_predict_market)[0]
         return round(predicted_price, 2)
     except Exception as e:
-        st.error(f"Error during market price prediction: {e}")
+        st.error(f"Error during market price prediction: {e}", icon="❌")
         st.exception(e) # Display full traceback for debugging
         return None
 
+
+# --- Voice Alert Function (Updated for Streamlit Cloud + Local) ---
+def speak_tip(tip_text, lang='en'):
+    try:
+        with st.spinner(f"Generating voice alert in {lang.upper()}..."):
+            tts = gTTS(text=tip_text, lang=lang)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+                file_path = f.name
+                tts.save(file_path)
+            
+            if PLAYSOUND_AVAILABLE:
+                try:
+                    playsound.playsound(file_path)
+                except Exception as e:
+                    st.error(f"Error playing voice alert with playsound: {e}. Attempting in-browser playback.", icon="❌")
+                    # Fallback to in-browser playback if playsound fails
+                    audio_file = open(file_path, "rb")
+                    audio_bytes = audio_file.read()
+                    st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+            else:
+                audio_file = open(file_path, "rb")
+                audio_bytes = audio_file.read()
+                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+    except Exception as e:
+        st.error(f"Error generating or playing voice alert: {e}", icon="❌")
+        st.info("This might be due to missing audio backend (e.g., `ffplay` on Linux) or `playsound` limitations on web servers.", icon="ℹ️")
+    finally:
+        if 'file_path' in locals() and os.path.exists(file_path):
+            os.remove(file_path) # Clean up the temporary file
 
 # --- Crop Care Advice Function ---
 # Mapping for advice messages to support multiple languages
@@ -402,8 +442,8 @@ ADVICE_MESSAGES = {
         'ph_off': "🧪 **pH is off ({ph_val:.1f})**: {message}",
         'light_low': "☀️ **Light Intensity is low ({light:.1f} lux)**: {message}",
         'light_high': "☀️ **Light Intensity is high ({light:.1f} lux)**: {message}",
-        'rainfall_low': "🌧️ **Rainfall is low ({rain:.1f} mm)**: {message}",
-        'rainfall_high': "🌧️ **Rainfall is high ({rain:.1f} mm)**: {message}",
+        'rainfall_low_msg': "🌧️ **Rainfall is low ({rain:.1f} mm)**: {message}",
+        'rainfall_high_msg': "🌧️ **Rainfall is high ({rain:.1f} mm)**: {message}",
         'all_good': "✅ All major parameters look good! Keep monitoring regularly for optimal growth.",
         'npk_n_low': "Consider applying nitrogen-rich fertilizer.",
         'npk_n_high': "Excess nitrogen can promote leafy growth over fruit/flower development.",
@@ -467,9 +507,7 @@ ADVICE_MESSAGES = {
         'wheat_light_low': "Ensure the crop gets enough sunlight.",
         'rice_light_low': "Ensure rice gets full sun exposure.",
         'general_light_low': "General advice: Insufficient light can hinder photosynthesis. Consider supplemental lighting or pruning.",
-        'general_light_high': "General advice: Excessive light can cause scorching. Consider shading during peak hours.",
-        'rainfall_low_msg': "Consider supplementary irrigation, especially for water-intensive crops.",
-        'rainfall_high_msg': "Ensure good drainage to prevent waterlogging and root rot."
+        'general_light_high': "General advice: Excessive light can cause scorching. Consider shading during peak hours."
     },
     'hi': {
         'no_data': "सलाह देने के लिए कोई सेंसर डेटा उपलब्ध नहीं है।",
@@ -551,7 +589,285 @@ ADVICE_MESSAGES = {
         'wheat_light_low': "सुनिश्चित करें कि फसल को पर्याप्त धूप मिले।",
         'rice_light_low': "सुनिश्चित करें कि चावल को पूरी धूप मिले।",
         'general_light_low': "सामान्य सलाह: अपर्याप्त प्रकाश प्रकाश संश्लेषण में बाधा डाल सकता है। पूरक प्रकाश या छंटाई पर विचार करें।",
-        'general_light_high': "सामान्य सलाह: अत्यधिक प्रकाश से झुलसना हो सकता है। चरम घंटों के दौरान छाया पर विचार करें।"
+        'general_light_high': "सामान्य सलाह: अत्यधिक प्रकाश से झुलसना हो सकता है। चरम घंटों के दौरान छाया पर विचार करें。"
+    },
+    'es': { # Spanish
+        'no_data': "No hay datos del sensor disponibles para proporcionar asesoramiento.",
+        'npk_low': "🌱 **{nutrient} bajo ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient} alto ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **Humedad del suelo baja ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **Humedad del suelo alta ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **Temperatura baja ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **Temperatura alta ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **Humedad baja ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **Humedad alta ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **pH bajo ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **pH alto ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **pH incorrecto ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **Intensidad de luz baja ({light:.1f} lux)**: {message}",
+        'light_high': "☀️ **Intensidad de luz alta ({light:.1f} lux)**: {message}",
+        'rainfall_low_msg': "🌧️ **Precipitación baja ({rain:.1f} mm)**: {message}",
+        'rainfall_high_msg': "🌧️ **Precipitación alta ({rain:.1f} mm)**: {message}",
+        'all_good': "✅ ¡Todos los parámetros principales se ven bien! Siga monitoreando regularmente para un crecimiento óptimo.",
+        'npk_n_low': "Considere aplicar fertilizante rico en nitrógeno.",
+        'npk_n_high': "El exceso de nitrógeno puede promover el crecimiento foliar sobre el desarrollo de frutos/flores.",
+        'npk_p_low': "Considere aplicar fertilizante de fósforo para el desarrollo de la raíz.",
+        'npk_p_high': "El fósforo alto puede bloquear otros nutrientes.",
+        'npk_k_low': "Considere aplicar fertilizante de potasio para la salud general de la planta y la calidad de la fruta.",
+        'npk_k_high': "El exceso de potasio puede interferir con la absorción de calcio y magnesio.",
+        'wheat_sm_low': "Riegue ligeramente – el trigo necesita 35–50% de humedad del suelo.",
+        'rice_sm_low': "El arroz necesita mucha humedad. Asegure un riego adecuado.",
+        'maize_sm_low': "El maíz necesita niveles moderados de humedad del suelo.",
+        'banana_sm_low': "Mantenga el suelo constantemente húmedo para el plátano.",
+        'mango_sm_high': "Evite el encharcamiento. El mango necesita un suelo bien drenado.",
+        'grapes_sm_high': "Las uvas prefieren un suelo más seco – evite el riego excesivo.",
+        'cotton_sm_low': "El algodón requiere humedad moderada durante la floración.",
+        'millet_sorghum_sm_low': "Estos son cultivos resistentes a la sequía pero aún necesitan humedad mínima.",
+        'jute_sm_low': "El yute requiere mucha humedad durante el crecimiento.",
+        'pomegranate_sm_high': "Evite el riego excesivo de la granada.",
+        'melon_sm_low': "Los melones necesitan riego constante, especialmente durante la fructificación.",
+        'coconut_sm_low': "Las palmas de coco necesitan altos niveles de humedad.",
+        'mothbeans_sm_low': "Las judías polilla son tolerantes a la sequía pero necesitan riego mínimo durante la floración.",
+        'mungbean_sm_low': "Asegure un riego regular durante la floración y la formación de vainas.",
+        'blackgram_sm_low': "Mantenga una humedad moderada especialmente durante la floración.",
+        'lentil_sm_low': "Las lentejas necesitan humedad baja a moderada.",
+        'general_sm_low': "Consejo general: Considere el riego para prevenir el estrés por sequía.",
+        'general_sm_high': "Consejo general: Asegure un buen drenaje para prevenir el encharcamiento.",
+        'wheat_temp_high': "Proporcione sombra o riegue por la noche – la temperatura es demasiado alta para el trigo.",
+        'rice_temp_high': "Demasiado calor para el arroz. Considere el riego nocturno o la sombra.",
+        'maize_temp_low': "El maíz prefiere el clima cálido (20–30°C).",
+        'banana_temp_low': "El plátano es sensible al frío – asegure condiciones cálidas.",
+        'mango_temp_low': "El mango requiere temperaturas más cálidas (>20°C).",
+        'cotton_temp_low': "El algodón prospera en temperaturas cálidas.",
+        'millet_sorghum_temp_low': "El clima cálido es ideal para el mijo/sorgo.",
+        'coffee_temp_low': "El café prospera en el rango de 18–24°C.",
+        'jute_temp_low': "El yute crece bien a 25–30°C.",
+        'papaya_temp_low': "La papaya prefiere el rango de 21–33°C.",
+        'pomegranate_temp_low': "La temperatura ideal es superior a 20°C.",
+        'melon_temp_low': "Asegure que la temperatura sea cálida (>25°C).",
+        'coconut_temp_low': "La temperatura ideal para el coco es superior a 25°C.",
+        'mothbeans_temp_low': "La temperatura debe ser superior a 22°C.",
+        'mungbean_temp_low': "La judía mungo requiere condiciones cálidas para un crecimiento óptimo.",
+        'blackgram_temp_low': "El rango de temperatura ideal es de 25–35°C.",
+        'lentil_temp_low': "Las lentejas crecen bien a 18–30°C.",
+        'general_temp_low': "Consejo general: Las bajas temperaturas pueden atrofiar el crecimiento. Considere medidas de protección.",
+        'general_temp_high': "Consejo general: Las altas temperaturas pueden causar estrés por calor. Asegure agua y sombra adecuadas.",
+        'wheat_hum_high': "Tenga cuidado con las infecciones fúngicas – asegure el flujo de aire.",
+        'rice_hum_low': "Aumente la humedad ambiental o use mantillo.",
+        'banana_hum_low': "El plátano requiere alta humedad. Considere la nebulización o el acolchado.",
+        'grapes_hum_high': "La alta humedad puede provocar infecciones fúngicas.",
+        'coffee_hum_low': "El café prefiere alta humedad.",
+        'orange_hum_high': "Pode los árboles para mejorar el flujo de aire y prevenir problemas fúngicos.",
+        'general_hum_low': "Consejo general: La baja humedad puede causar marchitamiento. Considere la nebulización o el aumento de la humedad del suelo.",
+        'general_hum_high': "Consejo general: La alta humedad aumenta el riesgo de enfermedades fúngicas. Asegure una buena ventilación.",
+        'wheat_ph_low': "Ligeramente ácido – considere aplicar cal para aumentar el pH.",
+        'rice_ph_off': "Mantenga el suelo ligeramente ácido para el arroz (pH 5.5–6.5).",
+        'maize_ph_off': "Mantenga el pH del suelo entre 5.8–7.0.",
+        'papaya_ph_low': "El suelo ligeramente ácido a neutro es el mejor para la papaya.",
+        'orange_ph_off': "El pH ideal del suelo para la naranja es 6.0–7.5.",
+        'general_ph_very_low': "Consejo general: El suelo es demasiado ácido. Aplique cal para aumentar el pH y mejorar la disponibilidad de nutrientes.",
+        'general_ph_very_high': "Consejo general: El suelo es demasiado alcalino. Aplique azufre o materia orgánica para disminuir el pH.",
+        'general_ph_off': "Consejo general: El rango de pH óptimo para la mayoría de los cultivos es 5.5-7.5. Ajuste según sea necesario.",
+        'wheat_light_low': "Asegure que el cultivo reciba suficiente luz solar.",
+        'rice_light_low': "Asegure que el arroz reciba plena exposición al sol.",
+        'general_light_low': "Consejo general: La luz insuficiente puede dificultar la fotosíntesis. Considere la iluminación suplementaria o la poda.",
+        'general_light_high': "Consejo general: La luz excesiva puede causar quemaduras. Considere la sombra durante las horas pico."
+    },
+    'fr': { # French
+        'no_data': "Aucune donnée de capteur disponible pour fournir des conseils.",
+        'npk_low': "🌱 **{nutrient} est faible ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient} est élevé ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **Humidité du sol faible ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **Humidité du sol élevée ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **Température basse ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **Température élevée ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **Humidité faible ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **Humidité élevée ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **pH faible ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **pH élevé ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **pH incorrect ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **Intensité lumineuse faible ({light:.1f} lux)**: {message}",
+        'light_high': "☀️ **Intensité lumineuse élevée ({light:.1f} lux)**: {message}",
+        'rainfall_low_msg': "🌧️ **Précipitations faibles ({rain:.1f} mm)**: {message}",
+        'rainfall_high_msg': "🌧️ **Précipitations élevées ({rain:.1f} mm)**: {message}",
+        'all_good': "✅ Tous les paramètres majeurs semblent bons ! Continuez à surveiller régulièrement pour une croissance optimale.",
+        'npk_n_low': "Envisagez d'appliquer un engrais riche en azote.",
+        'npk_n_high': "L'excès d'azote peut favoriser la croissance des feuilles au détriment du développement des fruits/fleurs.",
+        'npk_p_low': "Envisagez d'appliquer un engrais phosphoré pour le développement des racines.",
+        'npk_p_high': "Un niveau élevé de phosphore peut bloquer d'autres nutriments.",
+        'npk_k_low': "Envisagez d'appliquer un engrais potassique pour la santé générale des plantes et la qualité des fruits.",
+        'npk_k_high': "L'excès de potassium peut interférer avec l'absorption du calcium et du magnésium.",
+        'wheat_sm_low': "Arrosez légèrement – le blé a besoin de 35 à 50% d'humidité du sol.",
+        'rice_sm_low': "Le riz a besoin de beaucoup d'humidité. Assurez une irrigation adéquate.",
+        'maize_sm_low': "Le maïs a besoin de niveaux d'humidité du sol modérés.",
+        'banana_sm_low': "Gardez le sol constamment humide pour la banane.",
+        'mango_sm_high': "Évitez l'engorgement. La mangue a besoin d'un sol bien drainé.",
+        'grapes_sm_high': "Les raisins préfèrent un sol plus sec – évitez le sur-arrosage.",
+        'cotton_sm_low': "Le coton nécessite une humidité modérée pendant la floraison.",
+        'millet_sorghum_sm_low': "Ce sont des cultures résistantes à la sécheresse mais nécessitent tout de même une humidité minimale.",
+        'jute_sm_low': "Le jute nécessite une humidité abondante pendant la croissance.",
+        'pomegranate_sm_high': "Évitez de trop arroser la grenade.",
+        'melon_sm_low': "Les melons ont besoin d'un arrosage constant, surtout pendant la fructification.",
+        'coconut_sm_low': "Les cocotiers ont besoin de niveaux d'humidité élevés.",
+        'mothbeans_sm_low': "Les haricots papillons sont tolérants à la sécheresse mais nécessitent une irrigation minimale pendant la floraison.",
+        'mungbean_sm_low': "Assurez un arrosage régulier pendant la floraison et la formation des gousses.",
+        'blackgram_sm_low': "Maintenez une humidité modérée, surtout pendant la floraison.",
+        'lentil_sm_low': "Les lentilles ont besoin d'une humidité faible à modérée.",
+        'general_sm_low': "Conseil général : Envisagez l'irrigation pour prévenir le stress hydrique.",
+        'general_sm_high': "Conseil général : Assurez un bon drainage pour prévenir l'engorgement.",
+        'wheat_temp_high': "Fournissez de l'ombre ou arrosez le soir – la température est trop élevée pour le blé.",
+        'rice_temp_high': "Trop chaud pour le riz. Envisagez l'irrigation nocturne ou l'ombre.",
+        'maize_temp_low': "Le maïs préfère le temps chaud (20–30°C).",
+        'banana_temp_low': "La banane est sensible au froid – assurez des conditions chaudes.",
+        'mango_temp_low': "La mangue nécessite des températures plus chaudes (>20°C).",
+        'cotton_temp_low': "Le coton prospère sous des températures chaudes.",
+        'millet_sorghum_temp_low': "Le climat chaud est idéal pour le millet/sorgho.",
+        'coffee_temp_low': "Le café prospère dans la plage de 18–24°C.",
+        'jute_temp_low': "Le jute pousse bien entre 25 et 30°C.",
+        'papaya_temp_low': "La papaye préfère la plage de 21–33°C.",
+        'pomegranate_temp_low': "La température idéale est supérieure à 20°C.",
+        'melon_temp_low': "Assurez-vous que la température est chaude (>25°C).",
+        'coconut_temp_low': "La température idéale pour la noix de coco est supérieure à 25°C.",
+        'mothbeans_temp_low': "La température doit être supérieure à 22°C.",
+        'mungbean_temp_low': "Le haricot mungo nécessite des conditions chaudes pour une croissance optimale.",
+        'blackgram_temp_low': "La plage de température idéale est de 25–35°C.",
+        'lentil_temp_low': "Les lentilles poussent bien entre 18 et 30°C.",
+        'general_temp_low': "Conseil général : Les basses températures peuvent retarder la croissance. Envisagez des mesures de protection.",
+        'general_temp_high': "Conseil général : Les températures élevées peuvent provoquer un stress thermique. Assurez un apport suffisant en eau et en ombre.",
+        'wheat_hum_high': "Attention aux infections fongiques – assurez une bonne circulation de l'air.",
+        'rice_hum_low': "Augmentez l'humidité ambiante ou utilisez du paillis.",
+        'banana_hum_low': "La banane nécessite une humidité élevée. Envisagez la brumisation ou le paillage.",
+        'grapes_hum_high': "Une humidité élevée peut entraîner des infections fongiques.",
+        'coffee_hum_low': "Le café préfère une humidité élevée.",
+        'orange_hum_high': "Taillez les arbres pour améliorer la circulation de l'air et prévenir les problèmes fongiques.",
+        'general_hum_low': "Conseil général : Une faible humidité peut provoquer le flétrissement. Envisagez la brumisation ou l'augmentation de l'humidité du sol.",
+        'general_hum_high': "Conseil général : Une humidité élevée augmente le risque de maladies fongiques. Assurez une bonne ventilation.",
+        'wheat_ph_low': "Légèrement acide – envisagez d'appliquer de la chaux pour augmenter le pH.",
+        'rice_ph_off': "Maintenez un sol légèrement acide pour le riz (pH 5.5–6.5).",
+        'maize_ph_off': "Maintenez le pH du sol entre 5.8 et 7.0.",
+        'papaya_ph_low': "Un sol légèrement acide à neutre est le meilleur pour la papaye.",
+        'orange_ph_off': "Le pH idéal du sol pour l'orange est de 6.0 à 7.5.",
+        'general_ph_very_low': "Conseil général : Le sol est trop acide. Appliquez de la chaux pour augmenter le pH et améliorer la disponibilité des nutriments.",
+        'general_ph_very_high': "Conseil général : Le sol est trop alcalin. Appliquez du soufre ou de la matière organique pour diminuer le pH.",
+        'general_ph_off': "Conseil général : La plage de pH optimale pour la plupart des cultures est de 5.5 à 7.5. Ajustez si nécessaire.",
+        'wheat_light_low': "Assurez-vous que la culture reçoit suffisamment de lumière du soleil.",
+        'rice_light_low': "Assurez-vous que le riz reçoit une exposition complète au soleil.",
+        'general_light_low': "Conseil général : Une lumière insuffisante peut entraver la photosynthèse. Envisagez un éclairage supplémentaire ou une taille.",
+        'general_light_high': "Conseil général : Une lumière excessive peut provoquer des brûlures. Envisagez l'ombrage pendant les heures de pointe."
+    },
+    'de': { # German
+        'no_data': "Keine Sensordaten verfügbar, um Ratschläge zu geben.",
+        'npk_low': "🌱 **{nutrient} ist niedrig ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient} ist hoch ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **Bodenfeuchtigkeit niedrig ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **Bodenfeuchtigkeit hoch ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **Temperatur niedrig ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **Temperatur hoch ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **Luftfeuchtigkeit niedrig ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **Luftfeuchtigkeit hoch ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **pH-Wert niedrig ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **pH-Wert hoch ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **pH-Wert nicht optimal ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **Lichtintensität niedrig ({light:.1f} Lux)**: {message}",
+        'light_high': "☀️ **Lichtintensität hoch ({light:.1f} Lux)**: {message}",
+        'rainfall_low_msg': "🌧️ **Niederschlag niedrig ({rain:.1f} mm)**: {message}",
+        'rainfall_high_msg': "🌧️ **Niederschlag hoch ({rain:.1f} mm)**: {message}",
+        'all_good': "✅ Alle wichtigen Parameter sehen gut aus! Überwachen Sie regelmäßig für optimales Wachstum.",
+        'npk_n_low': "Erwägen Sie die Anwendung von stickstoffreichem Dünger.",
+        'npk_n_high': "Überschüssiger Stickstoff kann das Blattwachstum gegenüber der Frucht-/Blütenentwicklung fördern.",
+        'npk_p_low': "Erwägen Sie die Anwendung von Phosphordünger für die Wurzelentwicklung.",
+        'npk_p_high': "Hoher Phosphor kann andere Nährstoffe blockieren.",
+        'npk_k_low': "Erwägen Sie die Anwendung von Kaliumdünger für die allgemeine Pflanzengesundheit und Fruchtqualität.",
+        'npk_k_high': "Überschüssiges Kalium kann die Aufnahme von Kalzium und Magnesium beeinträchtigen.",
+        'wheat_sm_low': "Leicht bewässern – Weizen benötigt 35–50% Bodenfeuchtigkeit.",
+        'rice_sm_low': "Reis benötigt hohe Feuchtigkeit. Sorgen Sie für eine ordnungsgemäße Bewässerung.",
+        'maize_sm_low': "Mais benötigt moderate Bodenfeuchtigkeitswerte.",
+        'banana_sm_low': "Halten Sie den Boden für Bananen stets feucht.",
+        'mango_sm_high': "Vermeiden Sie Staunässe. Mangos benötigen gut durchlässigen Boden.",
+        'grapes_sm_high': "Trauben bevorzugen trockeneren Boden – vermeiden Sie Überwässerung.",
+        'cotton_sm_low': "Baumwolle benötigt während der Blütezeit moderate Feuchtigkeit.",
+        'millet_sorghum_sm_low': "Dies sind trockenheitstolerante Kulturen, benötigen aber dennoch minimale Feuchtigkeit.",
+        'jute_sm_low': "Jute benötigt während des Wachstums reichlich Feuchtigkeit.",
+        'pomegranate_sm_high': "Vermeiden Sie Überwässerung bei Granatäpfeln.",
+        'melon_sm_low': "Melonen benötigen konstante Bewässerung, besonders während der Fruchtbildung.",
+        'coconut_sm_low': "Kokospalmen benötigen hohe Feuchtigkeitswerte.",
+        'mothbeans_sm_low': "Mothbohnen sind trockenheitstolerant, benötigen aber während der Blütezeit minimale Bewässerung.",
+        'mungbean_sm_low': "Sorgen Sie für regelmäßige Bewässerung während der Blüte und Hülsenbildung.",
+        'blackgram_sm_low': "Halten Sie die Feuchtigkeit besonders während der Blüte moderat.",
+        'lentil_sm_low': "Linsen benötigen geringe bis moderate Feuchtigkeit.",
+        'general_sm_low': "Allgemeiner Ratschlag: Erwägen Sie Bewässerung, um Trockenstress vorzubeugen.",
+        'general_sm_high': "Allgemeiner Ratschlag: Sorgen Sie für eine gute Drainage, um Staunässe zu vermeiden.",
+        'wheat_temp_high': "Schatten spenden oder abends bewässern – Temperatur ist zu hoch für Weizen.",
+        'rice_temp_high': "Zu heiß für Reis. Erwägen Sie abendliche Bewässerung oder Schatten.",
+        'maize_temp_low': "Mais bevorzugt warmes Wetter (20–30°C).",
+        'banana_temp_low': "Banane ist kälteempfindlich – sorgen Sie für warme Bedingungen.",
+        'mango_temp_low': "Mango benötigt wärmere Temperaturen (>20°C).",
+        'cotton_temp_low': "Baumwolle gedeiht bei warmen Temperaturen.",
+        'millet_sorghum_temp_low': "Warmes Klima ist ideal für Hirse/Sorghum.",
+        'coffee_temp_low': "Kaffee gedeiht im Bereich von 18–24°C.",
+        'jute_temp_low': "Jute wächst gut bei 25–30°C.",
+        'papaya_temp_low': "Papaya bevorzugt den Bereich von 21–33°C.",
+        'pomegranate_temp_low': "Ideale Temperatur liegt über 20°C.",
+        'melon_temp_low': "Stellen Sie sicher, dass die Temperatur warm ist (>25°C).",
+        'coconut_temp_low': "Ideale Temperatur für Kokosnuss liegt über 25°C.",
+        'mothbeans_temp_low': "Die Temperatur sollte über 22°C liegen.",
+        'mungbean_temp_low': "Mungbohnen benötigen warme Bedingungen für optimales Wachstum.",
+        'blackgram_temp_low': "Der ideale Temperaturbereich liegt bei 25–35°C.",
+        'lentil_temp_low': "Linsen wachsen gut bei 18–30°C.",
+        'general_temp_low': "Allgemeiner Ratschlag: Kalte Temperaturen können das Wachstum hemmen. Erwägen Sie Schutzmaßnahmen.",
+        'general_temp_high': "Allgemeiner Ratschlag: Hohe Temperaturen können Hitzestress verursachen. Sorgen Sie für ausreichend Wasser und Schatten.",
+        'wheat_hum_high': "Achten Sie auf Pilzinfektionen – sorgen Sie für Luftzirkulation.",
+        'rice_hum_low': "Erhöhen Sie die Umgebungsfeuchtigkeit oder verwenden Sie Mulch.",
+        'banana_hum_low': "Banane benötigt hohe Luftfeuchtigkeit. Erwägen Sie Besprühen oder Mulchen.",
+        'grapes_hum_high': "Hohe Luftfeuchtigkeit kann zu Pilzinfektionen führen.",
+        'coffee_hum_low': "Kaffee bevorzugt hohe Luftfeuchtigkeit.",
+        'orange_hum_high': "Beschneiden Sie Bäume, um die Luftzirkulation zu verbessern und Pilzprobleme zu vermeiden.",
+        'general_hum_low': "Allgemeiner Ratschlag: Geringe Luftfeuchtigkeit kann Welken verursachen. Erwägen Sie Besprühen oder Erhöhung der Bodenfeuchtigkeit.",
+        'general_hum_high': "Allgemeiner Ratschlag: Hohe Luftfeuchtigkeit erhöht das Risiko von Pilzkrankheiten. Sorgen Sie für gute Belüftung.",
+        'wheat_ph_low': "Leicht sauer – erwägen Sie die Anwendung von Kalk, um den pH-Wert zu erhöhen.",
+        'rice_ph_off': "Halten Sie den Boden für Reis leicht sauer (pH 5.5–6.5).",
+        'maize_ph_off': "Halten Sie den Boden-pH-Wert zwischen 5.8–7.0.",
+        'papaya_ph_low': "Leicht saurer bis neutraler Boden ist am besten für Papaya.",
+        'orange_ph_off': "Der ideale Boden-pH-Wert für Orangen liegt bei 6.0–7.5.",
+        'general_ph_very_low': "Allgemeiner Ratschlag: Der Boden ist zu sauer. Wenden Sie Kalk an, um den pH-Wert zu erhöhen und die Nährstoffverfügbarkeit zu verbessern.",
+        'general_ph_very_high': "Allgemeiner Ratschlag: Der Boden ist zu alkalisch. Wenden Sie Schwefel oder organische Substanz an, um den pH-Wert zu senken.",
+        'general_ph_off': "Allgemeiner Ratschlag: Der optimale pH-Bereich für die meisten Kulturen liegt bei 5.5-7.5. Passen Sie ihn bei Bedarf an.",
+        'wheat_light_low': "Stellen Sie sicher, dass die Ernte ausreichend Sonnenlicht erhält.",
+        'rice_light_low': "Stellen Sie sicher, dass Reis volle Sonneneinstrahlung erhält.",
+        'general_light_low': "Allgemeiner Ratschlag: Unzureichendes Licht kann die Photosynthese behindern. Erwägen Sie zusätzliche Beleuchtung oder Beschneidung.",
+        'general_light_high': "Allgemeiner Ratschlag: Übermäßiges Licht kann Verbrennungen verursachen. Erwägen Sie Beschattung während der Spitzenzeiten."
+    },
+    'ar': { # Arabic (Example, requires more detailed translation)
+        'intro': "بناءً على الظروف الحالية، قد تفكر في: ",
+        'outro': ". يرجى استشارة خبراء الزراعة المحليين للحصول على توصيات دقيقة.",
+        'acid_tolerant': "محاصيل تتحمل الحموضة مثل التوت الأزرق، البطاطس، أو أصناف معينة من الأرز",
+        'alkaline_tolerant': "محاصيل تتحمل القلوية مثل الهليون، السبانخ، أو أصناف معينة من البرسيم الحجازي",
+        'neutral_ph': "مجموعة واسعة من المحاصيل تزدهر في درجة حموضة محايدة إلى حمضية قليلاً (5.5-7.5)، بما في ذلك القمح والذرة ومعظم الخضروات",
+        'heat_tolerant': "محاصيل تتحمل الحرارة مثل الدخن، الذرة الرفيعة، القطن، أو بعض أنواع الفول",
+        'cold_hardy': "محاصيل مقاومة للبرد مثل القمح (أصناف الشتاء)، الشعير، الشوفان، أو البازلاء",
+        'warm_season': "محاصيل الموسم الدافئ مثل الذرة، الأرز (الاستوائي)، معظم الخضروات، والفواكه",
+        'drought_resistant': "محاصيل مقاومة للجفاف مثل الدخن، الذرة الرفيعة، الحمص، أو أنواع معينة من الفول (مثل الماش)",
+        'water_loving': "محاصيل محبة للماء مثل الأرز، قصب السكر، الجوت، أو المحاصيل التي تتحمل التشبع بالمياه مؤقتًا",
+        'moderate_rainfall': "محاصيل مناسبة للأمطار المعتدلة، بما في ذلك القمح والذرة والعديد من الخضروات",
+        'very_dry': "محاصيل شديدة التحمل للجفاف (مثل البطيخ الصحراوي أو بعض الأعشاب)",
+        'very_wet': "محاصيل شبه مائية أو تلك شديدة التحمل للتشبع بالمياه (مثل القلقاس، بعض أصناف الأرز إذا كانت التربة سيئة التصريف)",
+        'no_specific': "لا توجد توصيات محددة، حيث أن الظروف الحالية غير عادية أو عامة."
+    },
+    'ja': { # Japanese (Example)
+        'intro': "現在の状況に基づき、以下を検討することができます：",
+        'outro': "正確な推奨事項については、地元の農業専門家にご相談ください。",
+        'acid_tolerant': "ブルーベリー、ジャガイモ、特定のイネ品種などの酸性土壌に強い作物",
+        'alkaline_tolerant': "アスパラガス、ほうれん草、特定のアルファルファ品種などのアルカリ性土壌に強い作物",
+        'neutral_ph': "小麦、トウモロコシ、ほとんどの野菜など、中性から弱酸性のpH（5.5-7.5）で育つ幅広い作物",
+        'heat_tolerant': "キビ、ソルガム、綿、一部の豆類などの耐熱性作物",
+        'cold_hardy': "小麦（冬品種）、大麦、オート麦、エンドウ豆などの耐寒性作物",
+        'warm_season': "トウモロコシ、イネ（熱帯性）、ほとんどの野菜、果物などの暖季作物",
+        'drought_resistant': "キビ、ソルガム、ひよこ豆、特定の種類の豆（例：モス豆）などの干ばつ耐性作物",
+        'water_loving': "イネ、サトウキビ、ジュート、一時的な湛水に耐える作物などの水生作物",
+        'moderate_rainfall': "小麦、トウモロコシ、多くの野菜など、中程度の降雨に適した作物",
+        'very_dry': "非常に干ばつに強い作物（例：砂漠に適応したメロンや一部のハーブ）",
+        'very_wet': "半水生作物または湛水に非常に強い作物（例：タロイモ、排水が悪い場合の特定のイネ品種）",
+        'no_specific': "現在の状況が異常または一般的なため、特定の推奨事項はありません。"
     }
 }
 
@@ -715,35 +1031,6 @@ def crop_care_advice(df, crop_type, lang='en'):
         
     return tips if tips else [messages['all_good']]
 
-# --- Voice Alert Function (Updated for Streamlit Cloud + Local) ---
-def speak_tip(tip_text, lang='en'):
-    try:
-        with st.spinner(f"Generating voice alert in {lang.upper()}..."):
-            tts = gTTS(text=tip_text, lang=lang)
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
-                file_path = f.name
-                tts.save(file_path)
-            
-            if PLAYSOUND_AVAILABLE:
-                try:
-                    playsound.playsound(file_path)
-                except Exception as e:
-                    st.error(f"Error playing voice alert with playsound: {e}. Attempting in-browser playback.")
-                    # Fallback to in-browser playback if playsound fails
-                    audio_file = open(file_path, "rb")
-                    audio_bytes = audio_file.read()
-                    st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-            else:
-                audio_file = open(file_path, "rb")
-                audio_bytes = audio_file.read()
-                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-    except Exception as e:
-        st.error(f"Error generating or playing voice alert: {e}")
-        st.info("This might be due to missing audio backend (e.g., `ffplay` on Linux) or `playsound` limitations on web servers.")
-    finally:
-        if 'file_path' in locals() and os.path.exists(file_path):
-            os.remove(file_path) # Clean up the temporary file
-
 # --- Seed Recommender Function ---
 # Adding multilingual support for seed recommendations
 SEED_RECOMMENDATIONS_MESSAGES = {
@@ -778,6 +1065,86 @@ SEED_RECOMMENDATIONS_MESSAGES = {
         'very_dry': "बहुत सूखा-सहिष्णु फसलें (जैसे रेगिस्तान-अनुकूलित तरबूज या कुछ जड़ी-बूटियाँ)",
         'very_wet': "अर्ध-जलीय फसलें या वे जो जलभराव के प्रति अत्यधिक सहिष्णु हैं (जैसे तारो, चावल की कुछ किस्में यदि खराब जल निकासी हो)",
         'no_specific': "कोई विशिष्ट सिफारिश नहीं, क्योंकि वर्तमान परिस्थितियाँ असामान्य या सामान्य हैं।"
+    },
+    'es': { # Spanish
+        'intro': "Basado en las condiciones actuales, podría considerar: ",
+        'outro': ". Consulte a expertos agrícolas locales para recomendaciones precisas.",
+        'acid_tolerant': "cultivos tolerantes a la acidez como arándanos, patatas o variedades específicas de arroz",
+        'alkaline_tolerant': "cultivos tolerantes a la alcalinidad como espárragos, espinacas o variedades específicas de alfalfa",
+        'neutral_ph': "una amplia gama de cultivos prosperan en pH neutro a ligeramente ácido (5.5-7.5), incluyendo trigo, maíz y la mayoría de las verduras",
+        'heat_tolerant': "cultivos tolerantes al calor como mijo, sorgo, algodón o algunas variedades de frijoles",
+        'cold_hardy': "cultivos resistentes al frío como trigo (variedades de invierno), cebada, avena o guisantes",
+        'warm_season': "cultivos de estación cálida como maíz, arroz (tropical), la mayoría de las verduras y frutas",
+        'drought_resistant': "cultivos resistentes a la sequía como mijo, sorgo, garbanzos o ciertos tipos de frijoles (por ejemplo, frijoles polilla)",
+        'water_loving': "cultivos amantes del agua como arroz, caña de azúcar, yute o cultivos que toleran el encharcamiento temporal",
+        'moderate_rainfall': "cultivos adecuados para precipitaciones moderadas, incluyendo trigo, maíz y muchas verduras",
+        'very_dry': "cultivos muy tolerantes a la sequía (por ejemplo, melones adaptados al desierto o algunas hierbas)",
+        'very_wet': "cultivos semiacuáticos o aquellos altamente tolerantes al encharcamiento (por ejemplo, taro, algunas variedades de arroz si están mal drenadas)",
+        'no_specific': "No hay recomendaciones específicas, ya que las condiciones actuales son inusuales o generales."
+    },
+    'fr': { # French
+        'intro': "En fonction des conditions actuelles, vous pourriez envisager : ",
+        'outro': ". Veuillez consulter des experts agricoles locaux pour des recommandations précises.",
+        'acid_tolerant': "cultures tolérantes à l'acidité comme les myrtilles, les pommes de terre ou des variétés spécifiques de riz",
+        'alkaline_tolerant': "cultures tolérantes à l'alcalinité telles que les asperges, les épinards ou des variétés spécifiques de luzerne",
+        'neutral_ph': "une large gamme de cultures prospèrent dans un pH neutre à légèrement acide (5.5-7.5), y compris le blé, le maïs et la plupart des légumes",
+        'heat_tolerant': "cultures tolérantes à la chaleur comme le millet, le sorgho, le coton ou certaines variétés de haricots",
+        'cold_hardy': "cultures résistantes au froid comme le blé (variétés d'hiver), l'orge, l'avoine ou les pois",
+        'warm_season': "cultures de saison chaude comme le maïs, le riz (tropical), la plupart des légumes et des fruits",
+        'drought_resistant': "cultures résistantes à la sécheresse comme le millet, le sorgho, les pois chiches ou certains types de haricots (par exemple, les haricots papillons)",
+        'water_loving': "cultures aimant l'eau comme le riz, la canne à sucre, le jute ou les cultures qui tolèrent l'engorgement temporaire",
+        'moderate_rainfall': "cultures adaptées aux précipitations modérées, y compris le blé, le maïs et de nombreux légumes",
+        'very_dry': "cultures très tolérantes à la sécheresse (par exemple, les melons adaptés au désert ou certaines herbes)",
+        'very_wet': "cultures semi-aquatiques ou celles très tolérantes à l'engorgement (par exemple, le taro, certaines variétés de riz si mal drainées)",
+        'no_specific': "Aucune recommandation spécifique, car les conditions actuelles sont inhabituelles ou générales."
+    },
+    'de': { # German
+        'intro': "Basierend auf den aktuellen Bedingungen könnten Sie Folgendes in Betracht ziehen: ",
+        'outro': ". Bitte konsultieren Sie lokale Landwirtschaftsexperten für präzise Empfehlungen.",
+        'acid_tolerant': "säuretolerante Kulturen wie Heidelbeeren, Kartoffeln oder spezifische Reissorten",
+        'alkaline_tolerant': "alkalitolerante Kulturen wie Spargel, Spinat oder spezifische Luzernesorten",
+        'neutral_ph': "eine breite Palette von Kulturen gedeiht in neutralem bis leicht saurem pH-Wert (5.5-7.5), einschließlich Weizen, Mais und den meisten Gemüsesorten",
+        'heat_tolerant': "hitzetolerante Kulturen wie Hirse, Sorghum, Baumwolle oder einige Bohnensorten",
+        'cold_hardy': "kälteresistente Kulturen wie Weizen (Winter сорта), Gerste, Hafer oder Erbsen",
+        'warm_season': "Warmwetterkulturen wie Mais, Reis (tropisch), die meisten Gemüsesorten und Früchte",
+        'drought_resistant': "trockenheitsresistente Kulturen wie Hirse, Sorghum, Kichererbsen oder bestimmte Bohnensorten (z.B. Mothbohnen)",
+        'water_loving': "wasserliebende Kulturen wie Reis, Zuckerrohr, Jute oder Kulturen, die vorübergehende Staunässe vertragen",
+        'moderate_rainfall': "Kulturen, die für moderate Niederschläge geeignet sind, einschließlich Weizen, Mais und viele Gemüsesorten",
+        'very_dry': "sehr trockenheitstolerante Kulturen (z.B. wüstenangepasste Melonen oder einige Kräuter)",
+        'very_wet': "semi-aquatische Kulturen oder solche, die sehr tolerant gegenüber Staunässe sind (z.B. Taro, einige Reissorten bei schlechter Drainage)",
+        'no_specific': "Keine spezifischen Empfehlungen, da die aktuellen Bedingungen ungewöhnlich oder allgemein sind."
+    },
+    'ar': { # Arabic (Example, requires more detailed translation)
+        'intro': "بناءً على الظروف الحالية، قد تفكر في: ",
+        'outro': ". يرجى استشارة خبراء الزراعة المحليين للحصول على توصيات دقيقة.",
+        'acid_tolerant': "محاصيل تتحمل الحموضة مثل التوت الأزرق، البطاطس، أو أصناف معينة من الأرز",
+        'alkaline_tolerant': "محاصيل تتحمل القلوية مثل الهليون، السبانخ، أو أصناف معينة من البرسيم الحجازي",
+        'neutral_ph': "مجموعة واسعة من المحاصيل تزدهر في درجة حموضة محايدة إلى حمضية قليلاً (5.5-7.5)، بما في ذلك القمح والذرة ومعظم الخضروات",
+        'heat_tolerant': "محاصيل تتحمل الحرارة مثل الدخن، الذرة الرفيعة، القطن، أو بعض أنواع الفول",
+        'cold_hardy': "محاصيل مقاومة للبرد مثل القمح (أصناف الشتاء)، الشعير، الشوفان، أو البازلاء",
+        'warm_season': "محاصيل الموسم الدافئ مثل الذرة، الأرز (الاستوائي)، معظم الخضروات، والفواكه",
+        'drought_resistant': "محاصيل مقاومة للجفاف مثل الدخن، الذرة الرفيعة، الحمص، أو أنواع معينة من الفول (مثل الماش)",
+        'water_loving': "محاصيل محبة للماء مثل الأرز، قصب السكر، الجوت، أو المحاصيل التي تتحمل التشبع بالمياه مؤقتًا",
+        'moderate_rainfall': "محاصيل مناسبة للأمطار المعتدلة، بما في ذلك القمح والذرة والعديد من الخضروات",
+        'very_dry': "محاصيل شديدة التحمل للجفاف (مثل البطيخ الصحراوي أو بعض الأعشاب)",
+        'very_wet': "محاصيل شبه مائية أو تلك شديدة التحمل للتشبع بالمياه (مثل القلقاس، بعض أصناف الأرز إذا كانت التربة سيئة التصريف)",
+        'no_specific': "لا توجد توصيات محددة، حيث أن الظروف الحالية غير عادية أو عامة."
+    },
+    'ja': { # Japanese (Example)
+        'intro': "現在の状況に基づき、以下を検討することができます：",
+        'outro': "正確な推奨事項については、地元の農業専門家にご相談ください。",
+        'acid_tolerant': "ブルーベリー、ジャガイモ、特定のイネ品種などの酸性土壌に強い作物",
+        'alkaline_tolerant': "アスパラガス、ほうれん草、特定のアルファルファ品種などのアルカリ性土壌に強い作物",
+        'neutral_ph': "小麦、トウモロコシ、ほとんどの野菜など、中性から弱酸性のpH（5.5-7.5）で育つ幅広い作物",
+        'heat_tolerant': "キビ、ソルガム、綿、一部の豆類などの耐熱性作物",
+        'cold_hardy': "小麦（冬品種）、大麦、オート麦、エンドウ豆などの耐寒性作物",
+        'warm_season': "トウモロコシ、イネ（熱帯性）、ほとんどの野菜、果物などの暖季作物",
+        'drought_resistant': "キビ、ソルガム、ひよこ豆、特定の種類の豆（例：モス豆）などの干ばつ耐性作物",
+        'water_loving': "イネ、サトウキビ、ジュート、一時的な湛水に耐える作物などの水生作物",
+        'moderate_rainfall': "小麦、トウモロコシ、多くの野菜など、中程度の降雨に適した作物",
+        'very_dry': "非常に干ばつに強い作物（例：砂漠に適応したメロンや一部のハーブ）",
+        'very_wet': "半水生作物または湛水に非常に強い作物（例：タロイモ、排水が悪い場合の特定のイネ品種）",
+        'no_specific': "現在の状況が異常または一般的なため、特定の推奨事項はありません。"
     }
 }
 
@@ -846,13 +1213,39 @@ with col_refresh:
         st.cache_data.clear() # Clear cache to fetch fresh data
         st.rerun()
 with col_lang:
-    voice_lang = st.selectbox("Choose Alert Language", ["en", "hi"], index=0, help="English (en) or Hindi (hi)")
+    # Get all available languages from the ADVICE_MESSAGES keys
+    available_languages = list(ADVICE_MESSAGES.keys())
+    # Create a mapping for display names if needed, e.g., {'en': 'English', 'hi': 'Hindi'}
+    language_display_names = {
+        'en': 'English',
+        'hi': 'Hindi',
+        'es': 'Español',
+        'fr': 'Français',
+        'de': 'Deutsch',
+        'ar': 'العربية', # Arabic
+        'ja': '日本語' # Japanese
+    }
+    # Create a list of display names for the selectbox, maintaining order
+    display_options = [language_display_names.get(lang, lang) for lang in available_languages]
+    
+    # Find the index of 'en' for default selection
+    default_lang_index = available_languages.index('en') if 'en' in available_languages else 0
+
+    voice_lang_display = st.selectbox(
+        "Choose Alert Language", 
+        options=display_options, 
+        index=default_lang_index, 
+        help="Select the language for voice alerts and recommendations."
+    )
+    # Map back to the language code for internal use
+    voice_lang = [k for k, v in language_display_names.items() if v == voice_lang_display][0]
+
 
 # --- Load and Display Sensor Data ---
 df = fetch_sensor_data()
 
 if df.empty:
-    st.warning("No data available from Firebase. Please ensure your sensor sends data or check Firebase connection.")
+    st.warning("No data available from Firebase. Please ensure your sensor sends data or check Firebase connection.", icon="⚠️")
 else:
     # Get latest sensor data for gauges and current readings
     latest_data = df.iloc[-1].to_dict()
@@ -863,15 +1256,16 @@ else:
     gauge_cols = st.columns(4)
 
     # Helper to create a gauge chart
-    def create_gauge(title, value, max_value, suffix, color='green', threshold=None):
+    def create_gauge(title, value, max_value, suffix, color='green', threshold=None, font_color='white'):
         fig = go.Figure(go.Indicator(
             mode="gauge+number",
             value=value,
-            title={'text': title},
+            title={'text': title, 'font': {'color': font_color}}, # Set title font color
+            number={'font': {'color': font_color}}, # Set number font color - MOVED HERE
             gauge={
-                'axis': {'range': [None, max_value], 'tickwidth': 1, 'tickcolor': "darkblue"},
+                'axis': {'range': [None, max_value], 'tickwidth': 1, 'tickcolor': font_color}, # Set tick color
                 'bar': {'color': color},
-                'bgcolor': "white",
+                'bgcolor': "white", # This is the background of the gauge itself, not the number
                 'borderwidth': 2,
                 'bordercolor': "gray",
                 'steps': [
@@ -882,44 +1276,54 @@ else:
                 'threshold': {
                     'line': {'color': "red", 'width': 4},
                     'thickness': 0.75,
-                    'value': threshold if threshold is not None else value # If no threshold, just show current value
-                }
+                    'value': threshold if threshold is not None else value 
+                },
             }
         ))
-        fig.update_layout(height=250, margin=dict(l=10, r=10, t=50, b=10), font={'color': "darkblue", 'family': "Arial"})
+        fig.update_layout(
+            height=250, 
+            margin=dict(l=10, r=10, t=50, b=10), 
+            font={'color': font_color, 'family': "Arial"}, # Overall font color for text elements
+            paper_bgcolor="rgba(0,0,0,0)", # Transparent background for the plot area
+            plot_bgcolor="rgba(0,0,0,0)" # Transparent background for the plot area
+        )
         return fig
+
+    # Determine font color based on Streamlit's theme (assuming dark mode)
+    # In Streamlit, it's hard to directly detect theme, so we'll assume dark mode for better contrast.
+    gauge_font_color = 'white' 
 
     # Soil Moisture Gauge
     soil_moisture_val = latest_data.get('soil_moisture')
     if soil_moisture_val is not None and not pd.isna(soil_moisture_val):
         with gauge_cols[0]:
-            st.plotly_chart(create_gauge("Soil Moisture (%)", soil_moisture_val, 100, "%", 'rgba(0,128,0,0.8)'), use_container_width=True)
+            st.plotly_chart(create_gauge("Soil Moisture (%)", soil_moisture_val, 100, "%", 'rgba(0,128,0,0.8)', font_color=gauge_font_color), use_container_width=True)
     else:
-        with gauge_cols[0]: st.info("Soil Moisture N/A")
+        with gauge_cols[0]: st.info("Soil Moisture N/A", icon="ℹ️")
 
     # Temperature Gauge
     temp_val = latest_data.get('temperature')
     if temp_val is not None and not pd.isna(temp_val):
         with gauge_cols[1]:
-            st.plotly_chart(create_gauge("Temperature (°C)", temp_val, 40, "°C", 'rgba(255,165,0,0.8)'), use_container_width=True)
+            st.plotly_chart(create_gauge("Temperature (°C)", temp_val, 40, "°C", 'rgba(255,165,0,0.8)', font_color=gauge_font_color), use_container_width=True)
     else:
-        with gauge_cols[1]: st.info("Temperature N/A")
+        with gauge_cols[1]: st.info("Temperature N/A", icon="ℹ️")
 
     # pH Gauge
     ph_val = latest_data.get('ph') # Use 'ph' after processing
     if ph_val is not None and not pd.isna(ph_val):
         with gauge_cols[2]:
-            st.plotly_chart(create_gauge("pH", ph_val, 14, "", 'rgba(0,0,255,0.8)'), use_container_width=True)
+            st.plotly_chart(create_gauge("pH", ph_val, 14, "", 'rgba(0,0,255,0.8)', font_color=gauge_font_color), use_container_width=True)
     else:
-        with gauge_cols[2]: st.info("pH N/A")
+        with gauge_cols[2]: st.info("pH N/A", icon="ℹ️")
 
     # Humidity Gauge
     humidity_val = latest_data.get('humidity')
     if humidity_val is not None and not pd.isna(humidity_val):
         with gauge_cols[3]:
-            st.plotly_chart(create_gauge("Humidity (%)", humidity_val, 100, "%", 'rgba(128,0,128,0.8)'), use_container_width=True)
+            st.plotly_chart(create_gauge("Humidity (%)", humidity_val, 100, "%", 'rgba(128,0,128,0.8)', font_color=gauge_font_color), use_container_width=True)
     else:
-        with gauge_cols[3]: st.info("Humidity N/A")
+        with gauge_cols[3]: st.info("Humidity N/A", icon="ℹ️")
 
     st.markdown("---")
 
@@ -959,10 +1363,10 @@ else:
                 )
                 st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
-                st.error(f"Error plotting sensor trends: {e}")
-                st.warning("⚠️ Could not plot all sensor trends. Check data types or missing values, or if the data is too sparse.")
+                st.error(f"Error plotting sensor trends: {e}", icon="❌")
+                st.warning("⚠️ Could not plot all sensor trends. Check data types or missing values, or if the data is too sparse.", icon="⚠️")
         else:
-            st.warning("⚠️ Not enough complete data available for plotting sensor trends. Check if sensors are reporting data for these features.")
+            st.warning("⚠️ Not enough complete data available for plotting sensor trends. Check if sensors are reporting data for these features.", icon="⚠️")
 
     with col2:
         st.subheader("🌿 Crop Care Recommendations")
@@ -974,21 +1378,21 @@ else:
             for tip in care_tips:
                 st.write(tip)
             
-            if st.button(f"🔊 Play Top Alerts ({'Hindi' if voice_lang=='hi' else 'English'})"):
+            if st.button(f"🔊 Play Top Alerts ({language_display_names.get(voice_lang, voice_lang)})"):
                 if care_tips:
                     for i, tip in enumerate(care_tips[:2]): # Play up to 2 alerts
                         # Remove markdown for better speech, and also remove emojis
                         clean_tip = tip.replace('**', '').replace('🌱', '').replace('💧', '').replace('🌡️', '').replace('💨', '').replace('🧪', '').replace('☀️', '').replace('🌧️', '').replace('✅', '').strip()
                         if clean_tip: # Only play if there's actual text after cleaning
-                            st.info(f"Playing alert {i+1}: {clean_tip}")
+                            st.info(f"Playing alert {i+1}: {clean_tip}", icon="🔊")
                             speak_tip(clean_tip, lang=voice_lang)
                 else:
-                    st.info("No specific alerts to play.")
+                    st.info("No specific alerts to play.", icon="ℹ️")
 
         elif not selected_crop_type:
-            st.info("Please select a crop to get recommendations.")
+            st.info("Please select a crop to get recommendations.", icon="ℹ️")
         else:
-            st.info("No sensor data available for crop care recommendations.")
+            st.info("No sensor data available for crop care recommendations.", icon="ℹ️")
 
         st.subheader("🤖 AI-Based Growth Prediction")
         soil_moisture_pred, light_intensity_pred, nutrient_sum_pred = None, None, None
@@ -996,26 +1400,26 @@ else:
             soil_moisture_pred, light_intensity_pred, nutrient_sum_pred = predict_growth(df, selected_crop_type)
             if soil_moisture_pred is not None:
                 if 0 <= soil_moisture_pred <= 100:
-                    st.success(f"📊 Predicted Soil Moisture: **{soil_moisture_pred:.2f}%**")
+                    st.success(f"📊 Predicted Soil Moisture: **{soil_moisture_pred:.2f}%**", icon="📊")
                 else:
-                    st.warning(f"📊 Predicted Soil Moisture: **{soil_moisture_pred:.2f}%**. This value seems unusual (Expected between 0-100%).")
-                st.info(f"💡 Predicted Light Intensity: **{light_intensity_pred:.2f} lux**")
-                st.info(f"🌿 Predicted NPK Nutrient Sum: **{nutrient_sum_pred:.2f}**")
+                    st.warning(f"📊 Predicted Soil Moisture: **{soil_moisture_pred:.2f}%**. This value seems unusual (Expected between 0-100%).", icon="⚠️")
+                st.info(f"💡 Predicted Light Intensity: **{light_intensity_pred:.2f} lux**", icon="💡")
+                st.info(f"🌿 Predicted NPK Nutrient Sum: **{nutrient_sum_pred:.2f}**", icon="🌿")
             else:
-                st.info("Not enough data or issue with model prediction. Check logs above for details.")
+                st.info("Not enough data or issue with model prediction. Check logs above for details.", icon="ℹ️")
         else:
-            st.info("Select a crop, ensure sensor data is available, and all AI components are loaded for prediction.")
+            st.info("Select a crop, ensure sensor data is available, and all AI components are loaded for prediction.", icon="ℹ️")
 
         st.subheader("📉 Market Price Forecast")
         if df is not None and not df.empty and selected_crop_type and market_price_model is not None and market_crop_encoder is not None:
             latest_sensor_data_for_price = df.iloc[-1].to_dict()
             predicted_price = predict_market_price(latest_sensor_data_for_price, selected_crop_type, market_price_model, market_crop_encoder, market_price_features)
             if predicted_price is not None:
-                st.success(f"💰 Estimated Market Price for {selected_crop_type}: **₹ {predicted_price:.2f} / unit**")
+                st.success(f"💰 Estimated Market Price for {selected_crop_type}: **₹ {predicted_price:.2f} / unit**", icon="💰")
             else:
-                st.info("Cannot forecast market price. Ensure all required sensor data is available and market model is trained.")
+                st.info("Cannot forecast market price. Ensure all required sensor data is available and market model is trained.", icon="ℹ️")
         else:
-            st.info("Select a crop, ensure sensor data is available, and market model is trained for market price forecast.")
+            st.info("Select a crop, ensure sensor data is available, and market model is trained for market price forecast.", icon="ℹ️")
 
 
         st.subheader("🌾 Crop Suggestion Based on Predicted Conditions")
@@ -1030,9 +1434,9 @@ else:
                 seed_recommendation = recommend_seeds(current_ph, current_temp, current_rainfall, soil_moisture_pred, lang=voice_lang) # Pass selected language
                 st.write(seed_recommendation)
             else:
-                st.info("Missing essential current sensor data (pH, temperature, rainfall) for crop suggestions.")
+                st.info("Missing essential current sensor data (pH, temperature, rainfall) for crop suggestions.", icon="ℹ️")
         else:
-            st.info("Predicted soil moisture is out of typical range or not available, hindering specific crop suggestions.")
+            st.info("Predicted soil moisture is out of typical range or not available, hindering specific crop suggestions.", icon="ℹ️")
 
     # --- Real-Time Plant Monitoring (Simulated) ---
     st.subheader("🌿 Real-Time Plant Monitoring (Simulated)")
@@ -1040,408 +1444,28 @@ else:
         with open("simulated_growth_data.json") as f:
             simulated_data = json.load(f)
             st.write(f"🕒 Timestamp: {simulated_data['timestamp']}")
-            st.success(f"📈 Growth Stage: {simulated_data['stage']}")
-            st.warning(f"⚠️ Advisory: {simulated_data['alert']}")
+            st.success(f"📈 Growth Stage: {simulated_data['stage']}", icon="📈")
+            st.warning(f"⚠️ Advisory: {simulated_data['alert']}", icon="⚠️")
     except FileNotFoundError:
-        st.error("❌ No simulation data found. Run `dummy_camera_simulator.py` to start simulation.")
+        st.error("❌ No simulation data found. Run `dummy_camera_simulator.py` to start simulation.", icon="❌")
 
     st.markdown("---")
     st.subheader("📋 Latest Sensor Readings (Raw Data)")
     if not df.empty:
         st.dataframe(df.tail(10))
     else:
-        st.info("No sensor data to display.")
+        st.info("No sensor data to display.", icon="ℹ️")
+    
+    st.markdown("---")
+    # Display initialization status messages at the very bottom
+    with st.expander("Application Initialization Status"):
+        for msg in firebase_init_status:
+            st.write(msg)
+
     # Auto-refresh every 10 seconds
     st_autorefresh(interval=10 * 1000, key="growth_sim_refresh")
 
------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-import pandas as pd
-import numpy as np
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Input, LSTM, Dropout, Dense
-from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
-import matplotlib.pyplot as plt
-import os
-import joblib
-
-# Ensure reproducible results (optional)
-tf.random.set_seed(42)
-np.random.seed(42)
-
-# --- Configuration ---
-DATA_FILE = "cleaned_sensor_data.csv"
-MODEL_SAVE_PATH = "tdann_pnsm_model.keras"
-INPUT_SCALER_SAVE_PATH = "tdann_input_scaler.joblib"
-OUTPUT_SCALER_SAVE_PATH = "tdann_output_scaler.joblib"
-CROP_ENCODER_SAVE_PATH = "tdann_crop_encoder.joblib"
-LOOKBACK_WINDOW = 5
-EPOCHS = 50
-BATCH_SIZE = 32
-VALIDATION_SPLIT = 0.2
-
-# --- Load Your Full Crop Dataset ---
-try:
-    df = pd.read_csv(DATA_FILE)
-    print(f"Data loaded from {DATA_FILE}")
-except FileNotFoundError:
-    print(f"Error: {DATA_FILE} not found. Please ensure the CSV file is in the same directory.")
-    exit()
-except Exception as e:
-    print(f"Error loading data: {e}")
-    exit()
-
-# --- Preprocessing ---
-
-# Ensure 'timestamp' index
-if 'timestamp' not in df.columns:
-    print("'timestamp' column not found. Generating synthetic timestamps.")
-    df['timestamp'] = pd.date_range(start='2024-01-01', periods=len(df), freq='h')
-df.set_index('timestamp', inplace=True)
-
-# Ensure 'label' column exists for crop awareness
-if 'label' not in df.columns:
-    print("Error: 'label' (crop type) column not found. Cannot perform crop-aware training.")
-    print("Please ensure your CSV has a 'label' column indicating crop types.")
-    exit()
-
-# Convert label to lowercase and strip whitespace
-df['label'] = df['label'].str.lower().str.strip()
-
-# One-Hot Encode Crop Labels using sklearn's OneHotEncoder
-crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
-# Fit the encoder on the unique crop labels present in the training data
-crop_encoder.fit(df[['label']])
-joblib.dump(crop_encoder, CROP_ENCODER_SAVE_PATH) # Save the fitted encoder
-print(f"Crop encoder saved to {CROP_ENCODER_SAVE_PATH}")
-
-# Transform the 'label' column into one-hot encoded features
-crop_encoded_data = crop_encoder.transform(df[['label']])
-# Create a DataFrame from the encoded data with meaningful column names
-crop_dummies = pd.DataFrame(crop_encoded_data, columns=crop_encoder.get_feature_names_out(['label']), index=df.index)
-df = pd.concat([df, crop_dummies], axis=1)
-print(f"Generated {len(crop_dummies.columns)} crop dummy variables using OneHotEncoder.")
-
-
-# --- Define Features and Targets ---
-
-# Input Features for the TDANN model (these must match the dashboard's `predict_growth` inputs)
-base_sensor_features = ['N', 'P', 'K', 'temperature', 'humidity', 'ph', 'rainfall']
-additional_features = []
-if 'growth_factor' in df.columns:
-    additional_features.append('growth_factor')
-# if 'growth_trigger' in df.columns: # Commented out to align with 30 features currently from Firebase
-#     additional_features.append('growth_trigger')
-
-# Use the column names generated by the OneHotEncoder
-final_input_features = base_sensor_features + additional_features + crop_encoder.get_feature_names_out(['label']).tolist()
-
-
-# Target Features for Multi-task output
-target_columns = ['soil_moisture', 'light_intensity']
-if 'N' in df.columns and 'P' in df.columns and 'K' in df.columns:
-    df['npk_sum'] = df['N'] + df['P'] + df['K']
-    target_columns.append('npk_sum')
-else:
-    print("N, P, or K columns missing. NPK sum target will not be used.")
-
-# Ensure all selected features and targets exist in the DataFrame
-missing_inputs = [f for f in final_input_features if f not in df.columns]
-missing_targets = [t for t in target_columns if t not in df.columns]
-
-if missing_inputs:
-    print(f"Missing input features in CSV: {missing_inputs}. Please check your data.")
-    exit()
-if missing_targets:
-    print(f"Missing target features in CSV: {missing_targets}. Please check your data.")
-    exit()
-
-print(f"Input features: {final_input_features}")
-print(f"Target features: {target_columns}")
-
-# Drop rows with any NaN values in the selected features or targets
-df_cleaned = df[final_input_features + target_columns].dropna()
-print(f"Original rows: {len(df)}. Rows after dropping NaNs: {len(df_cleaned)}")
-
-if df_cleaned.empty:
-    print("No clean data available after dropping NaNs for training. Exiting.")
-    exit()
-
-# --- Scaling ---
-# Input Scaler
-input_scaler = MinMaxScaler()
-data_scaled_inputs = input_scaler.fit_transform(df_cleaned[final_input_features])
-joblib.dump(input_scaler, INPUT_SCALER_SAVE_PATH)
-print(f"Input scaler saved to {INPUT_SCALER_SAVE_PATH}")
-
-# Output Scaler (separate scaler for targets is crucial for multi-output inverse transform)
-output_scaler = MinMaxScaler()
-data_scaled_targets = output_scaler.fit_transform(df_cleaned[target_columns])
-joblib.dump(output_scaler, OUTPUT_SCALER_SAVE_PATH)
-print(f"Output scaler saved to {OUTPUT_SCALER_SAVE_PATH}")
-
-
-# --- Sequence Generation for Multi-Output ---
-def create_sequences_multi_output(inputs, targets, lookback=5):
-    X, y = [], []
-    for i in range(lookback, len(inputs)):
-        X.append(inputs[i-lookback:i])
-        y.append(targets[i])
-    return np.array(X), np.array(y)
-
-X, y = create_sequences_multi_output(data_scaled_inputs, data_scaled_targets, LOOKBACK_WINDOW)
-
-print(f"Generated sequences: X.shape={X.shape}, y.shape={y.shape}")
-
-if X.shape[0] == 0:
-    print(f"Not enough data to create sequences with lookback window {LOOKBACK_WINDOW}. Need more than {LOOKBACK_WINDOW} rows.")
-    exit()
-
-# --- Build TDANN (LSTM-based) Model with Multi-Output ---
-model = Sequential()
-model.add(Input(shape=(X.shape[1], X.shape[2])))
-model.add(LSTM(128, return_sequences=True, activation='relu'))
-model.add(Dropout(0.3))
-model.add(LSTM(64, activation='relu'))
-model.add(Dropout(0.3))
-model.add(Dense(len(target_columns), activation='linear'))
-model.compile(optimizer='adam', loss='mse')
-model.summary()
-
-# --- Train ---
-print(f"\n--- Training Model for {EPOCHS} Epochs ---")
-history = model.fit(X, y, epochs=EPOCHS, batch_size=BATCH_SIZE, validation_split=VALIDATION_SPLIT, verbose=1)
-
-# --- Save Model ---
-model.save(MODEL_SAVE_PATH)
-print(f"New multi-output model trained and saved as {MODEL_SAVE_PATH}")
-
-# --- Optional: Plot Loss ---
-plt.figure(figsize=(10, 6))
-plt.plot(history.history['loss'], label='Train Loss')
-plt.plot(history.history['val_loss'], label='Validation Loss')
-plt.title("TDANN Training Loss (Multi-Output)")
-plt.xlabel("Epoch")
-plt.ylabel("Mean Squared Error")
-plt.legend()
-plt.grid(True)
-plt.show()
-
-
-# ==============================================================================
-# 🌾 New Component Suggestion: Seed Recommender (Already in your dashboard, just for completeness)
-# This part is a standalone function that can be integrated into your Streamlit dashboard.
-# It doesn't require retraining the TDANN model itself.
-# ==============================================================================
-
-def recommend_seeds(ph, temperature, rainfall, soil_moisture=None):
-    """
-    Suggests suitable crops based on environmental conditions.
-    Args:
-        ph (float): Current pH value of the soil.
-        temperature (float): Current temperature in Celsius.
-        rainfall (float): Recent rainfall in mm.
-        soil_moisture (float, optional): Current soil moisture percentage.
-                                        If available, provides more specific advice.
-    Returns:
-        str: Recommended crops or general advice.
-    """
-    recommendations = []
-
-    # pH based recommendations
-    if ph < 5.5:
-        recommendations.append("acid-tolerant crops like blueberries, potatoes, or specific rice varieties")
-    elif ph > 7.5:
-        recommendations.append("alkaline-tolerant crops such as asparagus, spinach, or specific varieties of alfalfa")
-    else:
-        recommendations.append("a wide range of crops thrive in neutral to slightly acidic pH (5.5-7.5), including wheat, maize, and most vegetables")
-
-    # Temperature based recommendations
-    if temperature > 35:
-        recommendations.append("heat-tolerant crops like millet, sorghum, cotton, or some varieties of beans")
-    elif temperature < 15:
-        recommendations.append("cold-hardy crops such as wheat (winter varieties), barley, oats, or peas")
-    else:
-        recommendations.append("warm-season crops like maize, rice (tropical), most vegetables, and fruits")
-
-    # Rainfall based recommendations
-    if rainfall < 50: # Low rainfall
-        recommendations.append("drought-resistant crops like millet, sorghum, chickpeas, or certain types of beans (e.g., mothbeans)")
-    elif rainfall > 200: # High rainfall, potentially waterlogging
-        recommendations.append("water-loving crops such as rice, sugarcane, jute, or crops that tolerate temporary waterlogging")
-    else:
-        recommendations.append("crops suitable for moderate rainfall, including wheat, maize, and many vegetables")
-
-    # Soil Moisture based recommendations (more granular if available)
-    if soil_moisture is not None:
-        if soil_moisture < 30: # Very dry
-            recommendations.append("very drought-tolerant crops (e.g., desert-adapted melons or some herbs)")
-        elif soil_moisture > 80: # Very wet, prone to waterlogging
-            recommendations.append("semi-aquatic crops or those highly tolerant to waterlogging (e.g., taro, some rice varieties if poorly drained)")
-
-    # Consolidate advice
-    if not recommendations:
-        return "No specific recommendations, as current conditions are unusual or general."
-    return "Based on your conditions, consider: " + ", ".join(recommendations) + ". Please consult local agricultural experts for precise recommendations."
-
-if __name__ == "__main__":
-    print("\n--- Seed Recommender Test ---")
-    # Simulate some current conditions
-    current_ph = 6.2
-    current_temp = 28.5
-    current_rainfall = 75
-    current_soil_moisture = 55 # Optional
-
-    print(f"Conditions: pH={current_ph}, Temp={current_temp}°C, Rainfall={current_rainfall}mm, Soil Moisture={current_soil_moisture}%")
-    recommended = recommend_seeds(current_ph, current_temp, current_rainfall, current_soil_moisture)
-    print(f"Recommendation: {recommended}")
-
-    current_ph_dry = 5.8
-    current_temp_dry = 32
-    current_rainfall_dry = 20
-    current_soil_moisture_dry = 25
-    print(f"\nConditions: pH={current_ph_dry}, Temp={current_temp_dry}°C, Rainfall={current_rainfall_dry}mm, Soil Moisture={current_soil_moisture_dry}%")
-    recommended_dry = recommend_seeds(current_ph_dry, current_temp_dry, current_rainfall_dry, current_soil_moisture_dry)
-    print(f"Recommendation: {recommended_dry}")
-
-    current_ph_wet = 7.0
-    current_temp_wet = 25
-    current_rainfall_wet = 250
-    current_soil_moisture_wet = 90
-    print(f"\nConditions: pH={current_ph_wet}, Temp={current_temp_wet}°C, Rainfall={current_rainfall_wet}mm, Soil Moisture={current_soil_moisture_wet}%")
-    recommended_wet = recommend_seeds(current_ph_wet, current_temp_wet, current_rainfall_wet, current_soil_moisture_wet)
-    print(f"Recommendation: {recommended_wet}")
-
 -----------------------------------------------------------------------------------------------------------
-
-import firebase_admin
-from firebase_admin import credentials, db
-import datetime
-import random
-import time
-import os
-import base64
-import tempfile # For creating temporary files from environment variables
-
-def run(): # Added the run function
-    # --- Firebase Secure Setup (Render-Compatible) ---
-    firebase_cred_path = None # Initialize to None
-    try:
-        firebase_key_b64 = os.getenv("FIREBASE_KEY_B64")
-        if firebase_key_b64:
-            decoded_json = base64.b64decode(firebase_key_b64).decode('utf-8')
-            with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as f:
-                f.write(decoded_json)
-            firebase_cred_path = f.name
-            cred = credentials.Certificate(firebase_cred_path)
-            print("Firebase credentials loaded from environment variable.")
-        else:
-            # Fallback for local development if environment variable is not set
-            # Ensure 'agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json' is in your project root
-            cred = credentials.Certificate("agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json")
-            print("Firebase credentials loaded from local file.")
-
-        # Prevent double initialization in case this script is run multiple times
-        if not firebase_admin._apps:
-            firebase_admin.initialize_app(cred, {
-                'databaseURL': 'https://agriastrax-website-default-rtdb.firebaseio.com/'
-            })
-        print("Firebase initialized successfully for data inserter.")
-    except Exception as e:
-        print(f"❌ Error initializing Firebase for insert-sample-data: {e}")
-        # In a thread, exiting might abruptly stop the main app, consider logging and returning
-        return # Return from run function if Firebase fails to initialize
-    finally:
-        # Clean up the temporary file if created from environment variable
-        if firebase_key_b64 and firebase_cred_path and os.path.exists(firebase_cred_path):
-            os.remove(firebase_cred_path)
-            print(f"Cleaned up temporary Firebase cred file: {firebase_cred_path}")
-
-    ref = db.reference('sensors/farm1')
-
-    # Define possible crop stages
-    CROP_STAGES = ['seed', 'sprout', 'vegetative', 'flowering', 'mature']
-
-    # Insert 10 past samples
-    print("Inserting 10 enhanced dummy sensor readings with all 12 features (including crop_stage and growth_factor)...")
-    for i in range(10):
-        sample_data = {
-            'timestamp': (datetime.datetime.now() - datetime.timedelta(minutes=(10 - i)*5)).isoformat(),
-            'soil_moisture': round(random.uniform(20, 80), 2),
-            'temperature': round(random.uniform(25, 40), 2),
-            'humidity': round(random.uniform(40, 90), 2),
-            'pH': round(random.uniform(5.5, 7.5), 2), # Corrected to 'pH' for consistency with dashboard
-            'light_intensity': random.randint(300, 800),
-            'N': random.randint(0, 120),
-            'P': random.randint(0, 60),
-            'K': random.randint(0, 200),
-            'rainfall': round(random.uniform(0, 200), 2),
-            'crop_stage': random.choice(CROP_STAGES),
-            'growth_factor': round(random.uniform(0.3, 1.0), 2)  # simulating energy/photosynthesis score
-        }
-        try:
-            ref.push(sample_data)
-        except Exception as e:
-            print(f"❌ Error pushing initial sample data to Firebase: {e}")
-            break # Stop inserting if there's an error
-    print("Successfully inserted 10 enhanced dummy sensor readings.")
-
-    # Simulate live updates every 10s
-    print("\nSimulating live updates. New data will be inserted every 10 seconds. Press Ctrl+C to stop.")
-    while True:
-        current_timestamp = datetime.datetime.now().isoformat()
-        
-        # Introduce some realistic variations
-        current_soil_moisture = round(random.uniform(20, 60), 2)
-        current_temperature = round(random.uniform(28, 35), 2)
-        current_humidity = round(random.uniform(50, 80), 2)
-        current_pH = round(random.uniform(6.0, 7.2), 2)
-        current_light_intensity = random.randint(400, 700)
-        current_N = random.randint(20, 100)
-        current_P = random.randint(10, 50)
-        current_K = random.randint(30, 150)
-        current_rainfall = round(random.uniform(0, 120), 2)
-        
-        # Simulate a progression in crop stage over time (very basic simulation)
-        # You might want a more sophisticated logic here based on actual time or growth_factor
-        # For now, it will pick a random stage, but you could make it sequential.
-        current_crop_stage = random.choice(CROP_STAGES) 
-        
-        # Growth factor could be influenced by light, temperature, moisture
-        # A simple example: higher light, temp, and moisture might lead to higher growth_factor
-        current_growth_factor = round(
-            random.uniform(0.3, 1.0) * (current_light_intensity / 800) * (current_temperature / 40) * (current_soil_moisture / 80), 2
-        )
-        # Clamp growth_factor to [0.3, 1.0] if the above calculation goes outside.
-        current_growth_factor = max(0.3, min(1.0, current_growth_factor))
-
-        try:
-            ref.push({
-                'timestamp': current_timestamp,
-                'soil_moisture': current_soil_moisture,
-                'temperature': current_temperature,
-                'humidity': current_humidity,
-                'pH': current_pH, # Corrected to 'pH' for consistency with dashboard
-                'light_intensity': current_light_intensity,
-                'N': current_N,
-                'P': current_P,
-                'K': current_K,
-                'rainfall': current_rainfall,
-                'crop_stage': current_crop_stage,
-                'growth_factor': current_growth_factor
-            })
-            print(f"Inserted real-time enriched sensor data at {current_timestamp}. Data: {current_crop_stage}, {current_growth_factor}")
-        except Exception as e:
-            print(f"❌ Error pushing real-time data to Firebase: {e}")
-            # If continuous errors occur, you might want a more robust error handling
-            # e.g., exponential backoff, or stop trying to push data for a while.
-        time.sleep(10)
-
-if __name__ == "__main__":
-    run() # Call the run function when the script is executed directly
-
--------------------------------------------------------------------------------------------------------------------------------------
 
 # dummy_camera_simulator.py
 
@@ -1555,6 +1579,6 @@ def run():
 if __name__ == "__main__":
     run()
 
------------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------
 
-here are all the files in my project.
+i don't have the simulated_growth_data.json file, it now pushes straight to firebase. please modify the dashboard based on this
