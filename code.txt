@@ -254,6 +254,28 @@ def fetch_sensor_data():
     df = df.sort_values('timestamp')
     return df.reset_index(drop=True)
 
+# --- Fetch Live Camera Feed Data ---
+@st.cache_data(ttl=10) # Cache data for 10 seconds
+def fetch_camera_feed_data():
+    """Fetches camera feed data (growth events) from Firebase Realtime Database."""
+    ref = db.reference('camera_feed/farm1')
+    snapshot = ref.get()
+    if not snapshot:
+        return None
+    
+    # Firebase data often comes as a dict of dicts, where keys are Firebase push IDs
+    # Get the last entry by sorting by key (which are often timestamp-like or sequential)
+    if isinstance(snapshot, dict):
+        # Get the last key (latest entry)
+        last_key = sorted(snapshot.keys())[-1]
+        return snapshot[last_key]
+    else:
+        # This case should ideally not happen for push data, but handle defensively
+        if isinstance(snapshot, list) and snapshot:
+            return snapshot[-1] # Get the last item if it's a list
+        return None
+
+
 # --- Predict Growth (Multi-Output TDANN) ---
 def predict_growth(df_latest_data, selected_crop_type):
     """
@@ -589,7 +611,7 @@ ADVICE_MESSAGES = {
         'wheat_light_low': "सुनिश्चित करें कि फसल को पर्याप्त धूप मिले।",
         'rice_light_low': "सुनिश्चित करें कि चावल को पूरी धूप मिले।",
         'general_light_low': "सामान्य सलाह: अपर्याप्त प्रकाश प्रकाश संश्लेषण में बाधा डाल सकता है। पूरक प्रकाश या छंटाई पर विचार करें।",
-        'general_light_high': "सामान्य सलाह: अत्यधिक प्रकाश से झुलसना हो सकता है। चरम घंटों के दौरान छाया पर विचार करें。"
+        'general_light_high': "सामान्य सलाह: अत्यधिक प्रकाश से झुलसना हो सकता है। चरम घंटों के दौरान छाया पर विचार करें।"
     },
     'es': { # Spanish
         'no_data': "No hay datos del sensor disponibles para proporcionar asesoramiento.",
@@ -754,6 +776,88 @@ ADVICE_MESSAGES = {
         'rice_light_low': "Assurez-vous que le riz reçoit une exposition complète au soleil.",
         'general_light_low': "Conseil général : Une lumière insuffisante peut entraver la photosynthèse. Envisagez un éclairage supplémentaire ou une taille.",
         'general_light_high': "Conseil général : Une lumière excessive peut provoquer des brûlures. Envisagez l'ombrage pendant les heures de pointe."
+    },
+    'de': { # German
+        'no_data': "Keine Sensordaten verfügbar, um Ratschläge zu geben.",
+        'npk_low': "🌱 **{nutrient} ist niedrig ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient} ist hoch ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **Bodenfeuchtigkeit niedrig ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **Bodenfeuchtigkeit hoch ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **Temperatur niedrig ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **Temperatur hoch ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **Luftfeuchtigkeit niedrig ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **Luftfeuchtigkeit hoch ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **pH-Wert niedrig ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **pH-Wert hoch ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **pH-Wert nicht optimal ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **Lichtintensität niedrig ({light:.1f} Lux)**: {message}",
+        'light_high': "☀️ **Lichtintensität hoch ({light:.1f} Lux)**: {message}",
+        'rainfall_low_msg': "🌧️ **Niederschlag niedrig ({rain:.1f} mm)**: {message}",
+        'rainfall_high_msg': "🌧️ **Niederschlag hoch ({rain:.1f} mm)**: {message}",
+        'all_good': "✅ Alle wichtigen Parameter sehen gut aus! Überwachen Sie regelmäßig für optimales Wachstum.",
+        'npk_n_low': "Erwägen Sie die Anwendung von stickstoffreichem Dünger.",
+        'npk_n_high': "Überschüssiger Stickstoff kann das Blattwachstum gegenüber der Frucht-/Blütenentwicklung fördern.",
+        'npk_p_low': "Erwägen Sie die Anwendung von Phosphordünger für die Wurzelentwicklung.",
+        'npk_p_high': "Hoher Phosphor kann andere Nährstoffe blockieren.",
+        'npk_k_low': "Erwägen Sie die Anwendung von Kaliumdünger für die allgemeine Pflanzengesundheit und Fruchtqualität.",
+        'npk_k_high': "Überschüssiges Kalium kann die Aufnahme von Kalzium und Magnesium beeinträchtigen.",
+        'wheat_sm_low': "Leicht bewässern – Weizen benötigt 35–50% Bodenfeuchtigkeit.",
+        'rice_sm_low': "Reis benötigt hohe Feuchtigkeit. Sorgen Sie für eine ordnungsgemäße Bewässerung.",
+        'maize_sm_low': "Mais benötigt moderate Bodenfeuchtigkeitswerte.",
+        'banana_sm_low': "Halten Sie den Boden für Bananen stets feucht.",
+        'mango_sm_high': "Vermeiden Sie Staunässe. Mangos benötigen gut durchlässigen Boden.",
+        'grapes_sm_high': "Trauben bevorzugen trockeneren Boden – vermeiden Sie Überwässerung.",
+        'cotton_sm_low': "Baumwolle benötigt während der Blütezeit moderate Feuchtigkeit.",
+        'millet_sorghum_sm_low': "Dies sind trockenheitstolerante Kulturen, benötigen aber dennoch minimale Feuchtigkeit.",
+        'jute_sm_low': "Jute benötigt während des Wachstums reichlich Feuchtigkeit.",
+        'pomegranate_sm_high': "Vermeiden Sie Überwässerung bei Granatäpfeln.",
+        'melon_sm_low': "Melonen benötigen konstante Bewässerung, besonders während der Fruchtbildung.",
+        'coconut_sm_low': "Kokospalmen benötigen hohe Feuchtigkeitswerte.",
+        'mothbeans_sm_low': "Mothbohnen sind trockenheitstolerant, benötigen aber während der Blütezeit minimale Bewässerung.",
+        'mungbean_sm_low': "Sorgen Sie für regelmäßige Bewässerung während der Blüte und Hülsenbildung.",
+        'blackgram_sm_low': "Halten Sie die Feuchtigkeit besonders während der Blüte moderat.",
+        'lentil_sm_low': "Linsen benötigen geringe bis moderate Feuchtigkeit.",
+        'general_sm_low': "Allgemeiner Ratschlag: Erwägen Sie Bewässerung, um Trockenstress vorzubeugen.",
+        'general_sm_high': "Allgemeiner Ratschlag: Sorgen Sie für eine gute Drainage, um Staunässe zu vermeiden.",
+        'wheat_temp_high': "Schatten spenden oder abends bewässern – Temperatur ist zu hoch für Weizen.",
+        'rice_temp_high': "Zu heiß für Reis. Erwägen Sie abendliche Bewässerung oder Schatten.",
+        'maize_temp_low': "Mais bevorzugt warmes Wetter (20–30°C).",
+        'banana_temp_low': "Banane ist kälteempfindlich – sorgen Sie für warme Bedingungen.",
+        'mango_temp_low': "Mango benötigt wärmere Temperaturen (>20°C).",
+        'cotton_temp_low': "Baumwolle gedeiht bei warmen Temperaturen.",
+        'millet_sorghum_temp_low': "Warmes Klima ist ideal für Hirse/Sorghum.",
+        'coffee_temp_low': "Kaffee gedeiht im Bereich von 18–24°C.",
+        'jute_temp_low': "Jute wächst gut bei 25–30°C.",
+        'papaya_temp_low': "Papaya bevorzugt den Bereich von 21–33°C.",
+        'pomegranate_temp_low': "Ideale Temperatur liegt über 20°C.",
+        'melon_temp_low': "Stellen Sie sicher, dass die Temperatur warm ist (>25°C).",
+        'coconut_temp_low': "Ideale Temperatur für Kokosnuss liegt über 25°C.",
+        'mothbeans_temp_low': "Die Temperatur sollte über 22°C liegen.",
+        'mungbean_temp_low': "Mungbohnen benötigen warme Bedingungen für optimales Wachstum.",
+        'blackgram_temp_low': "Der ideale Temperaturbereich liegt bei 25–35°C.",
+        'lentil_temp_low': "Linsen wachsen gut bei 18–30°C.",
+        'general_temp_low': "Allgemeiner Ratschlag: Kalte Temperaturen können das Wachstum hemmen. Erwägen Sie Schutzmaßnahmen.",
+        'general_temp_high': "Allgemeiner Ratschlag: Hohe Temperaturen können Hitzestress verursachen. Sorgen Sie für ausreichend Wasser und Schatten.",
+        'wheat_hum_high': "Achten Sie auf Pilzinfektionen – sorgen Sie für Luftzirkulation.",
+        'rice_hum_low': "Erhöhen Sie die Umgebungsfeuchtigkeit oder verwenden Sie Mulch.",
+        'banana_hum_low': "Banane benötigt hohe Luftfeuchtigkeit. Erwägen Sie Besprühen oder Mulchen.",
+        'grapes_hum_high': "Hohe Luftfeuchtigkeit kann zu Pilzinfektionen führen.",
+        'coffee_hum_low': "Kaffee bevorzugt hohe Luftfeuchtigkeit.",
+        'orange_hum_high': "Beschneiden Sie Bäume, um die Luftzirkulation zu verbessern und Pilzprobleme zu vermeiden.",
+        'general_hum_low': "Allgemeiner Ratschlag: Geringe Luftfeuchtigkeit kann Welken verursachen. Erwägen Sie Besprühen oder Erhöhung der Bodenfeuchtigkeit.",
+        'general_hum_high': "Allgemeiner Ratschlag: Hohe Luftfeuchtigkeit erhöht das Risiko von Pilzkrankheiten. Sorgen Sie für gute Belüftung.",
+        'wheat_ph_low': "Leicht sauer – erwägen Sie die Anwendung von Kalk, um den pH-Wert zu erhöhen.",
+        'rice_ph_off': "Halten Sie den Boden für Reis leicht sauer (pH 5.5–6.5).",
+        'maize_ph_off': "Halten Sie den Boden-pH-Wert zwischen 5.8–7.0.",
+        'papaya_ph_low': "Leicht saurer bis neutraler Boden ist am besten für Papaya.",
+        'orange_ph_off': "Der ideale Boden-pH-Wert für Orangen liegt bei 6.0–7.5.",
+        'general_ph_very_low': "Allgemeiner Ratschlag: Der Boden ist zu sauer. Wenden Sie Kalk an, um den pH-Wert zu erhöhen und die Nährstoffverfügbarkeit zu verbessern.",
+        'general_ph_very_high': "Allgemeiner Ratschlag: Der Boden ist zu alkalisch. Wenden Sie Schwefel oder organische Substanz an, um den pH-Wert zu senken.",
+        'general_ph_off': "Allgemeiner Ratschlag: Der optimale pH-Bereich für die meisten Kulturen liegt bei 5.5-7.5. Passen Sie ihn bei Bedarf an.",
+        'wheat_light_low': "Stellen Sie sicher, dass die Ernte ausreichend Sonnenlicht erhält.",
+        'rice_light_low': "Stellen Sie sicher, dass Reis volle Sonneneinstrahlung erhält.",
+        'general_light_low': "Allgemeiner Ratschlag: Unzureichendes Licht kann die Photosynthese behindern. Erwägen Sie zusätzliche Beleuchtung oder Beschneidung.",
+        'general_light_high': "Allgemeiner Ratschlag: Übermäßiges Licht kann Verbrennungen verursachen. Erwägen Sie Beschattung während der Spitzenzeiten."
     },
     'de': { # German
         'no_data': "Keine Sensordaten verfügbar, um Ratschläge zu geben.",
@@ -1090,7 +1194,7 @@ SEED_RECOMMENDATIONS_MESSAGES = {
         'neutral_ph': "une large gamme de cultures prospèrent dans un pH neutre à légèrement acide (5.5-7.5), y compris le blé, le maïs et la plupart des légumes",
         'heat_tolerant': "cultures tolérantes à la chaleur comme le millet, le sorgho, le coton ou certaines variétés de haricots",
         'cold_hardy': "cultures résistantes au froid comme le blé (variétés d'hiver), l'orge, l'avoine ou les pois",
-        'warm_season': "cultures de saison chaude comme le maïs, le riz (tropical), la plupart des légumes et des fruits",
+        'warm_season': "cultures de saison chaude comme le maïs, le riz (tropica), la plupart des légumes et des fruits",
         'drought_resistant': "cultures résistantes à la sécheresse comme le millet, le sorgho, les pois chiches ou certains types de haricots (par exemple, les haricots papillons)",
         'water_loving': "cultures aimant l'eau comme le riz, la canne à sucre, le jute ou les cultures qui tolèrent l'engorgement temporaire",
         'moderate_rainfall': "cultures adaptées aux précipitations modérées, y compris le blé, le maïs et de nombreux légumes",
@@ -1382,7 +1486,7 @@ else:
                 if care_tips:
                     for i, tip in enumerate(care_tips[:2]): # Play up to 2 alerts
                         # Remove markdown for better speech, and also remove emojis
-                        clean_tip = tip.replace('**', '').replace('🌱', '').replace('💧', '').replace('🌡️', '').replace('💨', '').replace('🧪', '').replace('☀️', '').replace('🌧️', '').replace('✅', '').strip()
+                        clean_tip = tip.replace('**', '').replace('🌱', '').replace('💧', '').replace('🌡️', '').replace('💨', '').replace('�', '').replace('☀️', '').replace('🌧️', '').replace('✅', '').strip()
                         if clean_tip: # Only play if there's actual text after cleaning
                             st.info(f"Playing alert {i+1}: {clean_tip}", icon="🔊")
                             speak_tip(clean_tip, lang=voice_lang)
@@ -1438,16 +1542,15 @@ else:
         else:
             st.info("Predicted soil moisture is out of typical range or not available, hindering specific crop suggestions.", icon="ℹ️")
 
-    # --- Real-Time Plant Monitoring (Simulated) ---
+    # --- Real-Time Plant Monitoring (Fetched from Firebase) ---
     st.subheader("🌿 Real-Time Plant Monitoring (Simulated)")
-    try:
-        with open("simulated_growth_data.json") as f:
-            simulated_data = json.load(f)
-            st.write(f"🕒 Timestamp: {simulated_data['timestamp']}")
-            st.success(f"📈 Growth Stage: {simulated_data['stage']}", icon="📈")
-            st.warning(f"⚠️ Advisory: {simulated_data['alert']}", icon="⚠️")
-    except FileNotFoundError:
-        st.error("❌ No simulation data found. Run `dummy_camera_simulator.py` to start simulation.", icon="❌")
+    camera_data = fetch_camera_feed_data()
+    if camera_data:
+        st.write(f"🕒 Timestamp: {camera_data.get('timestamp', 'N/A')}")
+        st.success(f"📈 Growth Stage: {camera_data.get('stage', 'N/A')}", icon="📈")
+        st.warning(f"⚠️ Advisory: {camera_data.get('alert', 'N/A')}", icon="⚠️")
+    else:
+        st.info("No real-time plant monitoring data available from Firebase. Please ensure the dummy camera simulator is running and pushing data.", icon="ℹ️")
 
     st.markdown("---")
     st.subheader("📋 Latest Sensor Readings (Raw Data)")
@@ -1465,120 +1568,7 @@ else:
     # Auto-refresh every 10 seconds
     st_autorefresh(interval=10 * 1000, key="growth_sim_refresh")
 
------------------------------------------------------------------------------------------------------------
 
-# dummy_camera_simulator.py
+---------------------------------------------------
 
-import time
-import random
-import json
-from datetime import datetime
-import os
-import base64
-import tempfile
-
-# Import Firebase Admin SDK
-import firebase_admin
-from firebase_admin import credentials, db
-
-# Simulated growth stages
-growth_stages = ["Germination", "Vegetative", "Flowering", "Maturity", "Wilting", "Yellowing"]
-
-# --- Firebase Secure Setup (Render-Compatible) ---
-# This part is adapted from your main dashboard script to make it runnable independently.
-# It tries to get the key from an environment variable first, then from a local file.
-firebase_cred_path = None
-try:
-    firebase_key_b64 = os.getenv("FIREBASE_KEY_B64")
-    if firebase_key_b64:
-        decoded_json = base64.b64decode(firebase_key_b64).decode('utf-8')
-        with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as f:
-            f.write(decoded_json)
-        firebase_cred_path = f.name
-        cred = credentials.Certificate(firebase_cred_path)
-        print("Firebase credentials loaded from environment variable.")
-    else:
-        # Fallback for local development if environment variable is not set
-        cred = credentials.Certificate("agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json")
-        print("Firebase credentials loaded from local file.")
-
-    # Prevent double initialization in case this script is run multiple times or in certain environments
-    if not firebase_admin._apps:
-        firebase_admin.initialize_app(cred, {
-            'databaseURL': 'https://agriastrax-website-default-rtdb.firebaseio.com/'
-        })
-    print("Firebase initialized successfully for camera simulator.")
-except Exception as e:
-    print(f"❌ Error initializing Firebase for dummy_camera_simulator: {e}")
-    # It's crucial to handle this error. If Firebase can't init, the script can't push data.
-    # For a simulator, you might just let it run and log errors, but it won't push data.
-    firebase_admin = None # Mark Firebase as not initialized
-
-finally:
-    # Clean up the temporary file if created from environment variable
-    if firebase_key_b64 and firebase_cred_path and os.path.exists(firebase_cred_path):
-        os.remove(firebase_cred_path)
-        print(f"Cleaned up temporary Firebase cred file: {firebase_cred_path}")
-
-
-def generate_dummy_growth_event():
-    event = {
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "stage": random.choice(growth_stages),
-        "alert": random.choice([
-            "Healthy Growth",
-            "Low Leaf Color Index",
-            "Possible Disease Detected",
-            "Needs Fertilizer",
-            "Check Irrigation"
-        ])
-    }
-    return event
-
-def run():
-    print("Starting dummy camera feed simulation...")
-
-    if firebase_admin is None:
-        print("Firebase is not initialized. Cannot push data to Firebase. Simulation will run but only print locally.")
-        # Fallback to local file if Firebase fails, or just print
-        local_file_only = True
-        # OUTPUT_FILE = "simulated_growth_data.json" # Re-enable if you want local file fallback
-    else:
-        local_file_only = False
-        try:
-            # Get a database reference to store camera data
-            camera_ref = db.reference('camera_feed/farm1')
-            print("Connected to Firebase path: camera_feed/farm1")
-        except Exception as e:
-            print(f"❌ Error getting Firebase database reference: {e}. Falling back to local file.")
-            local_file_only = True
-
-
-    while True:
-        event = generate_dummy_growth_event()
-        
-        if not local_file_only:
-            try:
-                # Push data to Firebase
-                camera_ref.push(event)
-                print(f"Simulated Data pushed to Firebase: {event}")
-            except Exception as e:
-                print(f"❌ Error pushing data to Firebase: {e}. Falling back to local printing.")
-                # If a persistent Firebase error, just print locally
-                local_file_only = True # Stop trying to push to Firebase
-                print("Simulated Data (local print):", event)
-        else:
-            # If Firebase is not initialized or failed, print locally
-            print("Simulated Data (local print):", event)
-            # You can re-enable writing to a local JSON file here if desired as a fallback:
-            # with open(OUTPUT_FILE, "w") as f:
-            #     json.dump(event, f)
-
-        time.sleep(10)  # Generate every 10 seconds
-
-if __name__ == "__main__":
-    run()
-
--------------------------------------------------------------------------------------------------------
-
-i don't have the simulated_growth_data.json file, it now pushes straight to firebase. please modify the dashboard based on this
+please inlcude bengali language in it.

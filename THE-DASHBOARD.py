@@ -21,19 +21,6 @@ from streamlit_autorefresh import st_autorefresh
 # For Voice Alerts
 from gtts import gTTS
 
-# Check for playsound availability
-PLAYSOUND_AVAILABLE = False
-try:
-    import playsound
-    PLAYSOUND_AVAILABLE = True
-except ImportError:
-    st.warning("`playsound` library not found. Voice alerts will be generated but not played. "
-               "Install with `pip install playsound` for local playback. "
-               "For cloud deployment, consider embedding HTML audio.", icon="⚠️")
-except Exception as e:
-    st.warning(f"Error importing playsound: {e}. Voice alerts might not work.", icon="⚠️")
-
-
 # --- Firebase Secure Setup (Render-Compatible) ---
 firebase_key_b64 = os.getenv("FIREBASE_KEY_B64")
 firebase_cred_path = None # Initialize to None
@@ -419,32 +406,36 @@ def predict_market_price(latest_data, selected_crop_type, market_model, market_c
 
 # --- Voice Alert Function (Updated for Streamlit Cloud + Local) ---
 def speak_tip(tip_text, lang='en'):
+    file_path = None # Initialize file_path
     try:
         with st.spinner(f"Generating voice alert in {lang.upper()}..."):
             tts = gTTS(text=tip_text, lang=lang)
+            # Use NamedTemporaryFile to get a unique file path
+            # delete=False means we'll manually delete it later
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
                 file_path = f.name
                 tts.save(file_path)
             
-            if PLAYSOUND_AVAILABLE:
-                try:
-                    playsound.playsound(file_path)
-                except Exception as e:
-                    st.error(f"Error playing voice alert with playsound: {e}. Attempting in-browser playback.", icon="❌")
-                    # Fallback to in-browser playback if playsound fails
-                    audio_file = open(file_path, "rb")
-                    audio_bytes = audio_file.read()
-                    st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-            else:
-                audio_file = open(file_path, "rb")
+            # Read the audio file bytes and then close it immediately
+            with open(file_path, "rb") as audio_file:
                 audio_bytes = audio_file.read()
-                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+            
+            st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+            
+            # Add a small delay to give Streamlit/browser time to process the audio
+            time.sleep(0.5) 
+
     except Exception as e:
         st.error(f"Error generating or playing voice alert: {e}", icon="❌")
-        st.info("This might be due to missing audio backend (e.g., `ffplay` on Linux) or `playsound` limitations on web servers.", icon="ℹ️")
+        st.info("This might be due to temporary file access issues or an unsupported audio backend.", icon="ℹ️")
     finally:
-        if 'file_path' in locals() and os.path.exists(file_path):
-            os.remove(file_path) # Clean up the temporary file
+        # Ensure the file is deleted only if it exists and after a short delay
+        if file_path and os.path.exists(file_path):
+            try:
+                os.remove(file_path) # Clean up the temporary file
+            except Exception as e_del:
+                st.warning(f"Could not delete temporary audio file {file_path}: {e_del}", icon="⚠️")
+
 
 # --- Crop Care Advice Function ---
 # Mapping for advice messages to support multiple languages
@@ -859,119 +850,251 @@ ADVICE_MESSAGES = {
         'general_light_low': "Allgemeiner Ratschlag: Unzureichendes Licht kann die Photosynthese behindern. Erwägen Sie zusätzliche Beleuchtung oder Beschneidung.",
         'general_light_high': "Allgemeiner Ratschlag: Übermäßiges Licht kann Verbrennungen verursachen. Erwägen Sie Beschattung während der Spitzenzeiten."
     },
-    'de': { # German
-        'no_data': "Keine Sensordaten verfügbar, um Ratschläge zu geben.",
-        'npk_low': "🌱 **{nutrient} ist niedrig ({value:.1f})**: {message}",
-        'npk_high': "🌱 **{nutrient} ist hoch ({value:.1f})**: {message}",
-        'soil_moisture_low': "💧 **Bodenfeuchtigkeit niedrig ({sm:.1f}%)**: {message}",
-        'soil_moisture_high': "💧 **Bodenfeuchtigkeit hoch ({sm:.1f}%)**: {message}",
-        'temp_low': "🌡️ **Temperatur niedrig ({temp:.1f}°C)**: {message}",
-        'temp_high': "🌡️ **Temperatur hoch ({temp:.1f}°C)**: {message}",
-        'humidity_low': "💨 **Luftfeuchtigkeit niedrig ({hum:.1f}%)**: {message}",
-        'humidity_high': "💨 **Luftfeuchtigkeit hoch ({hum:.1f}%)**: {message}",
-        'ph_low': "🧪 **pH-Wert niedrig ({ph_val:.1f})**: {message}",
-        'ph_high': "🧪 **pH-Wert hoch ({ph_val:.1f})**: {message}",
-        'ph_off': "🧪 **pH-Wert nicht optimal ({ph_val:.1f})**: {message}",
-        'light_low': "☀️ **Lichtintensität niedrig ({light:.1f} Lux)**: {message}",
-        'light_high': "☀️ **Lichtintensität hoch ({light:.1f} Lux)**: {message}",
-        'rainfall_low_msg': "🌧️ **Niederschlag niedrig ({rain:.1f} mm)**: {message}",
-        'rainfall_high_msg': "🌧️ **Niederschlag hoch ({rain:.1f} mm)**: {message}",
-        'all_good': "✅ Alle wichtigen Parameter sehen gut aus! Überwachen Sie regelmäßig für optimales Wachstum.",
-        'npk_n_low': "Erwägen Sie die Anwendung von stickstoffreichem Dünger.",
-        'npk_n_high': "Überschüssiger Stickstoff kann das Blattwachstum gegenüber der Frucht-/Blütenentwicklung fördern.",
-        'npk_p_low': "Erwägen Sie die Anwendung von Phosphordünger für die Wurzelentwicklung.",
-        'npk_p_high': "Hoher Phosphor kann andere Nährstoffe blockieren.",
-        'npk_k_low': "Erwägen Sie die Anwendung von Kaliumdünger für die allgemeine Pflanzengesundheit und Fruchtqualität.",
-        'npk_k_high': "Überschüssiges Kalium kann die Aufnahme von Kalzium und Magnesium beeinträchtigen.",
-        'wheat_sm_low': "Leicht bewässern – Weizen benötigt 35–50% Bodenfeuchtigkeit.",
-        'rice_sm_low': "Reis benötigt hohe Feuchtigkeit. Sorgen Sie für eine ordnungsgemäße Bewässerung.",
-        'maize_sm_low': "Mais benötigt moderate Bodenfeuchtigkeitswerte.",
-        'banana_sm_low': "Halten Sie den Boden für Bananen stets feucht.",
-        'mango_sm_high': "Vermeiden Sie Staunässe. Mangos benötigen gut durchlässigen Boden.",
-        'grapes_sm_high': "Trauben bevorzugen trockeneren Boden – vermeiden Sie Überwässerung.",
-        'cotton_sm_low': "Baumwolle benötigt während der Blütezeit moderate Feuchtigkeit.",
-        'millet_sorghum_sm_low': "Dies sind trockenheitstolerante Kulturen, benötigen aber dennoch minimale Feuchtigkeit.",
-        'jute_sm_low': "Jute benötigt während des Wachstums reichlich Feuchtigkeit.",
-        'pomegranate_sm_high': "Vermeiden Sie Überwässerung bei Granatäpfeln.",
-        'melon_sm_low': "Melonen benötigen konstante Bewässerung, besonders während der Fruchtbildung.",
-        'coconut_sm_low': "Kokospalmen benötigen hohe Feuchtigkeitswerte.",
-        'mothbeans_sm_low': "Mothbohnen sind trockenheitstolerant, benötigen aber während der Blütezeit minimale Bewässerung.",
-        'mungbean_sm_low': "Sorgen Sie für regelmäßige Bewässerung während der Blüte und Hülsenbildung.",
-        'blackgram_sm_low': "Halten Sie die Feuchtigkeit besonders während der Blüte moderat.",
-        'lentil_sm_low': "Linsen benötigen geringe bis moderate Feuchtigkeit.",
-        'general_sm_low': "Allgemeiner Ratschlag: Erwägen Sie Bewässerung, um Trockenstress vorzubeugen.",
-        'general_sm_high': "Allgemeiner Ratschlag: Sorgen Sie für eine gute Drainage, um Staunässe zu vermeiden.",
-        'wheat_temp_high': "Schatten spenden oder abends bewässern – Temperatur ist zu hoch für Weizen.",
-        'rice_temp_high': "Zu heiß für Reis. Erwägen Sie abendliche Bewässerung oder Schatten.",
-        'maize_temp_low': "Mais bevorzugt warmes Wetter (20–30°C).",
-        'banana_temp_low': "Banane ist kälteempfindlich – sorgen Sie für warme Bedingungen.",
-        'mango_temp_low': "Mango benötigt wärmere Temperaturen (>20°C).",
-        'cotton_temp_low': "Baumwolle gedeiht bei warmen Temperaturen.",
-        'millet_sorghum_temp_low': "Warmes Klima ist ideal für Hirse/Sorghum.",
-        'coffee_temp_low': "Kaffee gedeiht im Bereich von 18–24°C.",
-        'jute_temp_low': "Jute wächst gut bei 25–30°C.",
-        'papaya_temp_low': "Papaya bevorzugt den Bereich von 21–33°C.",
-        'pomegranate_temp_low': "Ideale Temperatur liegt über 20°C.",
-        'melon_temp_low': "Stellen Sie sicher, dass die Temperatur warm ist (>25°C).",
-        'coconut_temp_low': "Ideale Temperatur für Kokosnuss liegt über 25°C.",
-        'mothbeans_temp_low': "Die Temperatur sollte über 22°C liegen.",
-        'mungbean_temp_low': "Mungbohnen benötigen warme Bedingungen für optimales Wachstum.",
-        'blackgram_temp_low': "Der ideale Temperaturbereich liegt bei 25–35°C.",
-        'lentil_temp_low': "Linsen wachsen gut bei 18–30°C.",
-        'general_temp_low': "Allgemeiner Ratschlag: Kalte Temperaturen können das Wachstum hemmen. Erwägen Sie Schutzmaßnahmen.",
-        'general_temp_high': "Allgemeiner Ratschlag: Hohe Temperaturen können Hitzestress verursachen. Sorgen Sie für ausreichend Wasser und Schatten.",
-        'wheat_hum_high': "Achten Sie auf Pilzinfektionen – sorgen Sie für Luftzirkulation.",
-        'rice_hum_low': "Erhöhen Sie die Umgebungsfeuchtigkeit oder verwenden Sie Mulch.",
-        'banana_hum_low': "Banane benötigt hohe Luftfeuchtigkeit. Erwägen Sie Besprühen oder Mulchen.",
-        'grapes_hum_high': "Hohe Luftfeuchtigkeit kann zu Pilzinfektionen führen.",
-        'coffee_hum_low': "Kaffee bevorzugt hohe Luftfeuchtigkeit.",
-        'orange_hum_high': "Beschneiden Sie Bäume, um die Luftzirkulation zu verbessern und Pilzprobleme zu vermeiden.",
-        'general_hum_low': "Allgemeiner Ratschlag: Geringe Luftfeuchtigkeit kann Welken verursachen. Erwägen Sie Besprühen oder Erhöhung der Bodenfeuchtigkeit.",
-        'general_hum_high': "Allgemeiner Ratschlag: Hohe Luftfeuchtigkeit erhöht das Risiko von Pilzkrankheiten. Sorgen Sie für gute Belüftung.",
-        'wheat_ph_low': "Leicht sauer – erwägen Sie die Anwendung von Kalk, um den pH-Wert zu erhöhen.",
-        'rice_ph_off': "Halten Sie den Boden für Reis leicht sauer (pH 5.5–6.5).",
-        'maize_ph_off': "Halten Sie den Boden-pH-Wert zwischen 5.8–7.0.",
-        'papaya_ph_low': "Leicht saurer bis neutraler Boden ist am besten für Papaya.",
-        'orange_ph_off': "Der ideale Boden-pH-Wert für Orangen liegt bei 6.0–7.5.",
-        'general_ph_very_low': "Allgemeiner Ratschlag: Der Boden ist zu sauer. Wenden Sie Kalk an, um den pH-Wert zu erhöhen und die Nährstoffverfügbarkeit zu verbessern.",
-        'general_ph_very_high': "Allgemeiner Ratschlag: Der Boden ist zu alkalisch. Wenden Sie Schwefel oder organische Substanz an, um den pH-Wert zu senken.",
-        'general_ph_off': "Allgemeiner Ratschlag: Der optimale pH-Bereich für die meisten Kulturen liegt bei 5.5-7.5. Passen Sie ihn bei Bedarf an.",
-        'wheat_light_low': "Stellen Sie sicher, dass die Ernte ausreichend Sonnenlicht erhält.",
-        'rice_light_low': "Stellen Sie sicher, dass Reis volle Sonneneinstrahlung erhält.",
-        'general_light_low': "Allgemeiner Ratschlag: Unzureichendes Licht kann die Photosynthese behindern. Erwägen Sie zusätzliche Beleuchtung oder Beschneidung.",
-        'general_light_high': "Allgemeiner Ratschlag: Übermäßiges Licht kann Verbrennungen verursachen. Erwägen Sie Beschattung während der Spitzenzeiten."
-    },
     'ar': { # Arabic (Example, requires more detailed translation)
-        'intro': "بناءً على الظروف الحالية، قد تفكر في: ",
-        'outro': ". يرجى استشارة خبراء الزراعة المحليين للحصول على توصيات دقيقة.",
-        'acid_tolerant': "محاصيل تتحمل الحموضة مثل التوت الأزرق، البطاطس، أو أصناف معينة من الأرز",
-        'alkaline_tolerant': "محاصيل تتحمل القلوية مثل الهليون، السبانخ، أو أصناف معينة من البرسيم الحجازي",
-        'neutral_ph': "مجموعة واسعة من المحاصيل تزدهر في درجة حموضة محايدة إلى حمضية قليلاً (5.5-7.5)، بما في ذلك القمح والذرة ومعظم الخضروات",
-        'heat_tolerant': "محاصيل تتحمل الحرارة مثل الدخن، الذرة الرفيعة، القطن، أو بعض أنواع الفول",
-        'cold_hardy': "محاصيل مقاومة للبرد مثل القمح (أصناف الشتاء)، الشعير، الشوفان، أو البازلاء",
-        'warm_season': "محاصيل الموسم الدافئ مثل الذرة، الأرز (الاستوائي)، معظم الخضروات، والفواكه",
-        'drought_resistant': "محاصيل مقاومة للجفاف مثل الدخن، الذرة الرفيعة، الحمص، أو أنواع معينة من الفول (مثل الماش)",
-        'water_loving': "محاصيل محبة للماء مثل الأرز، قصب السكر، الجوت، أو المحاصيل التي تتحمل التشبع بالمياه مؤقتًا",
-        'moderate_rainfall': "محاصيل مناسبة للأمطار المعتدلة، بما في ذلك القمح والذرة والعديد من الخضروات",
-        'very_dry': "محاصيل شديدة التحمل للجفاف (مثل البطيخ الصحراوي أو بعض الأعشاب)",
-        'very_wet': "محاصيل شبه مائية أو تلك شديدة التحمل للتشبع بالمياه (مثل القلقاس، بعض أصناف الأرز إذا كانت التربة سيئة التصريف)",
-        'no_specific': "لا توجد توصيات محددة، حيث أن الظروف الحالية غير عادية أو عامة."
+        'no_data': "لا توجد بيانات مستشعر متاحة لتقديم المشورة.",
+        'npk_low': "🌱 **{nutrient} منخفض ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient} مرتفع ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **رطوبة التربة منخفضة ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **رطوبة التربة مرتفعة ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **درجة الحرارة منخفضة ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **درجة الحرارة مرتفعة ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **الرطوبة منخفضة ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **الرطوبة مرتفعة ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **الرقم الهيدروجيني منخفض ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **الرقم الهيدروجيني مرتفع ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **الرقم الهيدروجيني غير صحيح ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **شدة الإضاءة منخفضة ({light:.1f} لوكس)**: {message}",
+        'light_high': "☀️ **شدة الإضاءة مرتفعة ({light:.1f} لوكس)**: {message}",
+        'rainfall_low_msg': "🌧️ **هطول الأمطار منخفض ({rain:.1f} مم)**: {message}",
+        'rainfall_high_msg': "🌧️ **هطول الأمطار مرتفع ({rain:.1f} مم)**: {message}",
+        'all_good': "✅ جميع المعلمات الرئيسية تبدو جيدة! استمر في المراقبة بانتظام للنمو الأمثل.",
+        'npk_n_low': "فكر في استخدام سماد غني بالنيتروجين.",
+        'npk_n_high': "النيتروجين الزائد يمكن أن يعزز نمو الأوراق على حساب نمو الفاكهة/الزهور.",
+        'npk_p_low': "فكر في استخدام سماد الفوسفور لتنمية الجذور.",
+        'npk_p_high': "الفوسفور العالي يمكن أن يمنع امتصاص العناصر الغذائية الأخرى.",
+        'npk_k_low': "فكر في استخدام سماد البوتاسيوم لصحة النبات بشكل عام وجودة الفاكهة.",
+        'npk_k_high': "البوتاسيوم الزائد يمكن أن يتداخل مع امتصاص الكالسيوم والمغنيسيوم.",
+        'wheat_sm_low': "الري الخفيف – القمح يحتاج إلى 35-50% رطوبة التربة.",
+        'rice_sm_low': "الأرز يحتاج إلى رطوبة عالية. تأكد من الري المناسب.",
+        'maize_sm_low': "الذرة تحتاج إلى مستويات رطوبة تربة معتدلة.",
+        'banana_sm_low': "حافظ على رطوبة التربة باستمرار للموز.",
+        'mango_sm_high': "تجنب تشبع التربة بالماء. المانجو يحتاج إلى تربة جيدة التصريف.",
+        'grapes_sm_high': "العنب يفضل التربة الأكثر جفافاً – تجنب الإفراط في الري.",
+        'cotton_sm_low': "القطن يتطلب رطوبة معتدلة أثناء الإزهار.",
+        'millet_sorghum_sm_low': "هذه محاصيل مقاومة للجفاف ولكنها لا تزال بحاجة إلى الحد الأدنى من الرطوبة.",
+        'jute_sm_low': "الجوت يتطلب رطوبة وفيرة أثناء النمو.",
+        'pomegranate_sm_high': "تجنب الإفراط في ري الرمان.",
+        'melon_sm_low': "البطيخ يحتاج إلى ري مستمر، خاصة أثناء الإثمار.",
+        'coconut_sm_low': "أشجار النخيل تحتاج إلى مستويات رطوبة عالية.",
+        'mothbeans_sm_low': "المحاصيل البقولية مقاومة للجفاف ولكنها تحتاج إلى الحد الأدنى من الري أثناء الإزهار.",
+        'mungbean_sm_low': "تأكد من الري المنتظم أثناء الإزهار وتكوين القرون.",
+        'blackgram_sm_low': "حافظ على رطوبة معتدلة خاصة أثناء الإزهار.",
+        'lentil_sm_low': "العدس ينمو جيدًا في 18-30 درجة مئوية.",
+        'general_sm_low': "نصيحة عامة: فكر في الري لمنع إجهاد الجفاف.",
+        'general_sm_high': "نصيحة عامة: تأكد من التصريف الجيد لمنع تشبع التربة بالماء.",
+        'wheat_temp_high': "وفر الظل أو الري في المساء – درجة الحرارة مرتفعة جدًا للقمح.",
+        'rice_temp_high': "ساخن جدًا للأرز. فكر في الري المسائي أو الظل.",
+        'maize_temp_low': "الذرة تفضل الطقس الدافئ (20-30 درجة مئوية).",
+        'banana_temp_low': "الموز حساس للبرد – تأكد من توفر ظروف دافئة.",
+        'mango_temp_low': "المانجو يتطلب درجات حرارة أكثر دفئًا (>20 درجة مئوية).",
+        'cotton_temp_low': "القطن يزدهر في درجات الحرارة الدافئة.",
+        'millet_sorghum_temp_low': "المناخ الدافئ مثالي للدخن/الذرة الرفيعة.",
+        'coffee_temp_low': "القهوة تزدهر في نطاق 18-24 درجة مئوية.",
+        'jute_temp_low': "الجوت ينمو جيدًا في 25-30 درجة مئوية.",
+        'papaya_temp_low': "البابايا تفضل نطاق 21-33 درجة مئوية.",
+        'pomegranate_temp_low': "درجة الحرارة المثالية أعلى من 20 درجة مئوية.",
+        'melon_temp_low': "تأكد من أن درجة الحرارة دافئة (>25 درجة مئوية).",
+        'coconut_temp_low': "درجة الحرارة المثالية لجوز الهند أعلى من 25 درجة مئوية.",
+        'mothbeans_temp_low': "يجب أن تكون درجة الحرارة أعلى من 22 درجة مئوية.",
+        'mungbean_temp_low': "المحاصيل البقولية تحتاج إلى ظروف دافئة للنمو الأمثل.",
+        'blackgram_temp_low': "نطاق درجة الحرارة المثالي هو 25-35 درجة مئوية.",
+        'lentil_temp_low': "العدس ينمو جيدًا في 18-30 درجة مئوية.",
+        'general_temp_low': "نصيحة عامة: درجات الحرارة المنخفضة يمكن أن تعيق النمو. فكر في تدابير وقائية.",
+        'general_temp_high': "نصيحة عامة: درجات الحرارة المرتفعة يمكن أن تسبب إجهادًا حراريًا. تأكد من توفر الماء والظل الكافيين.",
+        'wheat_hum_high': "احذر من الالتهابات الفطرية – تأكد من تدفق الهواء.",
+        'rice_hum_low': "زيادة الرطوبة المحيطة أو استخدام النشارة.",
+        'banana_hum_low': "الموز يتطلب رطوبة عالية. فكر في الرش أو التغطية بالنشارة.",
+        'grapes_hum_high': "الرطوبة العالية قد تؤدي إلى التهابات فطرية.",
+        'coffee_hum_low': "القهوة تفضل الرطوبة العالية.",
+        'orange_hum_high': "تقليم الأشجار لتحسين تدفق الهواء ومنع مشاكل الفطريات.",
+        'general_hum_low': "نصيحة عامة: الرطوبة المنخفضة يمكن أن تسبب الذبول. فكر في الرش أو زيادة رطوبة التربة.",
+        'general_hum_high': "نصيحة عامة: الرطوبة العالية تزيد من خطر الأمراض الفطرية. تأكد من التهوية الجيدة.",
+        'wheat_ph_low': "حمضي قليلاً – فكر في استخدام الجير لرفع الرقم الهيدروجيني.",
+        'rice_ph_off': "حافظ على تربة حمضية قليلاً للأرز (الرقم الهيدروجيني 5.5-6.5).",
+        'maize_ph_off': "حافظ على الرقم الهيدروجيني للتربة بين 5.8-7.0.",
+        'papaya_ph_low': "التربة الحمضية قليلاً إلى المحايدة هي الأفضل للبابايا.",
+        'orange_ph_off': "الرقم الهيدروجيني المثالي للتربة للبرتقال هو 6.0-7.5.",
+        'general_ph_very_low': "نصيحة عامة: التربة شديدة الحموضة. استخدم الجير لزيادة الرقم الهيدروجيني وتحسين توافر المغذيات.",
+        'general_ph_very_high': "نصيحة عامة: التربة شديدة القلوية. استخدم الكبريت أو المواد العضوية لتقليل الرقم الهيدروجيني.",
+        'general_ph_off': "نصيحة عامة: نطاق الرقم الهيدروجيني الأمثل لمعظم المحاصيل هو 5.5-7.5. اضبط حسب الحاجة.",
+        'wheat_light_low': "تأكد من حصول المحصول على ما يكفي من ضوء الشمس.",
+        'rice_light_low': "تأكد من حصول الأرز على التعرض الكامل لأشعة الشمس.",
+        'general_light_low': "نصيحة عامة: الضوء غير الكافي يمكن أن يعيق التمثيل الضوئي. فكر في الإضاءة التكميلية أو التقليم.",
+        'general_light_high': "نصيحة عامة: الضوء الزائد يمكن أن يسبب حروقًا. فكر في التظليل خلال ساعات الذروة."
     },
     'ja': { # Japanese (Example)
-        'intro': "現在の状況に基づき、以下を検討することができます：",
-        'outro': "正確な推奨事項については、地元の農業専門家にご相談ください。",
-        'acid_tolerant': "ブルーベリー、ジャガイモ、特定のイネ品種などの酸性土壌に強い作物",
-        'alkaline_tolerant': "アスパラガス、ほうれん草、特定のアルファルファ品種などのアルカリ性土壌に強い作物",
-        'neutral_ph': "小麦、トウモロコシ、ほとんどの野菜など、中性から弱酸性のpH（5.5-7.5）で育つ幅広い作物",
-        'heat_tolerant': "キビ、ソルガム、綿、一部の豆類などの耐熱性作物",
-        'cold_hardy': "小麦（冬品種）、大麦、オート麦、エンドウ豆などの耐寒性作物",
-        'warm_season': "トウモロコシ、イネ（熱帯性）、ほとんどの野菜、果物などの暖季作物",
-        'drought_resistant': "キビ、ソルガム、ひよこ豆、特定の種類の豆（例：モス豆）などの干ばつ耐性作物",
-        'water_loving': "イネ、サトウキビ、ジュート、一時的な湛水に耐える作物などの水生作物",
-        'moderate_rainfall': "小麦、トウモロコシ、多くの野菜など、中程度の降雨に適した作物",
-        'very_dry': "非常に干ばつに強い作物（例：砂漠に適応したメロンや一部のハーブ）",
-        'very_wet': "半水生作物または湛水に非常に強い作物（例：タロイモ、排水が悪い場合の特定のイネ品種）",
-        'no_specific': "現在の状況が異常または一般的なため、特定の推奨事項はありません。"
+        'no_data': "アドバイスを提供するためのセンサーデータがありません。",
+        'npk_low': "🌱 **{nutrient}が低い ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient}が高い ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **土壌水分が低い ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **土壌水分が高い ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **温度が低い ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **温度が高い ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **湿度が低い ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **湿度が高い ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **pHが低い ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **pHが高い ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **pHが適切ではありません ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **光強度が低い ({light:.1f} ルクス)**: {message}",
+        'light_high': "☀️ **光強度が高い ({light:.1f} ルクス)**: {message}",
+        'rainfall_low_msg': "🌧️ **降水量が少ない ({rain:.1f} mm)**: {message}",
+        'rainfall_high_msg': "🌧️ **降水量が多い ({rain:.1f} mm)**: {message}",
+        'all_good': "✅ すべての主要なパラメーターは良好です！最適な成長のために定期的に監視を続けてください。",
+        'npk_n_low': "窒素が豊富な肥料の施用を検討してください。",
+        'npk_n_high': "過剰な窒素は、果実/花の成長よりも葉の成長を促進する可能性があります。",
+        'npk_p_low': "根の発育のためにリン酸肥料の施用を検討してください。",
+        'npk_p_high': "リン酸が高いと他の栄養素が吸収されにくくなることがあります。",
+        'npk_k_low': "植物全体の健康と果実の品質のためにカリウム肥料の施用を検討してください。",
+        'npk_k_high': "過剰なカリウムは、カルシウムとマグネシウムの吸収を妨げる可能性があります。",
+        'wheat_sm_low': "軽く灌漑してください – 小麦は35-50%の土壌水分が必要です。",
+        'rice_sm_low': "イネは高い水分が必要です。適切な灌漑を確保してください。",
+        'maize_sm_low': "トウモロコシは中程度の土壌水分レベルが必要です。",
+        'banana_sm_low': "バナナには土壌を常に湿らせておいてください。",
+        'mango_sm_high': "水浸しを避けてください。マンゴーは水はけの良い土壌が必要です。",
+        'grapes_sm_high': "ブドウは乾燥した土壌を好みます – 水のやりすぎを避けてください。",
+        'cotton_sm_low': "綿は開花中に中程度の水分が必要です。",
+        'millet_sorghum_sm_low': "これらは干ばつに強い作物ですが、それでも最小限の水分が必要です。",
+        'jute_sm_low': "ジュートは成長中に十分な水分が必要です。",
+        'pomegranate_sm_high': "ザクロの水のやりすぎを避けてください。",
+        'melon_sm_low': "メロンは、特に結実中に継続的な水やりが必要です。",
+        'coconut_sm_low': "ココヤシは高い水分レベルが必要です。",
+        'mothbeans_sm_low': "モース豆は干ばつに強いですが、開花中に最小限の灌漑が必要です。",
+        'mungbean_sm_low': "開花および莢形成中に定期的な灌漑を確保してください。",
+        'blackgram_sm_low': "特に開花中に中程度の水分を維持してください。",
+        'lentil_sm_low': "レンズ豆は低から中程度の水分が必要です。",
+        'general_sm_low': "一般的なアドバイス：干ばつストレスを防ぐために灌漑を検討してください。",
+        'general_sm_high': "一般的なアドバイス：水浸しを防ぐために良好な排水を確保してください。",
+        'wheat_temp_high': "日陰を提供するか、夕方に灌漑してください – 小麦には温度が高すぎます。",
+        'rice_temp_high': "イネには暑すぎます。夕方の灌漑または日陰を検討してください。",
+        'maize_temp_low': "トウモロコシは暖かい気候（20-30°C）を好みます。",
+        'banana_temp_low': "バナナは寒さに敏感です – 暖かい条件を確保してください。",
+        'mango_temp_low': "マンゴーはより暖かい温度（>20°C）が必要です。",
+        'cotton_temp_low': "綿は暖かい温度で生育します。",
+        'millet_sorghum_temp_low': "暖かい気候はキビ/ソルガムに理想的です。",
+        'coffee_temp_low': "コーヒーは18-24°Cの範囲で生育します。",
+        'jute_temp_low': "ジュートは25-30°Cでよく育ちます。",
+        'papaya_temp_low': "パパイヤは21-33°Cの範囲を好みます。",
+        'pomegranate_temp_low': "理想的な温度は20°C以上です。",
+        'melon_temp_low': "温度が暖かい（>25°C）ことを確認してください。",
+        'coconut_temp_low': "ココナッツの理想的な温度は25°C以上です。",
+        'mothbeans_temp_low': "温度は22°C以上である必要があります。",
+        'mungbean_temp_low': "緑豆は最適な成長のために暖かい条件が必要です。",
+        'blackgram_temp_low': "理想的な温度範囲は25-35°Cです。",
+        'lentil_temp_low': "レンズ豆は18-30°Cでよく育ちます。",
+        'general_temp_low': "一般的なアドバイス：低温は成長を妨げる可能性があります。保護対策を検討してください。",
+        'general_temp_high': "一般的なアドバイス：高温は熱ストレスを引き起こす可能性があります。十分な水と日陰を確保してください。",
+        'wheat_hum_high': "真菌感染症に注意してください – 空気循環を確保してください。",
+        'rice_hum_low': "周囲の湿度を上げるか、マルチを使用してください。",
+        'banana_hum_low': "バナナは高い湿度が必要です。ミストまたはマルチングを検討してください。",
+        'grapes_hum_high': "高湿度は真菌感染症につながる可能性があります。",
+        'coffee_hum_low': "コーヒーは高い湿度を好みます。",
+        'orange_hum_high': "空気循環を改善し、真菌の問題を防ぐために木を剪定してください。",
+        'general_hum_low': "一般的なアドバイス：低湿度はしおれを引き起こす可能性があります。ミストまたは土壌水分の増加を検討してください。",
+        'general_hum_high': "一般的なアドバイス：高湿度は真菌性疾患のリスクを高めます。換気を良くしてください。",
+        'wheat_ph_low': "わずかに酸性 – pHを上げるために石灰の施用を検討してください。",
+        'rice_ph_off': "イネにはわずかに酸性の土壌を維持してください（pH 5.5-6.5）。",
+        'maize_ph_off': "土壌pHを5.8-7.0の間に維持してください。",
+        'papaya_ph_low': "パパイヤにはわずかに酸性から中性の土壌が最適です。",
+        'orange_ph_off': "オレンジの理想的な土壌pHは6.0-7.5です。",
+        'general_ph_very_low': "一般的なアドバイス：土壌が酸性すぎます。pHを上げ、栄養素の利用可能性を改善するために石灰を施用してください。",
+        'general_ph_very_high': "一般的なアドバイス：土壌がアルカリ性すぎます。pHを下げるために硫黄または有機物を施用してください。",
+        'general_ph_off': "一般的なアドバイス：ほとんどの作物にとって最適なpH範囲は5.5-7.5です。必要に応じて調整してください。",
+        'wheat_light_low': "作物が十分な日光を浴びるようにしてください。",
+        'rice_light_low': "イネが十分な日照を浴びるようにしてください。",
+        'general_light_low': "一般的なアドバイス：光が不足すると光合成が妨げられる可能性があります。補助照明または剪定を検討してください。",
+        'general_light_high': "一般的なアドバイス：過剰な光は焼けを引き起こす可能性があります。ピーク時間帯は日陰を検討してください。"
+    },
+    'bn': { # Bengali
+        'no_data': "পরামর্শ দেওয়ার জন্য কোনো সেন্সর ডেটা উপলব্ধ নেই।",
+        'npk_low': "🌱 **{nutrient} কম আছে ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient} বেশি আছে ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **মাটির আর্দ্রতা কম ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **মাটির আর্দ্রতা বেশি ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **তাপমাত্রা কম ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **তাপমাত্রা বেশি ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **আর্দ্রতা কম ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **আর্দ্রতা বেশি ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **pH কম ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **pH বেশি ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **pH সঠিক নয় ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **আলোর তীব্রতা কম ({light:.1f} lux)**: {message}",
+        'light_high': "☀️ **আলোর তীব্রতা বেশি ({light:.1f} lux)**: {message}",
+        'rainfall_low_msg': "🌧️ **বৃষ্টিপাত কম ({rain:.1f} মিমি)**: {message}",
+        'rainfall_high_msg': "🌧️ **বৃষ্টিপাত বেশি ({rain:.1f} মিমি)**: {message}",
+        'all_good': "✅ সমস্ত প্রধান পরামিতি ভালো দেখাচ্ছে! সর্বোত্তম বৃদ্ধির জন্য নিয়মিত পর্যবেক্ষণ চালিয়ে যান।",
+        'npk_n_low': "নাইট্রোজেন সমৃদ্ধ সার প্রয়োগের কথা বিবেচনা করুন।",
+        'npk_n_high': "অতিরিক্ত নাইট্রোজেন ফল/ফুলের বিকাশের চেয়ে পাতার বৃদ্ধিকে উৎসাহিত করতে পারে।",
+        'npk_p_low': "মূল বিকাশের জন্য ফসফরাস সার প্রয়োগের কথা বিবেচনা করুন।",
+        'npk_p_high': "উচ্চ ফসফরাস অন্যান্য পুষ্টি উপাদানকে আবদ্ধ করতে পারে।",
+        'npk_k_low': "সামগ্রিক গাছের স্বাস্থ্য এবং ফলের গুণমানের জন্য পটাশিয়াম সার প্রয়োগের কথা বিবেচনা করুন।",
+        'npk_k_high': "অতিরিক্ত পটাশিয়াম ক্যালসিয়াম এবং ম্যাগনেসিয়ামের শোষণে হস্তক্ষেপ করতে পারে।",
+        'wheat_sm_low': "হালকা সেচ দিন – গমের জন্য ৩৫-৫০% মাটির আর্দ্রতা প্রয়োজন।",
+        'rice_sm_low': "ধানের জন্য উচ্চ আর্দ্রতা প্রয়োজন। সঠিক সেচ নিশ্চিত করুন।",
+        'maize_sm_low': "ভূট্টার জন্য মাঝারি মাটির আর্দ্রতা স্তর প্রয়োজন।",
+        'banana_sm_low': "কলার জন্য মাটি consistently moist রাখুন।",
+        'mango_sm_high': "জল জমে যাওয়া এড়িয়ে চলুন। আমের জন্য ভালো নিষ্কাশনযুক্ত মাটি প্রয়োজন।",
+        'grapes_sm_high': "আঙ্গুর শুষ্ক মাটি পছন্দ করে – অতিরিক্ত জল দেওয়া এড়িয়ে চলুন।",
+        'cotton_sm_low': "তুলা ফুল ফোটার সময় মাঝারি আর্দ্রতা প্রয়োজন।",
+        'millet_sorghum_sm_low': "এগুলি খরা-প্রতিরোধী ফসল তবে ন্যূনতম আর্দ্রতা প্রয়োজন।",
+        'jute_sm_low': "পাটের বৃদ্ধির সময় প্রচুর আর্দ্রতা প্রয়োজন।",
+        'pomegranate_sm_high': "ডালিমের অতিরিক্ত জল দেওয়া এড়িয়ে চলুন।",
+        'melon_sm_low': "তরমুজের জন্য নিয়মিত জল দেওয়া প্রয়োজন, বিশেষ করে ফল ধরার সময়।",
+        'coconut_sm_low': "নারকেল গাছের জন্য উচ্চ আর্দ্রতা স্তর প্রয়োজন।",
+        'mothbeans_sm_low': "মোথবীন খরা-সহনশীল তবে ফুল ফোটার সময় ন্যূনতম সেচ প্রয়োজন।",
+        'mungbean_sm_low': "ফুল ফোটা এবং শুঁটি গঠনের সময় নিয়মিত সেচ নিশ্চিত করুন।",
+        'blackgram_sm_low': "বিশেষ করে ফুল ফোটার সময় মাঝারি আর্দ্রতা বজায় রাখুন।",
+        'lentil_sm_low': "মসুরের জন্য কম থেকে মাঝারি আর্দ্রতা প্রয়োজন।",
+        'general_sm_low': "সাধারণ পরামর্শ: খরা চাপ প্রতিরোধের জন্য সেচ বিবেচনা করুন।",
+        'general_sm_high': "সাধারণ পরামর্শ: জল জমে যাওয়া প্রতিরোধের জন্য ভালো নিষ্কাশন নিশ্চিত করুন।",
+        'wheat_temp_high': "ছায়া প্রদান করুন বা সন্ধ্যায় সেচ দিন – গমের জন্য তাপমাত্রা খুব বেশি।",
+        'rice_temp_high': "ধানের জন্য খুব গরম। সন্ধ্যায় সেচ বা ছায়া বিবেচনা করুন।",
+        'maize_temp_low': "ভূট্টা উষ্ণ আবহাওয়া (২০-৩০°C) পছন্দ করে।",
+        'banana_temp_low': "কলা ঠান্ডার প্রতি সংবেদনশীল – উষ্ণ অবস্থা নিশ্চিত করুন।",
+        'mango_temp_low': "আমের জন্য উষ্ণ তাপমাত্রা (>২০°C) প্রয়োজন।",
+        'cotton_temp_low': "তুলা উষ্ণ তাপমাত্রায় ভালো জন্মায়।",
+        'millet_sorghum_temp_low': "উষ্ণ জলবায়ু বাজরা/জোয়ারের জন্য আদর্শ।",
+        'coffee_temp_low': "কফি ১৮-২৪°C পরিসরে ভালো জন্মায়।",
+        'jute_temp_low': "পাট ২৫-৩০°C এ ভালো জন্মায়।",
+        'papaya_temp_low': "পেঁপে ২১-৩৩°C পরিসর পছন্দ করে।",
+        'pomegranate_temp_low': "আদর্শ তাপমাত্রা ২০°C এর উপরে।",
+        'melon_temp_low': "তাপমাত্রা উষ্ণ (>২৫°C) নিশ্চিত করুন।",
+        'coconut_temp_low': "নারকেলের জন্য আদর্শ তাপমাত্রা ২৫°C এর উপরে।",
+        'mothbeans_temp_low': "তাপমাত্রা ২২°C এর উপরে হওয়া উচিত।",
+        'mungbean_temp_low': "মুগ ডালের সর্বোত্তম বৃদ্ধির জন্য উষ্ণ অবস্থার প্রয়োজন।",
+        'blackgram_temp_low': "আদর্শ তাপমাত্রা পরিসর ২৫-৩৫°C।",
+        'lentil_temp_low': "মসুর ১৮-৩০°C এ ভালো জন্মায়।",
+        'general_temp_low': "সাধারণ পরামর্শ: ঠান্ডা তাপমাত্রা বৃদ্ধি ব্যাহত করতে পারে। সুরক্ষামূলক ব্যবস্থা বিবেচনা করুন।",
+        'general_temp_high': "সাধারণ পরামর্শ: উচ্চ তাপমাত্রা তাপ চাপ সৃষ্টি করতে পারে। পর্যাপ্ত জল এবং ছায়া নিশ্চিত করুন।",
+        'wheat_hum_high': "ছত্রাক সংক্রমণ থেকে সাবধান – বায়ু চলাচল নিশ্চিত করুন।",
+        'rice_hum_low': "পরিবেষ্টিত আর্দ্রতা বাড়ান বা মালচ ব্যবহার করুন।",
+        'banana_hum_low': "কলা উচ্চ আর্দ্রতা প্রয়োজন। কুয়াশা বা মালচিং বিবেচনা করুন।",
+        'grapes_hum_high': "উচ্চ আর্দ্রতা ছত্রাক সংক্রমণের কারণ হতে পারে।",
+        'coffee_hum_low': "কফি উচ্চ আর্দ্রতা পছন্দ করে।",
+        'orange_hum_high': "বায়ু চলাচল উন্নত করতে এবং ছত্রাকজনিত সমস্যা প্রতিরোধের জন্য গাছ ছাঁটাই করুন।",
+        'general_hum_low': "সাধারণ পরামর্শ: কম আর্দ্রতা শুকিয়ে যেতে পারে। কুয়াশা বা মাটির আর্দ্রতা বাড়ানোর কথা বিবেচনা করুন।",
+        'general_hum_high': "সাধারণ পরামর্শ: উচ্চ আর্দ্রতা ছত্রাক রোগের ঝুঁকি বাড়ায়। ভালো বায়ুচলাচল নিশ্চিত করুন।",
+        'wheat_ph_low': "সামান্য অম্লীয় – pH বাড়ানোর জন্য চুন প্রয়োগের কথা বিবেচনা করুন।",
+        'rice_ph_off': "ধানের জন্য সামান্য অম্লীয় মাটি বজায় রাখুন (pH ৫.৫-৬.৫)।",
+        'maize_ph_off': "মাটির pH ৫.৮-৭.০ এর মধ্যে বজায় রাখুন।",
+        'papaya_ph_low': "পেঁপের জন্য সামান্য অম্লীয় থেকে নিরপেক্ষ মাটি সবচেয়ে ভালো।",
+        'orange_ph_off': "কমলার জন্য আদর্শ মাটির pH ৬.০-৭.৫।",
+        'general_ph_very_low': "সাধারণ পরামর্শ: মাটি খুব অম্লীয়। pH বাড়াতে এবং পুষ্টির প্রাপ্যতা উন্নত করতে চুন প্রয়োগ করুন।",
+        'general_ph_very_high': "সাধারণ পরামর্শ: মাটি খুব ক্ষারীয়। pH কমাতে সালফার বা জৈব পদার্থ প্রয়োগ করুন।",
+        'general_ph_off': "সাধারণ পরামর্শ: বেশিরভাগ ফসলের জন্য সর্বোত্তম pH পরিসর ৫.৫-৭.৫। প্রয়োজন অনুযায়ী সামঞ্জস্য করুন।",
+        'wheat_light_low': "ফসল পর্যাপ্ত সূর্যালোক পায় তা নিশ্চিত করুন।",
+        'rice_light_low': "ধান সম্পূর্ণ সূর্যালোক পায় তা নিশ্চিত করুন।",
+        'general_light_low': "সাধারণ পরামর্শ: অপর্যাপ্ত আলো সালোকসংশ্লেষণকে বাধা দিতে পারে। অতিরিক্ত আলো বা ছাঁটাই বিবেচনা করুন।",
+        'general_light_high': "সাধারণ পরামর্শ: অতিরিক্ত আলো ঝলসে যেতে পারে। পিক আওয়ারে ছায়া দেওয়ার কথা বিবেচনা করুন।"
     }
 }
 
@@ -1249,6 +1372,22 @@ SEED_RECOMMENDATIONS_MESSAGES = {
         'very_dry': "非常に干ばつに強い作物（例：砂漠に適応したメロンや一部のハーブ）",
         'very_wet': "半水生作物または湛水に非常に強い作物（例：タロイモ、排水が悪い場合の特定のイネ品種）",
         'no_specific': "現在の状況が異常または一般的なため、特定の推奨事項はありません。"
+    },
+    'bn': { # Bengali
+        'intro': "বর্তমান অবস্থার উপর ভিত্তি করে, আপনি বিবেচনা করতে পারেন: ",
+        'outro': ". সঠিক সুপারিশের জন্য স্থানীয় কৃষি বিশেষজ্ঞদের সাথে পরামর্শ করুন।",
+        'acid_tolerant': "ব্লুবেরি, আলু, বা নির্দিষ্ট ধান জাতের মতো অ্যাসিড-সহনশীল ফসল",
+        'alkaline_tolerant': "শতমূলী, পালং শাক, বা নির্দিষ্ট আলফালফা জাতের মতো ক্ষার-সহনশীল ফসল",
+        'neutral_ph': "গম, ভুট্টা এবং বেশিরভাগ সবজি সহ নিরপেক্ষ থেকে সামান্য অম্লীয় pH (৫.৫-৭.৫) এ বিস্তৃত ফসল ভালো জন্মায়",
+        'heat_tolerant': "বাজরা, জোয়ার, তুলা, বা কিছু শিম জাতের মতো তাপ-সহনশীল ফসল",
+        'cold_hardy': "গম (শীতকালীন জাত), বার্লি, ওটস, বা মটরের মতো ঠান্ডা-সহনশীল ফসল",
+        'warm_season': "ভুট্টা, ধান (ক্রান্তীয়), বেশিরভাগ সবজি এবং ফলের মতো উষ্ণ-মৌসুমী ফসল",
+        'drought_resistant': "বাজরা, জোয়ার, ছোলা, বা নির্দিষ্ট ধরণের শিম (যেমন মোথবীন) এর মতো খরা-প্রতিরোধী ফসল",
+        'water_loving': "ধান, আখ, পাট, বা অস্থায়ী জলজমাট সহনশীল ফসলের মতো জল-প্রেমী ফসল",
+        'moderate_rainfall': "গম, ভুট্টা এবং অনেক সবজি সহ মাঝারি বৃষ্টিপাতের জন্য উপযুক্ত ফসল",
+        'very_dry': "খুব খরা-সহনশীল ফসল (যেমন মরুভূমি-অভিযোজিত তরমুজ বা কিছু ভেষজ)",
+        'very_wet': "আধা-জলজ ফসল বা যেগুলি জলজমাট অত্যন্ত সহনশীল (যেমন কচু, খারাপ নিষ্কাশন হলে কিছু ধান জাত)",
+        'no_specific': "কোনো নির্দিষ্ট সুপারিশ নেই, কারণ বর্তমান অবস্থা অস্বাভাবিক বা সাধারণ।"
     }
 }
 
@@ -1327,7 +1466,8 @@ with col_lang:
         'fr': 'Français',
         'de': 'Deutsch',
         'ar': 'العربية', # Arabic
-        'ja': '日本語' # Japanese
+        'ja': '日本語', # Japanese
+        'bn': 'বাংলা' # Bengali
     }
     # Create a list of display names for the selectbox, maintaining order
     display_options = [language_display_names.get(lang, lang) for lang in available_languages]
@@ -1486,7 +1626,7 @@ else:
                 if care_tips:
                     for i, tip in enumerate(care_tips[:2]): # Play up to 2 alerts
                         # Remove markdown for better speech, and also remove emojis
-                        clean_tip = tip.replace('**', '').replace('🌱', '').replace('💧', '').replace('🌡️', '').replace('💨', '').replace('�', '').replace('☀️', '').replace('🌧️', '').replace('✅', '').strip()
+                        clean_tip = tip.replace('**', '').replace('🌱', '').replace('💧', '').replace('🌡️', '').replace('💨', '').replace('🧪', '').replace('☀️', '').replace('🌧️', '').replace('✅', '').strip()
                         if clean_tip: # Only play if there's actual text after cleaning
                             st.info(f"Playing alert {i+1}: {clean_tip}", icon="🔊")
                             speak_tip(clean_tip, lang=voice_lang)
@@ -1564,6 +1704,3 @@ else:
     with st.expander("Application Initialization Status"):
         for msg in firebase_init_status:
             st.write(msg)
-
-    # Auto-refresh every 10 seconds
-    st_autorefresh(interval=10 * 1000, key="growth_sim_refresh")
