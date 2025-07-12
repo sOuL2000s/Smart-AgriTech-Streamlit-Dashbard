@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart AgriTech Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Plotly.js CDN for charts -->
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Dark background */
+            color: #e2e8f0; /* Light text */
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .card {
+            background-color: #2d3748; /* Darker card background */
+            border-radius: 0.75rem; /* rounded-xl */
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .gauge-container {
+            height: 250px; /* Fixed height for gauges */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        /* Custom scrollbar for raw data table */
+        .dataframe-container {
+            max-height: 300px;
+            overflow-y: auto;
+            border-radius: 0.5rem;
+            background-color: #2d3748;
+        }
+        .dataframe-container table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .dataframe-container th, .dataframe-container td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #4a5568;
+            text-align: left;
+        }
+        .dataframe-container th {
+            background-color: #4a5568;
+            font-weight: bold;
+            color: #e2e8f0;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .dataframe-container tr:hover {
+            background-color: #4a5568;
+        }
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Styling for Google Translate dropdown */
+        #google_translate_element .goog-te-gadget-simple {
+            background-color: #2d3748 !important; /* Darker card background */
+            border: 1px solid #4a5568 !important;
+            border-radius: 0.5rem !important;
+            padding: 0.5rem !important;
+            color: #e2e8f0 !important;
+        }
+        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value {
+            color: #e2e8f0 !important;
+        }
+        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value span {
+            color: #e2e8f0 !important;
+        }
+        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value span:hover {
+            color: #cbd5e0 !important; /* Lighter on hover */
+        }
+        #google_translate_translate_element_div {
+            display: none; /* Hide the default Google Translate banner */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+    <div class="container">
+        <h1 class="text-4xl font-bold text-green-400 mb-6 text-center">🌿 Smart AgriTech Dashboard</h1>
+
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
+            <button id="refresh-button" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+                🔄 Refresh Data
+            </button>
+            <div class="flex items-center space-x-2">
+                <label for="google_translate_element" class="text-lg">Choose Language:</label>
+                <!-- Google Translate Dropdown -->
+                <div id="google_translate_element" style="margin-bottom: 0;"></div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- Current Sensor Readings -->
+            <div class="card">
+                <h2 class="text-2xl font-semibold text-green-300 mb-4">📊 Current Sensor Readings</h2>
+                <div id="gauge-charts" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div id="gauge-soil-moisture" class="gauge-container"></div>
+                    <div id="gauge-temperature" class="gauge-container"></div>
+                    <div id="gauge-ph" class="gauge-container"></div>
+                    <div id="gauge-humidity" class="gauge-container"></div>
+                </div>
+            </div>
+
+            <!-- Sensor Trends Over Time -->
+            <div class="card">
+                <h2 class="text-2xl font-semibold text-green-300 mb-4">📈 Sensor Trends Over Time</h2>
+                <div id="sensor-trends-chart" class="w-full h-80"></div>
+                <p id="sensor-trends-status" class="text-sm text-gray-400 mt-2"></p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- Crop Care Recommendations & AI-Based Predictions -->
+            <div class="card">
+                <h2 class="text-2xl font-semibold text-green-300 mb-4">🌿 Crop Care & AI Insights</h2>
+                
+                <div class="mb-4">
+                    <label for="crop-select" class="block text-lg font-medium text-gray-300 mb-2">Select Growing Crop:</label>
+                    <select id="crop-select" class="w-full bg-gray-700 text-white py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                        <!-- Options populated by JS -->
+                    </select>
+                </div>
+
+                <h3 class="text-xl font-medium text-gray-200 mb-2">Crop Care Recommendations:</h3>
+                <div id="care-tips" class="bg-gray-800 p-4 rounded-lg mb-4 min-h-[80px]">
+                    <p class="text-gray-400">Loading recommendations...</p>
+                </div>
+                <button id="play-alerts-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 mb-4">
+                    🔊 Play Top Alerts
+                </button>
+                <div id="audio-status" class="text-sm text-gray-400 mb-4"></div>
+
+                <h3 class="text-xl font-medium text-gray-200 mb-2">🤖 AI-Based Growth Prediction:</h3>
+                <div id="growth-prediction" class="bg-gray-800 p-4 rounded-lg mb-4 min-h-[80px]">
+                    <p class="text-gray-400">Loading predictions...</p>
+                </div>
+
+                <h3 class="text-xl font-medium text-gray-200 mb-2">📉 Market Price Forecast:</h3>
+                <div id="market-price-forecast" class="bg-gray-800 p-4 rounded-lg mb-4 min-h-[40px]">
+                    <p class="text-gray-400">Loading forecast...</p>
+                </div>
+
+                <h3 class="text-xl font-medium text-gray-200 mb-2">🌾 Crop Suggestion Based on Predicted Conditions:</h3>
+                <div id="crop-suggestion" class="bg-gray-800 p-4 rounded-lg min-h-[80px]">
+                    <p class="text-gray-400">Loading suggestions...</p>
+                </div>
+            </div>
+
+            <!-- Real-Time Plant Monitoring & Raw Data -->
+            <div class="card">
+                <h2 class="text-2xl font-semibold text-green-300 mb-4">🌿 Real-Time Plant Monitoring (Simulated)</h2>
+                <div id="camera-feed" class="bg-gray-800 p-4 rounded-lg mb-6 min-h-[100px]">
+                    <p class="text-gray-400">Loading camera data...</p>
+                </div>
+
+                <h2 class="text-2xl font-semibold text-green-300 mb-4">📋 Latest Sensor Readings (Raw Data)</h2>
+                <div id="raw-data-table" class="dataframe-container">
+                    <p class="text-gray-400 p-4">Loading raw data...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Application Initialization Status -->
+        <div class="card mb-6">
+            <h2 class="text-2xl font-semibold text-green-300 mb-4 cursor-pointer" onclick="toggleExpander('init-status-content')">
+                Application Initialization Status <span id="expander-icon" class="float-right transform rotate-0 transition-transform duration-200">▼</span>
+            </h2>
+            <div id="init-status-content" class="hidden">
+                <p class="text-gray-400">Firebase initialized successfully.</p>
+                <p class="text-gray-400">Crop labels loaded: X unique crops found.</p>
+                <p class="text-gray-400">AI model (tdann_pnsm_model.keras) loaded successfully.</p>
+                <p class="text-gray-400">Input and Output scalers loaded successfully.</p>
+                <p class="text-gray-400">Market price prediction model trained (simulated data).</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:5000'; // Flask app runs on the same origin
+
+        // Function to create an Audio object and play sound
+        function playAudio(audioBlob) {
+            const audio = new Audio(URL.createObjectURL(audioBlob));
+            audio.play().catch(e => console.error("Error playing audio:", e));
+        }
+
+        // Helper to create a gauge chart (adapted for Plotly.js in HTML)
+        function createGauge(elementId, title, value, max_value, suffix, color, font_color = '#e2e8f0') {
+            const data = [{
+                type: "indicator",
+                mode: "gauge+number",
+                value: value,
+                title: { text: title, font: { color: font_color } },
+                number: { font: { color: font_color } },
+                gauge: {
+                    axis: { range: [null, max_value], tickwidth: 1, tickcolor: font_color },
+                    bar: { color: color },
+                    bgcolor: "rgba(0,0,0,0)", // Transparent background for the gauge itself
+                    borderwidth: 2,
+                    bordercolor: "gray",
+                    steps: [
+                        { range: [0, max_value * 0.3], color: "#4a5568" }, // Darker gray for steps
+                        { range: [max_value * 0.3, max_value * 0.7], color: "#2d3748" },
+                        { range: [max_value * 0.7, max_value], color: "#1a202c" }
+                    ],
+                    threshold: {
+                        line: { color: "red", width: 4 },
+                        thickness: 0.75,
+                        value: value // Threshold at current value for visual effect
+                    },
+                }
+            }];
+
+            const layout = {
+                height: 250,
+                margin: { l: 10, r: 10, t: 50, b: 10 },
+                font: { color: font_color, family: "Inter" },
+                paper_bgcolor: "rgba(0,0,0,0)", // Transparent background for the plot area
+                plot_bgcolor: "rgba(0,0,0,0)" // Transparent background for the plot area
+            };
+
+            Plotly.newPlot(elementId, data, layout);
+        }
+
+        // Function to render sensor trends chart
+        function renderSensorTrendsChart(plotData) {
+            const chartDiv = document.getElementById('sensor-trends-chart');
+            const statusDiv = document.getElementById('sensor-trends-status');
+
+            if (!plotData || plotData.length === 0) {
+                statusDiv.textContent = "⚠️ Not enough complete data available for plotting sensor trends. Check if sensors are reporting data for these features.";
+                Plotly.purge(chartDiv); // Clear existing chart
+                return;
+            }
+            statusDiv.textContent = ""; // Clear status message
+
+            const traces = [];
+            const uniqueMetrics = [...new Set(plotData.map(d => d['Sensor Metric']))];
+
+            uniqueMetrics.forEach(metric => {
+                const filteredData = plotData.filter(d => d['Sensor Metric'] === metric);
+                traces.push({
+                    x: filteredData.map(d => d.timestamp),
+                    y: filteredData.map(d => d.Reading),
+                    mode: 'lines',
+                    name: metric,
+                    hovertemplate: `<b>%{fullData.name}</b><br>Time: %{x}<br>Reading: %{y:.2f}<extra></extra>`
+                });
+            });
+
+            const layout = {
+                title: {
+                    text: "Historical Sensor Readings",
+                    font: { color: "#e2e8f0" }
+                },
+                xaxis: {
+                    title: "Time",
+                    color: "#e2e8f0",
+                    gridcolor: '#4a5568',
+                    linecolor: '#4a5568'
+                },
+                yaxis: {
+                    title: "Sensor Reading",
+                    color: "#e2e8f0",
+                    gridcolor: '#4a5568',
+                    linecolor: '#4a5568'
+                },
+                legend: {
+                    title: { text: "Metric", font: { color: "#e2e8f0" } },
+                    font: { color: "#e2e8f0" }
+                },
+                hovermode: "x unified",
+                font: { family: "Inter", size: 12, color: "#e2e8f0" },
+                paper_bgcolor: "rgba(0,0,0,0)", // Transparent background for the plot area
+                plot_bgcolor: "rgba(0,0,0,0)", // Transparent background for the plot area
+                margin: { l: 40, r: 40, t: 60, b: 40 }
+            };
+
+            Plotly.newPlot(chartDiv, traces, layout);
+        }
+
+        // Function to populate crop selectbox
+        function populateCropSelect(cropLabels) {
+            const selectElement = document.getElementById('crop-select');
+            selectElement.innerHTML = ''; // Clear existing options
+
+            if (cropLabels && cropLabels.length > 0) {
+                cropLabels.forEach(label => {
+                    const option = document.createElement('option');
+                    option.value = label;
+                    option.textContent = label;
+                    selectElement.appendChild(option);
+                });
+            } else {
+                const option = document.createElement('option');
+                option.value = "";
+                option.textContent = "No crops found";
+                selectElement.appendChild(option);
+                selectElement.disabled = true;
+            }
+        }
+
+        // Function to render raw data table
+        function renderRawDataTable(rawData) {
+            const tableContainer = document.getElementById('raw-data-table');
+            tableContainer.innerHTML = ''; // Clear previous content
+
+            if (!rawData || rawData.length === 0) {
+                tableContainer.innerHTML = '<p class="text-gray-400 p-4">No sensor data to display.</p>';
+                return;
+            }
+
+            const table = document.createElement('table');
+            table.classList.add('min-w-full', 'table-auto'); // Tailwind classes for table styling
+
+            // Create table header
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            const headers = Object.keys(rawData[0]); // Get keys from the first object as headers
+            headers.forEach(headerText => {
+                const th = document.createElement('th');
+                th.textContent = headerText.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase()); // Format header text
+                th.classList.add('px-4', 'py-2', 'text-left', 'text-gray-200', 'bg-gray-700');
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            // Create table body
+            const tbody = document.createElement('tbody');
+            rawData.forEach(rowData => {
+                const tr = document.createElement('tr');
+                tr.classList.add('hover:bg-gray-700', 'transition-colors', 'duration-150');
+                headers.forEach(headerText => {
+                    const td = document.createElement('td');
+                    let value = rowData[headerText];
+                    if (typeof value === 'number') {
+                        value = value.toFixed(2); // Format numbers
+                    }
+                    td.textContent = value !== null ? value : 'N/A';
+                    td.classList.add('px-4', 'py-2', 'border-b', 'border-gray-600', 'text-gray-300');
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            tableContainer.appendChild(table);
+        }
+
+        // Function to toggle expander content
+        function toggleExpander(contentId) {
+            const content = document.getElementById(contentId);
+            const icon = document.getElementById('expander-icon');
+            if (content.classList.contains('hidden')) {
+                content.classList.remove('hidden');
+                icon.classList.add('rotate-180');
+            } else {
+                content.classList.add('hidden');
+                icon.classList.remove('rotate-180');
+            }
+        }
+        
+        // Function to display messages with icons
+        function displayMessage(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            let icon = '';
+            let colorClass = 'text-gray-400';
+
+            switch (type) {
+                case 'success':
+                    icon = '✅';
+                    colorClass = 'text-green-400';
+                    break;
+                case 'warning':
+                    icon = '⚠️';
+                    colorClass = 'text-yellow-400';
+                    break;
+                case 'error':
+                    icon = '❌';
+                    colorClass = 'text-red-400';
+                    break;
+                case 'info':
+                default:
+                    icon = 'ℹ️';
+                    colorClass = 'text-blue-400';
+                    break;
+            }
+            element.innerHTML = `<p class="${colorClass}">${icon} ${message}</p>`;
+        }
+
+        // Function to render Markdown-like text to HTML
+        function renderMarkdown(text) {
+            // Replace **text** with <b>text</b>
+            let html = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+            // Remove any remaining {key:value} placeholders
+            html = html.replace(/\{[a-zA-Z_]+(?::[^}]+)?\}/g, '');
+            return html;
+        }
+
+
+        // Main data fetching and rendering function
+        async function fetchDataAndRender() {
+            document.getElementById('refresh-button').disabled = true;
+            document.getElementById('refresh-button').innerHTML = '<span class="loading-spinner"></span> Loading...';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/data`);
+                const data = await response.json();
+
+                if (data.status === 'no_data') {
+                    displayMessage('gauge-soil-moisture', "Soil Moisture N/A", 'info');
+                    displayMessage('gauge-temperature', "Temperature N/A", 'info');
+                    displayMessage('gauge-ph', "pH N/A", 'info');
+                    displayMessage('gauge-humidity', "Humidity N/A", 'info');
+                    displayMessage('sensor-trends-status', "No data available for plotting sensor trends.", 'warning');
+                    Plotly.purge('sensor-trends-chart');
+                    displayMessage('camera-feed', "No real-time plant monitoring data available from Firebase. Please ensure the dummy camera simulator is running and pushing data.", 'info');
+                    renderRawDataTable([]);
+                    displayMessage('care-tips', "No sensor data available for crop care recommendations.", 'info');
+                    displayMessage('growth-prediction', "Select a crop, ensure sensor data is available, and all AI components are loaded for prediction.", 'info');
+                    displayMessage('market-price-forecast', "Select a crop, ensure sensor data is available, and market model is trained for market price forecast.", 'info');
+                    displayMessage('crop-suggestion', "Predicted soil moisture is out of typical range or not available, hindering specific crop suggestions.", 'info');
+                    populateCropSelect(data.crop_labels); // Still populate crop labels if available
+                    return;
+                }
+
+                const latestData = data.latest_data;
+                const plotData = data.plot_data;
+                const cameraData = data.camera_data;
+                const rawData = data.raw_data;
+                const cropLabels = data.crop_labels;
+
+                // Render Gauge Charts
+                createGauge('gauge-soil-moisture', "Soil Moisture (%)", latestData.soil_moisture || 0, 100, "%", 'rgba(0,128,0,0.8)');
+                createGauge('gauge-temperature', "Temperature (°C)", latestData.temperature || 0, 40, "°C", 'rgba(255,165,0,0.8)');
+                createGauge('gauge-ph', "pH", latestData.ph || 0, 14, "", 'rgba(0,0,255,0.8)');
+                createGauge('gauge-humidity', "Humidity (%)", latestData.humidity || 0, 100, "%", 'rgba(128,0,128,0.8)');
+
+                // Render Sensor Trends Chart
+                renderSensorTrendsChart(plotData);
+
+                // Populate Crop Select and trigger initial predictions/advice
+                populateCropSelect(cropLabels);
+                // Trigger change event to load initial data for selected crop
+                const cropSelect = document.getElementById('crop-select');
+                if (cropSelect.value) {
+                    cropSelect.dispatchEvent(new Event('change'));
+                } else {
+                    displayMessage('care-tips', "Please select a crop to get recommendations.", 'info');
+                    displayMessage('growth-prediction', "Select a crop, ensure sensor data is available, and all AI components are loaded for prediction.", 'info');
+                    displayMessage('market-price-forecast', "Select a crop, ensure sensor data is available, and market model is trained for market price forecast.", 'info');
+                    displayMessage('crop-suggestion', "Predicted soil moisture is out of typical range or not available, hindering specific crop suggestions.", 'info');
+                }
+
+                // Display Camera Feed Data
+                const cameraFeedDiv = document.getElementById('camera-feed');
+                if (cameraData) {
+                    cameraFeedDiv.innerHTML = `
+                        <p class="text-gray-300">🕒 Timestamp: ${cameraData.timestamp || 'N/A'}</p>
+                        <p class="text-green-400">📈 Growth Stage: ${cameraData.stage || 'N/A'}</p>
+                        <p class="text-yellow-400">⚠️ Advisory: ${cameraData.alert || 'N/A'}</p>
+                    `;
+                } else {
+                    displayMessage('camera-feed', "No real-time plant monitoring data available from Firebase. Please ensure the dummy camera simulator is running and pushing data.", 'info');
+                }
+
+                // Render Raw Data Table
+                renderRawDataTable(rawData);
+
+            } catch (error) {
+                console.error("Error fetching dashboard data:", error);
+                // Display error messages on relevant sections
+                displayMessage('gauge-soil-moisture', "Error loading data", 'error');
+                displayMessage('sensor-trends-status', "Error loading sensor trends.", 'error');
+                displayMessage('camera-feed', "Error loading camera data.", 'error');
+                displayMessage('raw-data-table', "Error loading raw data.", 'error');
+                displayMessage('care-tips', "Error loading recommendations.", 'error');
+                displayMessage('growth-prediction', "Error loading predictions.", 'error');
+                displayMessage('market-price-forecast', "Error loading forecast.", 'error');
+                displayMessage('crop-suggestion', "Error loading suggestions.", 'error');
+            } finally {
+                document.getElementById('refresh-button').disabled = false;
+                document.getElementById('refresh-button').innerHTML = '🔄 Refresh Data';
+            }
+        }
+
+        // Function to get the currently selected language from Google Translate dropdown
+        function getSelectedGoogleTranslateLanguage() {
+            const combo = document.querySelector('.goog-te-combo');
+            return combo ? combo.value : 'en'; // Default to 'en' if not found
+        }
+
+        // Function to update predictions and advice based on selected crop
+        async function updateCropSpecificData() {
+            const selectedCropType = document.getElementById('crop-select').value;
+            // Get language from Google Translate dropdown - used for TTS, not for backend messages
+            const currentLang = getSelectedGoogleTranslateLanguage();
+
+            if (!selectedCropType) {
+                displayMessage('care-tips', "Please select a crop to get recommendations.", 'info');
+                displayMessage('growth-prediction', "Select a crop, ensure sensor data is available, and all AI components are loaded for prediction.", 'info');
+                displayMessage('market-price-forecast', "Select a crop, ensure sensor data is available, and market model is trained for market price forecast.", 'info');
+                displayMessage('crop-suggestion', "Predicted soil moisture is out of typical range or not available, hindering specific crop suggestions.", 'info');
+                return;
+            }
+
+            // Fetch Crop Care Recommendations
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/care_advice`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ selected_crop_type: selectedCropType })
+                });
+                const data = await response.json();
+                const careTipsDiv = document.getElementById('care-tips');
+                if (data.advice && data.advice.length > 0) {
+                    careTipsDiv.innerHTML = data.advice.map(tip => `<p>${renderMarkdown(tip)}</p>`).join('');
+                } else {
+                    displayMessage('care-tips', "No specific care recommendations available.", 'info');
+                }
+            } catch (error) {
+                console.error("Error fetching crop care advice:", error);
+                displayMessage('care-tips', "Error loading crop care recommendations.", 'error');
+            }
+
+            let predictedSoilMoisture = null;
+
+            // Fetch AI-Based Growth Prediction
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/predict_growth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ selected_crop_type: selectedCropType })
+                });
+                const data = await response.json();
+                const growthPredictionDiv = document.getElementById('growth-prediction');
+                if (data.error) {
+                    displayMessage('growth-prediction', `Error: ${data.error}`, 'error');
+                } else {
+                    predictedSoilMoisture = data.soil_moisture_pred;
+                    let soilMoistureMsg = `📊 Predicted Soil Moisture: <b>${data.soil_moisture_pred.toFixed(2)}%</b>`;
+                    if (!(0 <= data.soil_moisture_pred <= 100)) {
+                        soilMoistureMsg += `. This value seems unusual (Expected between 0-100%).`;
+                        growthPredictionDiv.innerHTML = `<p class="text-yellow-400">⚠️ ${soilMoistureMsg}</p>`;
+                    } else {
+                        growthPredictionDiv.innerHTML = `<p class="text-green-400">✅ ${soilMoistureMsg}</p>`;
+                    }
+                    growthPredictionDiv.innerHTML += `<p class="text-blue-400">💡 Predicted Light Intensity: <b>${data.light_intensity_pred.toFixed(2)} lux</b></p>`;
+                    growthPredictionDiv.innerHTML += `<p class="text-green-400">🌿 Predicted NPK Nutrient Sum: <b>${data.nutrient_sum_pred.toFixed(2)}</b></p>`;
+                }
+            } catch (error) {
+                console.error("Error fetching growth prediction:", error);
+                displayMessage('growth-prediction', "Error loading AI-based growth prediction.", 'error');
+            }
+
+            // Fetch Market Price Forecast
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/market_price`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ selected_crop_type: selectedCropType })
+                });
+                const data = await response.json();
+                const marketPriceDiv = document.getElementById('market-price-forecast');
+                if (data.error) {
+                    displayMessage('market-price-forecast', `Error: ${data.error}`, 'error');
+                } else {
+                    marketPriceDiv.innerHTML = `<p class="text-green-400">💰 Estimated Market Price for ${selectedCropType}: <b>₹ ${data.predicted_price.toFixed(2)} / unit</b></p>`;
+                }
+            } catch (error) {
+                console.error("Error fetching market price forecast:", error);
+                displayMessage('market-price-forecast', "Error loading market price forecast.", 'error');
+            }
+
+            // Fetch Crop Suggestion Based on Predicted Conditions
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/seed_recommendations`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ soil_moisture_pred: predictedSoilMoisture })
+                });
+                const data = await response.json();
+                const cropSuggestionDiv = document.getElementById('crop-suggestion');
+                if (data.error) {
+                    displayMessage('crop-suggestion', `Error: ${data.error}`, 'error');
+                } else {
+                    cropSuggestionDiv.innerHTML = `<p class="text-gray-300">${renderMarkdown(data.recommendation)}</p>`;
+                }
+            } catch (error) {
+                console.error("Error fetching crop suggestion:", error);
+                displayMessage('crop-suggestion', "Error loading crop suggestions.", 'error');
+            }
+        }
+
+        // Event Listeners
+        document.getElementById('refresh-button').addEventListener('click', fetchDataAndRender);
+        document.getElementById('crop-select').addEventListener('change', updateCropSpecificData);
+
+        document.getElementById('play-alerts-button').addEventListener('click', async () => {
+            const careTipsDiv = document.getElementById('care-tips');
+            const audioStatusDiv = document.getElementById('audio-status');
+            const currentLang = getSelectedGoogleTranslateLanguage();
+
+            const tips = Array.from(careTipsDiv.querySelectorAll('p')).map(p => p.textContent);
+            
+            if (tips.length === 0 || tips[0].includes("No specific care recommendations") || tips[0].includes("Loading recommendations...")) {
+                audioStatusDiv.textContent = "ℹ️ No specific alerts to play.";
+                return;
+            }
+
+            audioStatusDiv.textContent = "🔊 Playing alerts...";
+            const topAlerts = tips.slice(0, 2); // Play up to 2 alerts
+
+            for (let i = 0; i < topAlerts.length; i++) {
+                let tip = topAlerts[i];
+                // Remove markdown and emojis for better speech
+                const cleanTip = tip.replace(/\*\*/g, '').replace(/[🌱💧🌡️💨🧪☀️🌧️✅⚠️❌ℹ️]/g, '').trim();
+                if (cleanTip) {
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/voice_alert`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ text: cleanTip, lang: currentLang })
+                        });
+
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            throw new Error(`Server error: ${response.status} ${response.statusText} - ${errorText}`);
+                        }
+
+                        const audioBlob = await response.blob();
+                        playAudio(audioBlob);
+                        audioStatusDiv.textContent = `🔊 Playing alert ${i + 1}: "${cleanTip}"`;
+                        // Wait for the audio to finish or a reasonable duration
+                        await new Promise(resolve => setTimeout(resolve, cleanTip.length * 50 + 1000)); // Rough estimate
+                    } catch (error) {
+                        console.error("Error playing voice alert:", error);
+                        audioStatusDiv.textContent = `❌ Error playing alert ${i + 1}: ${error.message}`;
+                        break; // Stop playing if an error occurs
+                    }
+                }
+            }
+            audioStatusDiv.textContent = "🔊 Alerts finished.";
+        });
+
+
+        // Initial data load when the page is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchDataAndRender();
+            // Set up auto-refresh (e.g., every 30 seconds)
+            setInterval(fetchDataAndRender, 30000); // Refresh every 30 seconds
+        });
+    </script>
+
+    <!-- Google Translate Widget -->
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                pageLanguage: 'en',
+                includedLanguages: 'hi,bn,ta,te,ml,gu,mr,kn,pa,ur',
+                layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+            }, 'google_translate_element');
+        }
+    </script>
+    <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+
+    <!-- Optional: Auto-Detect and Switch Language -->
+    <script>
+        window.onload = function () {
+            const userLang = navigator.language || navigator.userLanguage;
+            const combo = document.querySelector('.goog-te-combo');
+            const langMatch = {
+                'hi': 'hi', 'bn': 'bn', 'ta': 'ta', 'te': 'te', 'ml': 'ml',
+                'gu': 'gu', 'mr': 'mr', 'kn': 'kn', 'pa': 'pa', 'ur': 'ur'
+            };
+
+            const shortLang = userLang.split('-')[0];
+            if (langMatch[shortLang]) {
+                // Give Google Translate widget a moment to load and populate the combo box
+                setTimeout(() => {
+                    if (combo && combo.querySelector(`option[value="${langMatch[shortLang]}"]`)) {
+                        combo.value = langMatch[shortLang];
+                        // Trigger change event to apply translation immediately
+                        combo.dispatchEvent(new Event('change'));
+                        // Also trigger our dashboard's update function after translation
+                        updateCropSpecificData(); 
+                    }
+                }, 1000); // Adjust timeout if needed
+            }
+        };
+    </script>
+</body>
+</html>
