@@ -1,264 +1,27 @@
-# dummy_camera_simulator.py
-
+# Imports from all original files
 import time
 import random
 import json
-from datetime import datetime
+from datetime import datetime, timedelta # Import timedelta for time calculations
 import os
 import base64
 import tempfile
-
-# Import Firebase Admin SDK
-import firebase_admin
-from firebase_admin import credentials, db
-
-# Simulated growth stages
-growth_stages = ["Germination", "Vegetative", "Flowering", "Maturity", "Wilting", "Yellowing"]
-
-# --- Firebase Secure Setup (Render-Compatible) ---
-# This part is adapted from your main dashboard script to make it runnable independently.
-# It tries to get the key from an environment variable first, then from a local file.
-firebase_cred_path = None
-try:
-    firebase_key_b64 = os.getenv("FIREBASE_KEY_B64")
-    if firebase_key_b64:
-        decoded_json = base64.b64decode(firebase_key_b64).decode('utf-8')
-        with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as f:
-            f.write(decoded_json)
-        firebase_cred_path = f.name
-        cred = credentials.Certificate(firebase_cred_path)
-        print("Firebase credentials loaded from environment variable.")
-    else:
-        # Fallback for local development if environment variable is not set
-        cred = credentials.Certificate("agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json")
-        print("Firebase credentials loaded from local file.")
-
-    # Prevent double initialization in case this script is run multiple times or in certain environments
-    if not firebase_admin._apps:
-        firebase_admin.initialize_app(cred, {
-            'databaseURL': 'https://agriastrax-website-default-rtdb.firebaseio.com/'
-        })
-    print("Firebase initialized successfully for camera simulator.")
-except Exception as e:
-    print(f"❌ Error initializing Firebase for dummy_camera_simulator: {e}")
-    # It's crucial to handle this error. If Firebase can't init, the script can't push data.
-    # For a simulator, you might just let it run and log errors, but it won't push data.
-    firebase_admin = None # Mark Firebase as not initialized
-
-finally:
-    # Clean up the temporary file if created from environment variable
-    if firebase_key_b64 and firebase_cred_path and os.path.exists(firebase_cred_path):
-        os.remove(firebase_cred_path)
-        print(f"Cleaned up temporary Firebase cred file: {firebase_cred_path}")
-
-
-def generate_dummy_growth_event():
-    event = {
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "stage": random.choice(growth_stages),
-        "alert": random.choice([
-            "Healthy Growth",
-            "Low Leaf Color Index",
-            "Possible Disease Detected",
-            "Needs Fertilizer",
-            "Check Irrigation"
-        ])
-    }
-    return event
-
-def run():
-    print("Starting dummy camera feed simulation...")
-
-    if firebase_admin is None:
-        print("Firebase is not initialized. Cannot push data to Firebase. Simulation will run but only print locally.")
-        # Fallback to local file if Firebase fails, or just print
-        local_file_only = True
-        # OUTPUT_FILE = "simulated_growth_data.json" # Re-enable if you want local file fallback
-    else:
-        local_file_only = False
-        try:
-            # Get a database reference to store camera data
-            camera_ref = db.reference('camera_feed/farm1')
-            print("Connected to Firebase path: camera_feed/farm1")
-        except Exception as e:
-            print(f"❌ Error getting Firebase database reference: {e}. Falling back to local file.")
-            local_file_only = True
-
-
-    while True:
-        event = generate_dummy_growth_event()
-        
-        if not local_file_only:
-            try:
-                # Push data to Firebase
-                camera_ref.push(event)
-                print(f"Simulated Data pushed to Firebase: {event}")
-            except Exception as e:
-                print(f"❌ Error pushing data to Firebase: {e}. Falling back to local printing.")
-                # If a persistent Firebase error, just print locally
-                local_file_only = True # Stop trying to push to Firebase
-                print("Simulated Data (local print):", event)
-        else:
-            # If Firebase is not initialized or failed, print locally
-            print("Simulated Data (local print):", event)
-            # You can re-enable writing to a local JSON file here if desired as a fallback:
-            # with open(OUTPUT_FILE, "w") as f:
-            #     json.dump(event, f)
-
-        time.sleep(10)  # Generate every 10 seconds
-
-if __name__ == "__main__":
-    run()
-
-----------------------------------------------------------------------------------------
-
-import firebase_admin
-from firebase_admin import credentials, db
-import datetime
-import random
-import time
-import os
-import base64
-import tempfile # For creating temporary files from environment variables
-
-def run(): # Added the run function
-    # --- Firebase Secure Setup (Render-Compatible) ---
-    firebase_cred_path = None # Initialize to None
-    try:
-        firebase_key_b64 = os.getenv("FIREBASE_KEY_B64")
-        if firebase_key_b64:
-            decoded_json = base64.b64decode(firebase_key_b64).decode('utf-8')
-            with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as f:
-                f.write(decoded_json)
-            firebase_cred_path = f.name
-            cred = credentials.Certificate(firebase_cred_path)
-            print("Firebase credentials loaded from environment variable.")
-        else:
-            # Fallback for local development if environment variable is not set
-            # Ensure 'agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json' is in your project root
-            cred = credentials.Certificate("agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json")
-            print("Firebase credentials loaded from local file.")
-
-        # Prevent double initialization in case this script is run multiple times
-        if not firebase_admin._apps:
-            firebase_admin.initialize_app(cred, {
-                'databaseURL': 'https://agriastrax-website-default-rtdb.firebaseio.com/'
-            })
-        print("Firebase initialized successfully for data inserter.")
-    except Exception as e:
-        print(f"❌ Error initializing Firebase for insert-sample-data: {e}")
-        # In a thread, exiting might abruptly stop the main app, consider logging and returning
-        return # Return from run function if Firebase fails to initialize
-    finally:
-        # Clean up the temporary file if created from environment variable
-        if firebase_key_b64 and firebase_cred_path and os.path.exists(firebase_cred_path):
-            os.remove(firebase_cred_path)
-            print(f"Cleaned up temporary Firebase cred file: {firebase_cred_path}")
-
-    ref = db.reference('sensors/farm1')
-
-    # Define possible crop stages
-    CROP_STAGES = ['seed', 'sprout', 'vegetative', 'flowering', 'mature']
-
-    # Insert 10 past samples
-    print("Inserting 10 enhanced dummy sensor readings with all 12 features (including crop_stage and growth_factor)...")
-    for i in range(10):
-        sample_data = {
-            'timestamp': (datetime.datetime.now() - datetime.timedelta(minutes=(10 - i)*5)).isoformat(),
-            'soil_moisture': round(random.uniform(20, 80), 2),
-            'temperature': round(random.uniform(25, 40), 2),
-            'humidity': round(random.uniform(40, 90), 2),
-            'pH': round(random.uniform(5.5, 7.5), 2), # Corrected to 'pH' for consistency with dashboard
-            'light_intensity': random.randint(300, 800),
-            'N': random.randint(0, 120),
-            'P': random.randint(0, 60),
-            'K': random.randint(0, 200),
-            'rainfall': round(random.uniform(0, 200), 2),
-            'crop_stage': random.choice(CROP_STAGES),
-            'growth_factor': round(random.uniform(0.3, 1.0), 2)  # simulating energy/photosynthesis score
-        }
-        try:
-            ref.push(sample_data)
-        except Exception as e:
-            print(f"❌ Error pushing initial sample data to Firebase: {e}")
-            break # Stop inserting if there's an error
-    print("Successfully inserted 10 enhanced dummy sensor readings.")
-
-    # Simulate live updates every 10s
-    print("\nSimulating live updates. New data will be inserted every 10 seconds. Press Ctrl+C to stop.")
-    while True:
-        current_timestamp = datetime.datetime.now().isoformat()
-        
-        # Introduce some realistic variations
-        current_soil_moisture = round(random.uniform(20, 60), 2)
-        current_temperature = round(random.uniform(28, 35), 2)
-        current_humidity = round(random.uniform(50, 80), 2)
-        current_pH = round(random.uniform(6.0, 7.2), 2)
-        current_light_intensity = random.randint(400, 700)
-        current_N = random.randint(20, 100)
-        current_P = random.randint(10, 50)
-        current_K = random.randint(30, 150)
-        current_rainfall = round(random.uniform(0, 120), 2)
-        
-        # Simulate a progression in crop stage over time (very basic simulation)
-        # You might want a more sophisticated logic here based on actual time or growth_factor
-        # For now, it will pick a random stage, but you could make it sequential.
-        current_crop_stage = random.choice(CROP_STAGES) 
-        
-        # Growth factor could be influenced by light, temperature, moisture
-        # A simple example: higher light, temp, and moisture might lead to higher growth_factor
-        current_growth_factor = round(
-            random.uniform(0.3, 1.0) * (current_light_intensity / 800) * (current_temperature / 40) * (current_soil_moisture / 80), 2
-        )
-        # Clamp growth_factor to [0.3, 1.0] if the above calculation goes outside.
-        current_growth_factor = max(0.3, min(1.0, current_growth_factor))
-
-        try:
-            ref.push({
-                'timestamp': current_timestamp,
-                'soil_moisture': current_soil_moisture,
-                'temperature': current_temperature,
-                'humidity': current_humidity,
-                'pH': current_pH, # Corrected to 'pH' for consistency with dashboard
-                'light_intensity': current_light_intensity,
-                'N': current_N,
-                'P': current_P,
-                'K': current_K,
-                'rainfall': current_rainfall,
-                'crop_stage': current_crop_stage,
-                'growth_factor': current_growth_factor
-            })
-            print(f"Inserted real-time enriched sensor data at {current_timestamp}. Data: {current_crop_stage}, {current_growth_factor}")
-        except Exception as e:
-            print(f"❌ Error pushing real-time data to Firebase: {e}")
-            # If continuous errors occur, you might want a more robust error handling
-            # e.g., exponential backoff, or stop trying to push data for a while.
-        time.sleep(10)
-
-if __name__ == "__main__":
-    run() # Call the run function when the script is executed directly
-
-----------------------------------------------------------------------------------------------------------------------------------------------
+import threading # New import for threading
 
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
+
 import firebase_admin
 from firebase_admin import credentials, db
+
 import pandas as pd
 import numpy as np
 import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from sklearn.linear_model import LinearRegression
-import datetime
-import os
-import base64
-import tempfile
-import json
 import joblib
-import time
 from gtts import gTTS
 import io
-import random
 
 app = Flask(__name__)
 # Explicitly enable CORS for /api routes from any origin
@@ -274,6 +37,8 @@ market_price_model = None
 market_crop_encoder = None
 market_price_features = None
 all_crop_labels = []
+firebase_db_ref = None # Global reference for Firebase DB
+firebase_camera_ref = None # Global reference for Firebase camera feed
 
 # Refined messages: Removed markdown and direct placeholders from dictionary values.
 # The formatting will be done in the crop_care_advice_backend function.
@@ -377,7 +142,8 @@ SEED_RECOMMENDATIONS_MESSAGES = {
 def initialize_app_components():
     """Initializes Firebase, loads AI model, scalers, and crop encoder."""
     global firebase_app, model, input_scaler, output_scaler, crop_encoder, \
-           market_price_model, market_crop_encoder, market_price_features, all_crop_labels
+           market_price_model, market_crop_encoder, market_price_features, all_crop_labels, \
+           firebase_db_ref, firebase_camera_ref
 
     # --- Firebase Secure Setup ---
     firebase_key_b64 = os.getenv("FIREBASE_KEY_B64")
@@ -394,6 +160,7 @@ def initialize_app_components():
                 print("Firebase credentials loaded from environment variable.")
             else:
                 # Fallback for local development if environment variable is not set
+                # Ensure 'agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json' is in your project root
                 cred = credentials.Certificate("agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json")
                 print("Firebase credentials loaded from local file.")
             
@@ -405,9 +172,15 @@ def initialize_app_components():
             firebase_app = firebase_admin.get_app() # Get existing app if already initialized
             print("Firebase already initialized.")
 
+        firebase_db_ref = db.reference('sensors/farm1')
+        firebase_camera_ref = db.reference('camera_feed/farm1')
+        print("Firebase database references obtained.")
+
     except Exception as e:
         print(f"❌ Firebase initialization failed: {e}")
         firebase_app = None # Mark as failed
+        firebase_db_ref = None
+        firebase_camera_ref = None
     finally:
         # Clean up the temporary file if it was created
         if firebase_key_b64 and firebase_cred_path and os.path.exists(firebase_cred_path):
@@ -519,21 +292,151 @@ def initialize_app_components():
     else:
         print("❌ Cannot train market price model: Crop encoder not initialized.")
 
-# Call initialization when the app starts
-with app.app_context():
-    initialize_app_components()
 
+# --- Data Simulation Functions (Integrated from dummy_camera_simulator.py and insert-sample-data.py) ---
 
-# --- Helper Functions (adapted from THE-DASHBOARD.py) ---
+# Simulated growth stages
+growth_stages = ["Germination", "Vegetative", "Flowering", "Maturity", "Wilting", "Yellowing"]
+# Define possible crop stages for sensor data
+CROP_STAGES = ['seed', 'sprout', 'vegetative', 'flowering', 'mature']
+
+def generate_dummy_growth_event():
+    """Generates a single dummy camera feed event."""
+    event = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "stage": random.choice(growth_stages),
+        "alert": random.choice([
+            "Healthy Growth",
+            "Low Leaf Color Index",
+            "Possible Disease Detected",
+            "Needs Fertilizer",
+            "Check Irrigation"
+        ])
+    }
+    return event
+
+def run_camera_simulator():
+    """Simulates camera feed data and pushes to Firebase."""
+    print("Starting dummy camera feed simulation thread...")
+    if firebase_camera_ref is None:
+        print("Firebase camera reference not initialized. Camera simulation will only print locally.")
+        local_print_only = True
+    else:
+        local_print_only = False
+        print("Connected to Firebase path for camera feed: camera_feed/farm1")
+
+    while True:
+        event = generate_dummy_growth_event()
+        
+        if not local_print_only:
+            try:
+                firebase_camera_ref.push(event)
+                # print(f"Simulated Camera Data pushed to Firebase: {event}") # Too verbose for continuous run
+            except Exception as e:
+                print(f"❌ Error pushing camera data to Firebase: {e}. Falling back to local printing.")
+                local_print_only = True # Stop trying to push to Firebase
+                print("Simulated Camera Data (local print):", event)
+        else:
+            print("Simulated Camera Data (local print):", event)
+
+        time.sleep(10)  # Generate every 10 seconds
+
+def run_sensor_data_inserter():
+    """Inserts initial dummy sensor data and then simulates live updates to Firebase."""
+    print("Starting sensor data inserter thread...")
+    if firebase_db_ref is None:
+        print("Firebase DB reference not initialized. Sensor data insertion will only print locally.")
+        local_print_only = True
+    else:
+        local_print_only = False
+        print("Connected to Firebase path for sensor data: sensors/farm1")
+
+    # Insert 10 past samples
+    print("Inserting 10 enhanced dummy sensor readings with all 12 features (including crop_stage and growth_factor)...")
+    for i in range(10):
+        sample_data = {
+            'timestamp': (datetime.now() - timedelta(minutes=(10 - i)*5)).isoformat(),
+            'soil_moisture': round(random.uniform(20, 80), 2),
+            'temperature': round(random.uniform(20, 40), 2), # Wider range
+            'humidity': round(random.uniform(30, 95), 2), # Wider range
+            'pH': round(random.uniform(4.0, 9.0), 2), 
+            'light_intensity': random.randint(200, 900), # Wider range
+            'N': random.randint(0, 150), # Wider range
+            'P': random.randint(0, 70), # Wider range
+            'K': random.randint(0, 250), # Wider range
+            'rainfall': round(random.uniform(0, 250), 2), # Wider range
+            'crop_stage': random.choice(CROP_STAGES),
+            'growth_factor': round(random.uniform(0.1, 1.2), 2) # Wider range for more visible change
+        }
+        if not local_print_only:
+            try:
+                firebase_db_ref.push(sample_data)
+            except Exception as e:
+                print(f"❌ Error pushing initial sample data to Firebase: {e}. Falling back to local printing.")
+                local_print_only = True
+                print("Initial Sample Data (local print):", sample_data)
+                break # Stop inserting if there's an error
+        else:
+            print("Initial Sample Data (local print):", sample_data)
+    print("Successfully inserted 10 enhanced dummy sensor readings (if Firebase was available).")
+
+    # Simulate live updates every 10s
+    print("\nSimulating live sensor data updates. New data will be inserted every 10 seconds. Press Ctrl+C to stop.")
+    while True:
+        current_timestamp = datetime.now().isoformat()
+        
+        current_soil_moisture = round(random.uniform(20, 60), 2)
+        current_temperature = round(random.uniform(20, 40), 2) # Wider range
+        current_humidity = round(random.uniform(30, 95), 2) # Wider range
+        current_pH = round(random.uniform(4.0, 9.0), 2) # Wider range
+        current_light_intensity = random.randint(200, 900) # Wider range
+        current_N = random.randint(0, 150) # Wider range
+        current_P = random.randint(0, 70) # Wider range
+        current_K = random.randint(0, 250) # Wider range
+        current_rainfall = round(random.uniform(0, 250), 2) # Wider range
+        
+        current_crop_stage = random.choice(CROP_STAGES) 
+        
+        # Make growth factor more visibly dynamic
+        current_growth_factor = round(random.uniform(0.1, 1.2), 2) # Directly random for more variation
+
+        live_data = {
+            'timestamp': current_timestamp,
+            'soil_moisture': current_soil_moisture,
+            'temperature': current_temperature,
+            'humidity': current_humidity,
+            'pH': current_pH, 
+            'light_intensity': current_light_intensity,
+            'N': current_N,
+            'P': current_P,
+            'K': current_K,
+            'rainfall': current_rainfall,
+            'crop_stage': current_crop_stage,
+            'growth_factor': current_growth_factor
+        }
+
+        if not local_print_only:
+            try:
+                firebase_db_ref.push(live_data)
+                # print(f"Inserted real-time enriched sensor data at {current_timestamp}.") # Too verbose
+            except Exception as e:
+                print(f"❌ Error pushing real-time data to Firebase: {e}. Falling back to local printing.")
+                local_print_only = True
+                print("Live Sensor Data (local print):", live_data)
+        else:
+            print("Live Sensor Data (local print):", live_data)
+            
+        time.sleep(10)
+
+# --- Helper Functions (adapted from original app.py) ---
 
 def fetch_sensor_data_backend():
     """Fetches sensor data from Firebase Realtime Database."""
-    if not firebase_app:
-        print("Firebase app not initialized. Cannot fetch sensor data.")
+    if firebase_db_ref is None:
+        print("Firebase DB reference not initialized. Cannot fetch sensor data.")
         return pd.DataFrame()
     try:
-        ref = db.reference('sensors/farm1')
-        snapshot = ref.get()
+        snapshot = firebase_db_ref.get()
         if not snapshot:
             return pd.DataFrame()
         
@@ -577,12 +480,11 @@ def fetch_sensor_data_backend():
 
 def fetch_camera_feed_data_backend():
     """Fetches camera feed data (growth events) from Firebase Realtime Database."""
-    if not firebase_app:
-        print("Firebase app not initialized. Cannot fetch camera data.")
+    if firebase_camera_ref is None:
+        print("Firebase camera reference not initialized. Cannot fetch camera data.")
         return None
     try:
-        ref = db.reference('camera_feed/farm1')
-        snapshot = ref.get()
+        snapshot = firebase_camera_ref.get()
         if not snapshot:
             return None
         
@@ -777,7 +679,7 @@ def crop_care_advice_backend(df, crop_type):
         elif ct == 'jute':
             if temp < 25: tips.append(f"{temp_msg_prefix} {messages['jute_temp_low_advice']}")
         elif ct == 'papaya':
-            if temp < 20: tips.append(f"{temp_msg_prefix} {messages['papaya_temp_low_advice']}")
+            if temp < 20: tips.append(f"{temp_msg_prefix} {messages['papaya_temp_low_advice']}") 
         elif ct == 'pomegranate':
             if temp < 20: tips.append(f"{temp_msg_prefix} {messages['pomegranate_temp_low_advice']}")
         elif ct == 'muskmelon' or ct == 'watermelon':
@@ -944,7 +846,6 @@ def get_dashboard_data():
             value_name='Reading'
         )
         # Convert timestamps to string for JSON
-        # FIX: Removed redundant .dt accessor
         plot_df_melted['timestamp'] = plot_df_melted['timestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S')
         
         # Convert any NaN in the 'Reading' column to None
@@ -1074,5 +975,20 @@ def get_crop_labels():
     return jsonify({'crop_labels': all_crop_labels})
 
 if __name__ == '__main__':
+    # Initialize app components (models, scalers, Firebase, etc.)
+    with app.app_context():
+        initialize_app_components()
+
+    # Start camera simulator in a separate thread
+    camera_thread = threading.Thread(target=run_camera_simulator)
+    camera_thread.daemon = True # Allow main program to exit even if threads are running
+    camera_thread.start()
+
+    # Start sensor data inserter in a separate thread
+    sensor_inserter_thread = threading.Thread(target=run_sensor_data_inserter)
+    sensor_inserter_thread.daemon = True
+    sensor_inserter_thread.start()
+
+    # Run the Flask app
     app.static_folder = 'static'
     app.run(debug=True, host='0.0.0.0', port=5000)
