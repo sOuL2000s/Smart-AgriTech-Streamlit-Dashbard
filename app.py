@@ -814,7 +814,7 @@ def speak_tip_backend(text, lang='en'):
 
 @app.route('/')
 def index():
-    return app.send_static_file('index.html')
+    return send_file('index.html')
 
 @app.route('/api/data')
 def get_dashboard_data():
@@ -990,5 +990,4 @@ if __name__ == '__main__':
     sensor_inserter_thread.start()
 
     # Run the Flask app
-    app.static_folder = 'static'
     app.run(debug=True, host='0.0.0.0', port=5000)
