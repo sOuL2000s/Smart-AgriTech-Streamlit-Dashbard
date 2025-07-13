@@ -81,6 +81,106 @@ def initialize_app_components():
                 print(f"[DEBUG] Cleaned up temporary Firebase cred file: {firebase_cred_path}")
             except Exception as e_clean:
                 print(f"[WARNING] Could not delete temp file {firebase_cred_path}: {e_clean}")
+    # --- Load Crop Labels from CSV ---
+    try:
+        # Assuming 'cleaned_sensor_data.csv' is available in the same directory as app.py
+        crop_df_for_labels = pd.read_csv("cleaned_sensor_data.csv")
+        all_crop_labels = sorted(crop_df_for_labels['label'].unique().tolist())
+        crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+        crop_encoder.fit(np.array(all_crop_labels).reshape(-1, 1))
+        market_crop_encoder = crop_encoder # Use the same encoder for market price
+        print(f"Crop labels loaded: {len(all_crop_labels)} unique crops found.")
+    except FileNotFoundError:
+        print("❌ 'cleaned_sensor_data.csv' not found. Crop labels and encoder will be limited or empty.")
+        all_crop_labels = []
+        crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False) # Fallback
+        market_crop_encoder = crop_encoder
+    except Exception as e:
+        print(f"❌ Error loading 'cleaned_sensor_data.csv': {e}")
+        all_crop_labels = []
+        crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False) # Fallback
+        market_crop_encoder = crop_encoder
+
+    # --- Load AI Model ---
+    try:
+        # Assuming 'tdann_pnsm_model.keras' is available
+        model = tf.keras.models.load_model("tdann_pnsm_model.keras")
+        print("AI model (tdann_pnsm_model.keras) loaded successfully.")
+    except Exception as e:
+        print(f"❌ Error loading AI model (tdann_pnsm_model.keras): {e}")
+        model = None
+
+    # --- Load Scalers ---
+    try:
+        # Assuming scaler files are available
+        input_scaler = joblib.load('tdann_input_scaler.joblib')
+        output_scaler = joblib.load('tdann_output_scaler.joblib')
+        print("Input and Output scalers loaded successfully.")
+    except FileNotFoundError:
+        print("❌ Scaler files (tdann_input_scaler.joblib, tdann_output_scaler.joblib) not found.")
+        input_scaler = MinMaxScaler() # Fallback
+        output_scaler = MinMaxScaler() # Fallback
+        print("Using newly initialized scalers. Predictions may be inaccurate.")
+    except Exception as e:
+        print(f"❌ Error loading scalers: {e}")
+        input_scaler = MinMaxScaler() # Fallback
+        output_scaler = MinMaxScaler() # Fallback
+        print("Using newly initialized scalers. Predictions may be inaccurate.")
+
+    # --- Market Price Predictor Setup ---
+    def generate_market_price_data(num_samples=1000):
+        data = []
+        crops = all_crop_labels if all_crop_labels else ['wheat', 'rice', 'maize']
+        
+        for _ in range(num_samples):
+            crop_type = random.choice(crops)
+            N = random.uniform(50, 150)
+            P = random.uniform(20, 60)
+            K = random.uniform(50, 200)
+            temperature = random.uniform(20, 35)
+            humidity = random.uniform(30, 80)
+            
+            base_price = 100
+            
+            if crop_type == 'wheat':
+                price = base_price * 1.2
+            elif crop_type == 'rice':
+                price = base_price * 1.5
+            elif crop_type == 'maize':
+                price = base_price * 1.1
+            else: 
+                price = base_price * 1.0
+                
+            price += (N / 10) + (P / 5) + (K / 10)
+            price += (temperature - 25) * 2
+            price += (humidity - 50) * 1.5
+            
+            price += random.uniform(-10, 10)
+            price = max(50, price)
+            
+            data.append([N, P, K, temperature, humidity, crop_type, price])
+            
+        df_prices = pd.DataFrame(data, columns=['N', 'P', 'K', 'temperature', 'humidity', 'crop_type', 'price'])
+        return df_prices
+
+    if crop_encoder: # Ensure crop_encoder is available for market price model training
+        df_prices = generate_market_price_data(num_samples=2000)
+        market_price_features = ['N', 'P', 'K', 'temperature', 'humidity']
+        
+        # Ensure crop_encoder is fitted with 'crop_type' if it's used here
+        X_categorical = market_crop_encoder.transform(df_prices[['crop_type']])
+        X_categorical_df = pd.DataFrame(X_categorical, columns=market_crop_encoder.get_feature_names_out(['crop_type']))
+        
+        X_numerical = df_prices[market_price_features]
+        
+        X_train_market = pd.concat([X_numerical, X_categorical_df], axis=1)
+        y_train_market = df_prices['price']
+        
+        market_price_model = LinearRegression()
+        market_price_model.fit(X_train_market, y_train_market)
+        print("Market price prediction model trained (simulated data).")
+    else:
+        print("❌ Cannot train market price model: Crop encoder not initialized.")
 
 app = Flask(__name__)
 # Explicitly enable CORS for /api routes from any origin
@@ -195,169 +295,6 @@ SEED_RECOMMENDATIONS_MESSAGES = {
     'very_wet': "semi-aquatic crops or those highly tolerant to waterlogging (e.g., taro, some rice varieties if poorly drained)",
     'no_specific': "No specific recommendations, as current conditions are unusual or general."
 }
-
-
-# --- Initialization Function ---
-def initialize_app_components():
-    global firebase_app, model, input_scaler, output_scaler, crop_encoder, \
-           market_price_model, market_crop_encoder, market_price_features, all_crop_labels, \
-           firebase_db_ref, firebase_camera_ref
-
-    firebase_key_b64 = os.getenv("FIREBASE_KEY_B64")
-    print(f"[DEBUG] FIREBASE_KEY_B64 found: {bool(firebase_key_b64)}")
-    if firebase_key_b64:
-        print(f"[DEBUG] First 50 chars of FIREBASE_KEY_B64: {firebase_key_b64[:50]}...")
-    firebase_cred_path = None
-
-    try:
-        if not firebase_admin._apps:
-            if firebase_key_b64:
-                try:
-                    decoded_json = base64.b64decode(firebase_key_b64).decode('utf-8')
-                    print("[DEBUG] FIREBASE_KEY_B64 decoded successfully.")
-                except Exception as e:
-                    print(f"[ERROR] Failed to decode FIREBASE_KEY_B64: {e}")
-                    raise
-
-                with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as f:
-                    f.write(decoded_json)
-                    print(f"[DEBUG] Firebase credentials written to temporary file: {f.name}")
-                firebase_cred_path = f.name
-                cred = credentials.Certificate(firebase_cred_path)
-                print("Firebase credentials loaded from environment variable.")
-            else:
-                print("[DEBUG] FIREBASE_KEY_B64 not found, falling back to local JSON.")
-                cred = credentials.Certificate("agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json")
-                print("Firebase credentials loaded from local file.")
-
-            firebase_app = firebase_admin.initialize_app(cred, {
-                'databaseURL': 'https://agriastrax-website-default-rtdb.firebaseio.com/'
-            })
-            print("[DEBUG] Firebase initialized with decoded credentials.")
-        else:
-            firebase_app = firebase_admin.get_app()
-            print("Firebase already initialized.")
-
-        firebase_db_ref = db.reference('sensors/farm1')
-        firebase_camera_ref = db.reference('camera_feed/farm1')
-        print("Firebase database references obtained.")
-
-    except Exception as e:
-        print(f"❌ Firebase initialization failed: {e}")
-        firebase_app = None
-        firebase_db_ref = None
-        firebase_camera_ref = None
-
-    finally:
-        if firebase_key_b64 and firebase_cred_path and os.path.exists(firebase_cred_path):
-            try:
-                os.remove(firebase_cred_path)
-                print(f"[DEBUG] Cleaned up temporary Firebase cred file: {firebase_cred_path}")
-            except Exception as e_clean:
-                print(f"[WARNING] Could not delete temp file {firebase_cred_path}: {e_clean}")
-
-
-    # --- Load Crop Labels from CSV ---
-    try:
-        # Assuming 'cleaned_sensor_data.csv' is available in the same directory as app.py
-        crop_df_for_labels = pd.read_csv("cleaned_sensor_data.csv")
-        all_crop_labels = sorted(crop_df_for_labels['label'].unique().tolist())
-        crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
-        crop_encoder.fit(np.array(all_crop_labels).reshape(-1, 1))
-        market_crop_encoder = crop_encoder # Use the same encoder for market price
-        print(f"Crop labels loaded: {len(all_crop_labels)} unique crops found.")
-    except FileNotFoundError:
-        print("❌ 'cleaned_sensor_data.csv' not found. Crop labels and encoder will be limited or empty.")
-        all_crop_labels = []
-        crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False) # Fallback
-        market_crop_encoder = crop_encoder
-    except Exception as e:
-        print(f"❌ Error loading 'cleaned_sensor_data.csv': {e}")
-        all_crop_labels = []
-        crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False) # Fallback
-        market_crop_encoder = crop_encoder
-
-    # --- Load AI Model ---
-    try:
-        # Assuming 'tdann_pnsm_model.keras' is available
-        model = tf.keras.models.load_model("tdann_pnsm_model.keras")
-        print("AI model (tdann_pnsm_model.keras) loaded successfully.")
-    except Exception as e:
-        print(f"❌ Error loading AI model (tdann_pnsm_model.keras): {e}")
-        model = None
-
-    # --- Load Scalers ---
-    try:
-        # Assuming scaler files are available
-        input_scaler = joblib.load('tdann_input_scaler.joblib')
-        output_scaler = joblib.load('tdann_output_scaler.joblib')
-        print("Input and Output scalers loaded successfully.")
-    except FileNotFoundError:
-        print("❌ Scaler files (tdann_input_scaler.joblib, tdann_output_scaler.joblib) not found.")
-        input_scaler = MinMaxScaler() # Fallback
-        output_scaler = MinMaxScaler() # Fallback
-        print("Using newly initialized scalers. Predictions may be inaccurate.")
-    except Exception as e:
-        print(f"❌ Error loading scalers: {e}")
-        input_scaler = MinMaxScaler() # Fallback
-        output_scaler = MinMaxScaler() # Fallback
-        print("Using newly initialized scalers. Predictions may be inaccurate.")
-
-    # --- Market Price Predictor Setup ---
-    def generate_market_price_data(num_samples=1000):
-        data = []
-        crops = all_crop_labels if all_crop_labels else ['wheat', 'rice', 'maize']
-        
-        for _ in range(num_samples):
-            crop_type = random.choice(crops)
-            N = random.uniform(50, 150)
-            P = random.uniform(20, 60)
-            K = random.uniform(50, 200)
-            temperature = random.uniform(20, 35)
-            humidity = random.uniform(30, 80)
-            
-            base_price = 100
-            
-            if crop_type == 'wheat':
-                price = base_price * 1.2
-            elif crop_type == 'rice':
-                price = base_price * 1.5
-            elif crop_type == 'maize':
-                price = base_price * 1.1
-            else: 
-                price = base_price * 1.0
-                
-            price += (N / 10) + (P / 5) + (K / 10)
-            price += (temperature - 25) * 2
-            price += (humidity - 50) * 1.5
-            
-            price += random.uniform(-10, 10)
-            price = max(50, price)
-            
-            data.append([N, P, K, temperature, humidity, crop_type, price])
-            
-        df_prices = pd.DataFrame(data, columns=['N', 'P', 'K', 'temperature', 'humidity', 'crop_type', 'price'])
-        return df_prices
-
-    if crop_encoder: # Ensure crop_encoder is available for market price model training
-        df_prices = generate_market_price_data(num_samples=2000)
-        market_price_features = ['N', 'P', 'K', 'temperature', 'humidity']
-        
-        # Ensure crop_encoder is fitted with 'crop_type' if it's used here
-        X_categorical = market_crop_encoder.transform(df_prices[['crop_type']])
-        X_categorical_df = pd.DataFrame(X_categorical, columns=market_crop_encoder.get_feature_names_out(['crop_type']))
-        
-        X_numerical = df_prices[market_price_features]
-        
-        X_train_market = pd.concat([X_numerical, X_categorical_df], axis=1)
-        y_train_market = df_prices['price']
-        
-        market_price_model = LinearRegression()
-        market_price_model.fit(X_train_market, y_train_market)
-        print("Market price prediction model trained (simulated data).")
-    else:
-        print("❌ Cannot train market price model: Crop encoder not initialized.")
-
 
 # --- Data Simulation Functions (Integrated from dummy_camera_simulator.py and insert-sample-data.py) ---
 
@@ -1042,8 +979,6 @@ def get_crop_labels():
 
 if __name__ == '__main__':
     # Initialize app components (models, scalers, Firebase, etc.)
-    with app.app_context():
-        initialize_app_components()
 
     # Start camera simulator in a separate thread
     camera_thread = threading.Thread(target=run_camera_simulator)
