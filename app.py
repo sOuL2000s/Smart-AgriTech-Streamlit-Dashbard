@@ -979,10 +979,11 @@ def api_voice_alert():
 def get_crop_labels():
     return jsonify({'crop_labels': all_crop_labels})
 
+# Initialize app components (models, scalers, Firebase, etc.)
+with app.app_context():
+    initialize_app_components()
+
 if __name__ == '__main__':
-    # Initialize app components (models, scalers, Firebase, etc.)
-    with app.app_context():
-        initialize_app_components()
 
     # Start camera simulator in a separate thread
     camera_thread = threading.Thread(target=run_camera_simulator)
