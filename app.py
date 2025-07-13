@@ -7,7 +7,6 @@ import os
 import base64
 import tempfile
 import threading # New import for threading
-import io
 
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
@@ -22,7 +21,7 @@ from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from sklearn.linear_model import LinearRegression
 import joblib
 from gtts import gTTS
-
+import io
 
 app = Flask(__name__)
 # Explicitly enable CORS for /api routes from any origin
@@ -149,13 +148,9 @@ def initialize_app_components():
     # --- Firebase Secure Setup ---
     firebase_key_b64 = os.getenv("FIREBASE_KEY_B64")
     firebase_cred_path = None
-    
-    print("Attempting Firebase initialization...")
     try:
         if not firebase_admin._apps: # Prevent double initialization
-            print("Firebase app not already initialized. Proceeding with initialization.")
             if firebase_key_b64:
-                print("FIREBASE_KEY_B64 environment variable found. Decoding credentials.")
                 decoded_json = base64.b64decode(firebase_key_b64).decode('utf-8')
                 # Use tempfile to create a temporary file for the credentials
                 with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as f:
@@ -164,20 +159,18 @@ def initialize_app_components():
                 cred = credentials.Certificate(firebase_cred_path)
                 print("Firebase credentials loaded from environment variable.")
             else:
-                print("FIREBASE_KEY_B64 not found. Attempting to load from local file.")
                 # Fallback for local development if environment variable is not set
                 # Ensure 'agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json' is in your project root
                 cred = credentials.Certificate("agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json")
                 print("Firebase credentials loaded from local file.")
             
-            print("Calling firebase_admin.initialize_app...")
             firebase_app = firebase_admin.initialize_app(cred, {
                 'databaseURL': 'https://agriastrax-website-default-rtdb.firebaseio.com/'
             })
             print("Firebase initialized successfully.")
         else:
             firebase_app = firebase_admin.get_app() # Get existing app if already initialized
-            print("Firebase already initialized (skipped re-initialization).")
+            print("Firebase already initialized.")
 
         firebase_db_ref = db.reference('sensors/farm1')
         firebase_camera_ref = db.reference('camera_feed/farm1')
@@ -981,12 +974,11 @@ def api_voice_alert():
 def get_crop_labels():
     return jsonify({'crop_labels': all_crop_labels})
 
-# Initialize app components (models, scalers, Firebase, etc.) when the module is imported
-# This ensures it runs when Gunicorn loads the app.
-with app.app_context():
-    initialize_app_components()
-
 if __name__ == '__main__':
+    # Initialize app components (models, scalers, Firebase, etc.)
+    with app.app_context():
+        initialize_app_components()
+
     # Start camera simulator in a separate thread
     camera_thread = threading.Thread(target=run_camera_simulator)
     camera_thread.daemon = True # Allow main program to exit even if threads are running
@@ -997,7 +989,6 @@ if __name__ == '__main__':
     sensor_inserter_thread.daemon = True
     sensor_inserter_thread.start()
 
-    # The Flask app will be run by Gunicorn in a production environment,
-    # so app.run() is not needed here.
-    # port = int(os.environ.get("PORT", 5000))
-    # app.run(host="0.0.0.0", port=port, debug=True)
+    # Run the Flask app
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
