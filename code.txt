@@ -7,6 +7,7 @@ import os
 import base64
 import tempfile
 import threading # New import for threading
+import io
 
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
@@ -21,7 +22,7 @@ from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from sklearn.linear_model import LinearRegression
 import joblib
 from gtts import gTTS
-import io
+
 
 app = Flask(__name__)
 # Explicitly enable CORS for /api routes from any origin
@@ -980,11 +981,12 @@ def api_voice_alert():
 def get_crop_labels():
     return jsonify({'crop_labels': all_crop_labels})
 
-if __name__ == '__main__':
-    # Initialize app components (models, scalers, Firebase, etc.)
-    with app.app_context():
-        initialize_app_components()
+# Initialize app components (models, scalers, Firebase, etc.) when the module is imported
+# This ensures it runs when Gunicorn loads the app.
+with app.app_context():
+    initialize_app_components()
 
+if __name__ == '__main__':
     # Start camera simulator in a separate thread
     camera_thread = threading.Thread(target=run_camera_simulator)
     camera_thread.daemon = True # Allow main program to exit even if threads are running
