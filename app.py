@@ -140,36 +140,43 @@ SEED_RECOMMENDATIONS_MESSAGES = {
 
 # --- Initialization Function ---
 def initialize_app_components():
-    """Initializes Firebase, loads AI model, scalers, and crop encoder."""
     global firebase_app, model, input_scaler, output_scaler, crop_encoder, \
            market_price_model, market_crop_encoder, market_price_features, all_crop_labels, \
            firebase_db_ref, firebase_camera_ref
 
-    # --- Firebase Secure Setup ---
     firebase_key_b64 = os.getenv("FIREBASE_KEY_B64")
+    print(f"[DEBUG] FIREBASE_KEY_B64 found: {bool(firebase_key_b64)}")
+    if firebase_key_b64:
+        print(f"[DEBUG] First 50 chars of FIREBASE_KEY_B64: {firebase_key_b64[:50]}...")
     firebase_cred_path = None
+
     try:
-        if not firebase_admin._apps: # Prevent double initialization
+        if not firebase_admin._apps:
             if firebase_key_b64:
-                decoded_json = base64.b64decode(firebase_key_b64).decode('utf-8')
-                # Use tempfile to create a temporary file for the credentials
+                try:
+                    decoded_json = base64.b64decode(firebase_key_b64).decode('utf-8')
+                    print("[DEBUG] FIREBASE_KEY_B64 decoded successfully.")
+                except Exception as e:
+                    print(f"[ERROR] Failed to decode FIREBASE_KEY_B64: {e}")
+                    raise
+
                 with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as f:
                     f.write(decoded_json)
+                    print(f"[DEBUG] Firebase credentials written to temporary file: {f.name}")
                 firebase_cred_path = f.name
                 cred = credentials.Certificate(firebase_cred_path)
                 print("Firebase credentials loaded from environment variable.")
             else:
-                # Fallback for local development if environment variable is not set
-                # Ensure 'agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json' is in your project root
+                print("[DEBUG] FIREBASE_KEY_B64 not found, falling back to local JSON.")
                 cred = credentials.Certificate("agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json")
                 print("Firebase credentials loaded from local file.")
-            
+
             firebase_app = firebase_admin.initialize_app(cred, {
                 'databaseURL': 'https://agriastrax-website-default-rtdb.firebaseio.com/'
             })
-            print("Firebase initialized successfully.")
+            print("[DEBUG] Firebase initialized with decoded credentials.")
         else:
-            firebase_app = firebase_admin.get_app() # Get existing app if already initialized
+            firebase_app = firebase_admin.get_app()
             print("Firebase already initialized.")
 
         firebase_db_ref = db.reference('sensors/farm1')
@@ -178,17 +185,17 @@ def initialize_app_components():
 
     except Exception as e:
         print(f"❌ Firebase initialization failed: {e}")
-        firebase_app = None # Mark as failed
+        firebase_app = None
         firebase_db_ref = None
         firebase_camera_ref = None
+
     finally:
-        # Clean up the temporary file if it was created
         if firebase_key_b64 and firebase_cred_path and os.path.exists(firebase_cred_path):
             try:
                 os.remove(firebase_cred_path)
-                print(f"Cleaned up temporary Firebase cred file: {firebase_cred_path}")
+                print(f"[DEBUG] Cleaned up temporary Firebase cred file: {firebase_cred_path}")
             except Exception as e_clean:
-                print(f"Warning: Could not delete temporary Firebase cred file {firebase_cred_path}: {e_clean}")
+                print(f"[WARNING] Could not delete temp file {firebase_cred_path}: {e_clean}")
 
 
     # --- Load Crop Labels from CSV ---
