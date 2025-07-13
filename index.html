@@ -183,24 +183,20 @@
             </div>
         </div>
 
-        <!-- Application Initialization Status -->
+        <!-- Application Initialization Status (Placeholder as this is backend info) -->
         <div class="card mb-6">
             <h2 class="text-2xl font-semibold text-green-300 mb-4 cursor-pointer" onclick="toggleExpander('init-status-content')">
                 Application Initialization Status <span id="expander-icon" class="float-right transform rotate-0 transition-transform duration-200">▼</span>
             </h2>
             <div id="init-status-content" class="hidden">
-                <p class="text-gray-400">Firebase initialized successfully.</p>
-                <p class="text-gray-400">Crop labels loaded: X unique crops found.</p>
-                <p class="text-gray-400">AI model (tdann_pnsm_model.keras) loaded successfully.</p>
-                <p class="text-gray-400">Input and Output scalers loaded successfully.</p>
-                <p class="text-gray-400">Market price prediction model trained (simulated data).</p>
+                <p class="text-gray-400">Backend components (Firebase, AI models, scalers) are initialized during server startup. Check server logs for detailed status.</p>
             </div>
         </div>
     </div>
 
     <script>
         // Use a relative path for API calls. This assumes your Flask app serves both frontend and backend.
-        const API_BASE_URL = 'https://smart-agritech-streamlit-dashbard.onrender.com/api';
+        const API_BASE_URL = 'https://smart-agritech-streamlit-dashbard.onrender.com/api'; // Changed to relative path
 
         // Function to create an Audio object and play sound
         function playAudio(audioBlob) {
@@ -428,7 +424,7 @@
             document.getElementById('refresh-button').innerHTML = '<span class="loading-spinner"></span> Loading...';
 
             try {
-                const response = await fetch(`${API_BASE_URL}/data`); // Changed to relative path
+                const response = await fetch(`${API_BASE_URL}/data`);
                 const data = await response.json();
 
                 if (data.status === 'no_data') {
@@ -530,10 +526,10 @@
 
             // Fetch Crop Care Recommendations
             try {
-                const response = await fetch(`${API_BASE_URL}/care_advice`, { // Changed to relative path
+                const response = await fetch(`${API_BASE_URL}/care_advice`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ selected_crop_type: selectedCropType })
+                    body: JSON.stringify({ selected_crop_type: selectedCropType, lang: currentLang })
                 });
                 const data = await response.json();
                 const careTipsDiv = document.getElementById('care-tips');
@@ -551,7 +547,7 @@
 
             // Fetch AI-Based Growth Prediction
             try {
-                const response = await fetch(`${API_BASE_URL}/predict_growth`, { // Changed to relative path
+                const response = await fetch(`${API_BASE_URL}/predict_growth`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ selected_crop_type: selectedCropType })
@@ -579,7 +575,7 @@
 
             // Fetch Market Price Forecast
             try {
-                const response = await fetch(`${API_BASE_URL}/market_price`, { // Changed to relative path
+                const response = await fetch(`${API_BASE_URL}/market_price`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ selected_crop_type: selectedCropType })
@@ -598,10 +594,10 @@
 
             // Fetch Crop Suggestion Based on Predicted Conditions
             try {
-                const response = await fetch(`${API_BASE_URL}/seed_recommendations`, { // Changed to relative path
+                const response = await fetch(`${API_BASE_URL}/seed_recommendations`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ soil_moisture_pred: predictedSoilMoisture })
+                    body: JSON.stringify({ soil_moisture_pred: predictedSoilMoisture, lang: currentLang })
                 });
                 const data = await response.json();
                 const cropSuggestionDiv = document.getElementById('crop-suggestion');
@@ -641,7 +637,7 @@
                 const cleanTip = tip.replace(/\*\*/g, '').replace(/[🌱💧🌡️💨🧪☀️🌧️✅⚠️❌ℹ️]/g, '').trim();
                 if (cleanTip) {
                     try {
-                        const response = await fetch(`${API_BASE_URL}/voice_alert`, { // Changed to relative path
+                        const response = await fetch(`${API_BASE_URL}/voice_alert`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ text: cleanTip, lang: currentLang })
@@ -681,7 +677,7 @@
         function googleTranslateElementInit() {
             new google.translate.TranslateElement({
                 pageLanguage: 'en',
-                includedLanguages: 'hi,bn,ta,te,ml,gu,mr,kn,pa,ur',
+                includedLanguages: 'hi,bn,ta,te,ml,gu,mr,kn,pa,ur,es,fr,de,ar,ja', // Added more languages
                 layout: google.translate.TranslateElement.InlineLayout.SIMPLE
             }, 'google_translate_element');
         }
@@ -694,8 +690,9 @@
             const userLang = navigator.language || navigator.userLanguage;
             const combo = document.querySelector('.goog-te-combo');
             const langMatch = {
-                'hi': 'hi', 'bn': 'bn', 'ta': 'ta', 'te': 'te', 'ml': 'ml',
-                'gu': 'gu', 'mr': 'mr', 'kn': 'kn', 'pa': 'pa', 'ur': 'ur'
+                'en': 'en', 'hi': 'hi', 'bn': 'bn', 'ta': 'ta', 'te': 'te', 'ml': 'ml',
+                'gu': 'gu', 'mr': 'mr', 'kn': 'kn', 'pa': 'pa', 'ur': 'ur',
+                'es': 'es', 'fr': 'fr', 'de': 'de', 'ar': 'ar', 'ja': 'ja'
             };
 
             const shortLang = userLang.split('-')[0];
