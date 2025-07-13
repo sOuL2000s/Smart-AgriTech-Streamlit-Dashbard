@@ -7,7 +7,6 @@ import os
 import base64
 import tempfile
 import threading # New import for threading
-import io
 
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
@@ -22,7 +21,7 @@ from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from sklearn.linear_model import LinearRegression
 import joblib
 from gtts import gTTS
-
+import io
 
 app = Flask(__name__)
 # Explicitly enable CORS for /api routes from any origin
@@ -620,7 +619,7 @@ def crop_care_advice_backend(df, crop_type):
         if nutrient in latest and not pd.isna(latest.get(nutrient)):
             value = latest[nutrient]
             if value < thresholds['min']:
-                tips.append(f"🌱 {nutrient} is low ({value:.1f}). {messages[thresholds['low_key']]}")
+                tips.append(f"� {nutrient} is low ({value:.1f}). {messages[thresholds['low_key']]}")
             elif value > thresholds['max']:
                 tips.append(f"🌱 {nutrient} is high ({value:.1f}). {messages[thresholds['high_key']]}")
 
