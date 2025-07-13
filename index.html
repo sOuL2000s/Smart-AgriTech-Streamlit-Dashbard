@@ -8,6 +8,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Plotly.js CDN for charts -->
     <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -136,7 +140,7 @@
             <!-- Crop Care Recommendations & AI-Based Predictions -->
             <div class="card">
                 <h2 class="text-2xl font-semibold text-green-300 mb-4">🌿 Crop Care & AI Insights</h2>
-                
+
                 <div class="mb-4">
                     <label for="crop-select" class="block text-lg font-medium text-gray-300 mb-2">Select Growing Crop:</label>
                     <select id="crop-select" class="w-full bg-gray-700 text-white py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
@@ -183,23 +187,20 @@
             </div>
         </div>
 
-        <!-- Application Initialization Status -->
+        <!-- Application Initialization Status (Placeholder as this is backend info) -->
         <div class="card mb-6">
             <h2 class="text-2xl font-semibold text-green-300 mb-4 cursor-pointer" onclick="toggleExpander('init-status-content')">
                 Application Initialization Status <span id="expander-icon" class="float-right transform rotate-0 transition-transform duration-200">▼</span>
             </h2>
             <div id="init-status-content" class="hidden">
-                <p class="text-gray-400">Firebase initialized successfully.</p>
-                <p class="text-gray-400">Crop labels loaded: X unique crops found.</p>
-                <p class="text-gray-400">AI model (tdann_pnsm_model.keras) loaded successfully.</p>
-                <p class="text-gray-400">Input and Output scalers loaded successfully.</p>
-                <p class="text-gray-400">Market price prediction model trained (simulated data).</p>
+                <p class="text-gray-400">Backend components (Firebase, AI models, scalers) are initialized during server startup. Check server logs for detailed status.</p>
             </div>
         </div>
     </div>
 
     <script>
-        const API_BASE_URL = 'https://smart-agritech-streamlit-dashbard.onrender.com'; // Flask app runs on the same origin
+        // Use a relative path for API calls. This assumes your Flask app serves both frontend and backend.
+        const API_BASE_URL = 'https://smart-agritech-streamlit-dashbard.onrender.com/api'; // Changed to relative path
 
         // Function to create an Audio object and play sound
         function playAudio(audioBlob) {
@@ -382,7 +383,7 @@
                 icon.classList.remove('rotate-180');
             }
         }
-        
+
         // Function to display messages with icons
         function displayMessage(elementId, message, type = 'info') {
             const element = document.getElementById(elementId);
@@ -427,7 +428,7 @@
             document.getElementById('refresh-button').innerHTML = '<span class="loading-spinner"></span> Loading...';
 
             try {
-                const response = await fetch(`${API_BASE_URL}/api/data`);
+                const response = await fetch(`${API_BASE_URL}/data`);
                 const data = await response.json();
 
                 if (data.status === 'no_data') {
@@ -529,10 +530,10 @@
 
             // Fetch Crop Care Recommendations
             try {
-                const response = await fetch(`${API_BASE_URL}/api/care_advice`, {
+                const response = await fetch(`${API_BASE_URL}/care_advice`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ selected_crop_type: selectedCropType })
+                    body: JSON.stringify({ selected_crop_type: selectedCropType, lang: currentLang })
                 });
                 const data = await response.json();
                 const careTipsDiv = document.getElementById('care-tips');
@@ -550,7 +551,7 @@
 
             // Fetch AI-Based Growth Prediction
             try {
-                const response = await fetch(`${API_BASE_URL}/api/predict_growth`, {
+                const response = await fetch(`${API_BASE_URL}/predict_growth`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ selected_crop_type: selectedCropType })
@@ -578,7 +579,7 @@
 
             // Fetch Market Price Forecast
             try {
-                const response = await fetch(`${API_BASE_URL}/api/market_price`, {
+                const response = await fetch(`${API_BASE_URL}/market_price`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ selected_crop_type: selectedCropType })
@@ -597,10 +598,10 @@
 
             // Fetch Crop Suggestion Based on Predicted Conditions
             try {
-                const response = await fetch(`${API_BASE_URL}/api/seed_recommendations`, {
+                const response = await fetch(`${API_BASE_URL}/seed_recommendations`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ soil_moisture_pred: predictedSoilMoisture })
+                    body: JSON.stringify({ soil_moisture_pred: predictedSoilMoisture, lang: currentLang })
                 });
                 const data = await response.json();
                 const cropSuggestionDiv = document.getElementById('crop-suggestion');
@@ -625,7 +626,7 @@
             const currentLang = getSelectedGoogleTranslateLanguage();
 
             const tips = Array.from(careTipsDiv.querySelectorAll('p')).map(p => p.textContent);
-            
+
             if (tips.length === 0 || tips[0].includes("No specific care recommendations") || tips[0].includes("Loading recommendations...")) {
                 audioStatusDiv.textContent = "ℹ️ No specific alerts to play.";
                 return;
@@ -640,7 +641,7 @@
                 const cleanTip = tip.replace(/\*\*/g, '').replace(/[🌱💧🌡️💨🧪☀️🌧️✅⚠️❌ℹ️]/g, '').trim();
                 if (cleanTip) {
                     try {
-                        const response = await fetch(`${API_BASE_URL}/api/voice_alert`, {
+                        const response = await fetch(`${API_BASE_URL}/voice_alert`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ text: cleanTip, lang: currentLang })
@@ -680,7 +681,7 @@
         function googleTranslateElementInit() {
             new google.translate.TranslateElement({
                 pageLanguage: 'en',
-                includedLanguages: 'hi,bn,ta,te,ml,gu,mr,kn,pa,ur',
+                includedLanguages: 'hi,bn,ta,te,ml,gu,mr,kn,pa,ur,es,fr,de,ar,ja', // Added more languages
                 layout: google.translate.TranslateElement.InlineLayout.SIMPLE
             }, 'google_translate_element');
         }
@@ -693,8 +694,9 @@
             const userLang = navigator.language || navigator.userLanguage;
             const combo = document.querySelector('.goog-te-combo');
             const langMatch = {
-                'hi': 'hi', 'bn': 'bn', 'ta': 'ta', 'te': 'te', 'ml': 'ml',
-                'gu': 'gu', 'mr': 'mr', 'kn': 'kn', 'pa': 'pa', 'ur': 'ur'
+                'en': 'en', 'hi': 'hi', 'bn': 'bn', 'ta': 'ta', 'te': 'te', 'ml': 'ml',
+                'gu': 'gu', 'mr': 'mr', 'kn': 'kn', 'pa': 'pa', 'ur': 'ur',
+                'es': 'es', 'fr': 'fr', 'de': 'de', 'ar': 'ar', 'ja': 'ja'
             };
 
             const shortLang = userLang.split('-')[0];
@@ -706,7 +708,7 @@
                         // Trigger change event to apply translation immediately
                         combo.dispatchEvent(new Event('change'));
                         // Also trigger our dashboard's update function after translation
-                        updateCropSpecificData(); 
+                        updateCropSpecificData();
                     }
                 }, 1000); // Adjust timeout if needed
             }
