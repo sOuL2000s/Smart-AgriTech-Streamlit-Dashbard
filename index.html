@@ -136,7 +136,7 @@
             <!-- Crop Care Recommendations & AI-Based Predictions -->
             <div class="card">
                 <h2 class="text-2xl font-semibold text-green-300 mb-4">🌿 Crop Care & AI Insights</h2>
-                
+
                 <div class="mb-4">
                     <label for="crop-select" class="block text-lg font-medium text-gray-300 mb-2">Select Growing Crop:</label>
                     <select id="crop-select" class="w-full bg-gray-700 text-white py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
@@ -199,7 +199,8 @@
     </div>
 
     <script>
-        const API_BASE_URL = 'http://localhost:5000/'; // Flask app runs on the same origin
+        // Use a relative path for API calls. This assumes your Flask app serves both frontend and backend.
+        const API_BASE_URL = '/api';
 
         // Function to create an Audio object and play sound
         function playAudio(audioBlob) {
@@ -382,7 +383,7 @@
                 icon.classList.remove('rotate-180');
             }
         }
-        
+
         // Function to display messages with icons
         function displayMessage(elementId, message, type = 'info') {
             const element = document.getElementById(elementId);
@@ -427,7 +428,7 @@
             document.getElementById('refresh-button').innerHTML = '<span class="loading-spinner"></span> Loading...';
 
             try {
-                const response = await fetch(`${API_BASE_URL}/api/data`);
+                const response = await fetch(`${API_BASE_URL}/data`); // Changed to relative path
                 const data = await response.json();
 
                 if (data.status === 'no_data') {
@@ -529,7 +530,7 @@
 
             // Fetch Crop Care Recommendations
             try {
-                const response = await fetch(`${API_BASE_URL}/api/care_advice`, {
+                const response = await fetch(`${API_BASE_URL}/care_advice`, { // Changed to relative path
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ selected_crop_type: selectedCropType })
@@ -550,7 +551,7 @@
 
             // Fetch AI-Based Growth Prediction
             try {
-                const response = await fetch(`${API_BASE_URL}/api/predict_growth`, {
+                const response = await fetch(`${API_BASE_URL}/predict_growth`, { // Changed to relative path
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ selected_crop_type: selectedCropType })
@@ -578,7 +579,7 @@
 
             // Fetch Market Price Forecast
             try {
-                const response = await fetch(`${API_BASE_URL}/api/market_price`, {
+                const response = await fetch(`${API_BASE_URL}/market_price`, { // Changed to relative path
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ selected_crop_type: selectedCropType })
@@ -597,7 +598,7 @@
 
             // Fetch Crop Suggestion Based on Predicted Conditions
             try {
-                const response = await fetch(`${API_BASE_URL}/api/seed_recommendations`, {
+                const response = await fetch(`${API_BASE_URL}/seed_recommendations`, { // Changed to relative path
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ soil_moisture_pred: predictedSoilMoisture })
@@ -625,7 +626,7 @@
             const currentLang = getSelectedGoogleTranslateLanguage();
 
             const tips = Array.from(careTipsDiv.querySelectorAll('p')).map(p => p.textContent);
-            
+
             if (tips.length === 0 || tips[0].includes("No specific care recommendations") || tips[0].includes("Loading recommendations...")) {
                 audioStatusDiv.textContent = "ℹ️ No specific alerts to play.";
                 return;
@@ -640,7 +641,7 @@
                 const cleanTip = tip.replace(/\*\*/g, '').replace(/[🌱💧🌡️💨🧪☀️🌧️✅⚠️❌ℹ️]/g, '').trim();
                 if (cleanTip) {
                     try {
-                        const response = await fetch(`${API_BASE_URL}/api/voice_alert`, {
+                        const response = await fetch(`${API_BASE_URL}/voice_alert`, { // Changed to relative path
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ text: cleanTip, lang: currentLang })
@@ -706,7 +707,7 @@
                         // Trigger change event to apply translation immediately
                         combo.dispatchEvent(new Event('change'));
                         // Also trigger our dashboard's update function after translation
-                        updateCropSpecificData(); 
+                        updateCropSpecificData();
                     }
                 }, 1000); // Adjust timeout if needed
             }
