@@ -1,4 +1,3 @@
-# Imports from all original files
 import time
 import random
 import json
@@ -7,6 +6,7 @@ import os
 import base64
 import tempfile
 import threading
+import io
 
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
@@ -21,7 +21,6 @@ from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from sklearn.linear_model import LinearRegression
 import joblib
 from gtts import gTTS
-import io
 
 app = Flask(__name__)
 # Explicitly enable CORS for /api routes from any origin.
@@ -30,18 +29,18 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # --- Global Variables for Firebase, Models, Scalers, etc. ---
 firebase_app = None
-model = None
-input_scaler = None
-output_scaler = None
-crop_encoder = None
+model = None # For growth prediction
+input_scaler = None # For growth prediction model input
+output_scaler = None # For growth prediction model output
+crop_encoder = None # For encoding crop types for growth prediction
 market_price_model = None
-market_crop_encoder = None
-market_price_features = None
-all_crop_labels = []
-firebase_db_ref = None  # Global reference for Firebase DB
+market_crop_encoder = None # For encoding crop types for market price prediction
+market_price_features = None # List of features expected by the market price model
+all_crop_labels = [] # List of all known crop labels from training data
+firebase_db_ref = None  # Global reference for Firebase DB (sensor data)
 firebase_camera_ref = None  # Global reference for Firebase camera feed
 
-# Multilingual Advice Messages (from file: 3)
+# Multilingual Advice Messages
 ADVICE_MESSAGES = {
     'en': {
         'no_data': "No sensor data available to provide advice.",
@@ -529,11 +528,7 @@ ADVICE_MESSAGES = {
         'orange_ph_off': "الرقم الهيدروجيني المثالي للتربة للبرتقال هو 6.0-7.5.",
         'general_ph_very_low': "نصيحة عامة: التربة شديدة الحموضة. استخدم الجير لزيادة الرقم الهيدروجيني وتحسين توافر المغذيات.",
         'general_ph_very_high': "نصيحة عامة: التربة شديدة القلوية. استخدم الكبريت أو المواد العضوية لتقليل الرقم الهيدروجيني.",
-        'general_ph_off': "نصيحة عامة: نطاق الرقم الهيدروجيني الأمثل لمعظم المحاصيل هو 5.5-7.5. اضبط حسب الحاجة.",
-        'wheat_light_low': "تأكد من حصول المحصول على ما يكفي من ضوء الشمس.",
-        'rice_light_low': "تأكد من حصول الأرز على التعرض الكامل لأشعة الشمس.",
-        'general_light_low': "نصيحة عامة: الضوء غير الكافي يمكن أن يعيق التمثيل الضوئي. فكر في الإضاءة التكميلية أو التقليم.",
-        'general_light_high': "نصيحة عامة: الضوء الزائد يمكن أن يسبب حروقًا. فكر في التظليل خلال ساعات الذروة."
+        'general_ph_off': "نصيحة عامة: نطاق الرقم الهيدروجيني الأمثل لمعظم المحاصيل هو 5.5-7.5. اضبط حسب الحاجة."
     },
     'ja': { # Japanese (Example)
         'no_data': "アドバイスを提供するためのセンサーデータがありません。",
@@ -693,15 +688,11 @@ ADVICE_MESSAGES = {
         'orange_ph_off': "কমলার জন্য আদর্শ মাটির pH ৬.০-৭.৫।",
         'general_ph_very_low': "সাধারণ পরামর্শ: মাটি খুব অম্লীয়। pH বাড়াতে এবং পুষ্টির প্রাপ্যতা উন্নত করতে চুন প্রয়োগ করুন।",
         'general_ph_very_high': "সাধারণ পরামর্শ: মাটি খুব ক্ষারীয়। pH কমাতে সালফার বা জৈব পদার্থ প্রয়োগ করুন।",
-        'general_ph_off': "সাধারণ পরামর্শ: বেশিরভাগ ফসলের জন্য সর্বোত্তম pH পরিসর ৫.৫-৭.৫। প্রয়োজন অনুযায়ী সামঞ্জস্য করুন।",
-        'wheat_light_low': "ফসল পর্যাপ্ত সূর্যালোক পায় তা নিশ্চিত করুন।",
-        'rice_light_low': "ধান সম্পূর্ণ সূর্যালোক পায় তা নিশ্চিত করুন।",
-        'general_light_low': "সাধারণ পরামর্শ: অপর্যাপ্ত আলো সালোকসংশ্লেষণকে বাধা দিতে পারে। অতিরিক্ত আলো বা ছাঁটাই বিবেচনা করুন।",
-        'general_light_high': "সাধারণ পরামর্শ: অতিরিক্ত আলো ঝলসে যেতে পারে। পিক আওয়ারে ছায়া দেওয়ার কথা বিবেচনা করুন।"
+        'general_ph_off': "সাধারণ পরামর্শ: বেশিরভাগ ফসলের জন্য সর্বোত্তম pH পরিসর ৫.৫-৭.৫। প্রয়োজন অনুযায়ী সামঞ্জস্য করুন।"
     }
 }
 
-# Multilingual Seed Recommendation Messages (from file: 3)
+# Multilingual Seed Recommendation Messages
 SEED_RECOMMENDATIONS_MESSAGES = {
     'en': {
         'intro': "Based on current conditions, you might consider: ",
@@ -800,20 +791,86 @@ SEED_RECOMMENDATIONS_MESSAGES = {
         'no_specific': "لا توجد توصيات محددة، حيث أن الظروف الحالية غير عادية أو عامة."
     },
     'ja': { # Japanese (Example)
-        'intro': "現在の状況に基づき、以下を検討することができます：",
-        'outro': "正確な推奨事項については、地元の農業専門家にご相談ください。",
-        'acid_tolerant': "ブルーベリー、ジャガイモ、特定のイネ品種などの酸性土壌に強い作物",
-        'alkaline_tolerant': "アスパラガス、ほうれん草、特定のアルファルファ品種などのアルカリ性土壌に強い作物",
-        'neutral_ph': "小麦、トウモロコシ、ほとんどの野菜など、中性から弱酸性のpH（5.5-7.5）で育つ幅広い作物",
-        'heat_tolerant': "キビ、ソルガム、綿、一部の豆類などの耐熱性作物",
-        'cold_hardy': "小麦（冬品種）、大麦、オート麦、エンドウ豆などの耐寒性作物",
-        'warm_season': "トウモロコシ、イネ（熱帯性）、ほとんどの野菜、果物などの暖季作物",
-        'drought_resistant': "キビ、ソルガム、ひよこ豆、特定の種類の豆（例：モス豆）などの干ばつ耐性作物",
-        'water_loving': "イネ、サトウキビ、ジュート、一時的な湛水に耐える作物などの水生作物",
-        'moderate_rainfall': "小麦、トウモロコシ、多くの野菜など、中程度の降雨に適した作物",
-        'very_dry': "非常に干ばつに強い作物（例：砂漠に適応したメロンや一部のハーブ）",
-        'very_wet': "半水生作物または湛水に非常に強い作物（例：タロイモ、排水が悪い場合の特定のイネ品種）",
-        'no_specific': "現在の状況が異常または一般的なため、特定の推奨事項はありません。"
+        'no_data': "アドバイスを提供するためのセンサーデータがありません。",
+        'npk_low': "🌱 **{nutrient}が低い ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient}が高い ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **土壌水分が低い ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **土壌水分が高い ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **温度が低い ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **温度が高い ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **湿度が低い ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **湿度が高い ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **pHが低い ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **pHが高い ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **pHが適切ではありません ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **光強度が低い ({light:.1f} ルクス)**: {message}",
+        'light_high': "☀️ **光強度が高い ({light:.1f} ルクス)**: {message}",
+        'rainfall_low_msg': "🌧️ **降水量が少ない ({rain:.1f} mm)**: {message}",
+        'rainfall_high_msg': "🌧️ **降水量が多い ({rain:.1f} mm)**: {message}",
+        'all_good': "✅ すべての主要なパラメーターは良好です！最適な成長のために定期的に監視を続けてください。",
+        'npk_n_low': "窒素が豊富な肥料の施用を検討してください。",
+        'npk_n_high': "過剰な窒素は、果実/花の成長よりも葉の成長を促進する可能性があります。",
+        'npk_p_low': "根の発育のためにリン酸肥料の施用を検討してください。",
+        'npk_p_high': "リン酸が高いと他の栄養素が吸収されにくくなることがあります。",
+        'npk_k_low': "植物全体の健康と果実の品質のためにカリウム肥料の施用を検討してください。",
+        'npk_k_high': "過剰なカリウムは、カルシウムとマグネシウムの吸収を妨げる可能性があります。",
+        'wheat_sm_low': "軽く灌漑してください – 小麦は35-50%の土壌水分が必要です。",
+        'rice_sm_low': "イネは高い水分が必要です。適切な灌漑を確保してください。",
+        'maize_sm_low': "トウモロコシは中程度の土壌水分レベルが必要です。",
+        'banana_sm_low': "バナナには土壌を常に湿らせておいてください。",
+        'mango_sm_high': "水浸しを避けてください。マンゴーは水はけの良い土壌が必要です。",
+        'grapes_sm_high': "ブドウは乾燥した土壌を好みます – 水のやりすぎを避けてください。",
+        'cotton_sm_low': "綿は開花中に中程度の水分が必要です。",
+        'millet_sorghum_sm_low': "これらは干ばつに強い作物ですが、それでも最小限の水分が必要です。",
+        'jute_sm_low': "ジュートは成長中に十分な水分が必要です。",
+        'pomegranate_sm_high': "ザクロの水のやりすぎを避けてください。",
+        'melon_sm_low': "メロンは、特に結実中に継続的な水やりが必要です。",
+        'coconut_sm_low': "ココヤシは高い水分レベルが必要です。",
+        'mothbeans_sm_low': "モース豆は干ばつに強いですが、開花中に最小限の灌漑が必要です。",
+        'mungbean_sm_low': "開花および莢形成中に定期的な灌漑を確保してください。",
+        'blackgram_sm_low': "特に開花中に中程度の水分を維持してください。",
+        'lentil_sm_low': "レンズ豆は低から中程度の水分が必要です。",
+        'general_sm_low': "一般的なアドバイス：干ばつストレスを防ぐために灌漑を検討してください。",
+        'general_sm_high': "一般的なアドバイス：水浸しを防ぐために良好な排水を確保してください。",
+        'wheat_temp_high': "日陰を提供するか、夕方に灌漑してください – 小麦には温度が高すぎます。",
+        'rice_temp_high': "イネには暑すぎます。夕方の灌漑または日陰を検討してください。",
+        'maize_temp_low': "トウモロコシは暖かい気候（20-30°C）を好みます。",
+        'banana_temp_low': "バナナは寒さに敏感です – 暖かい条件を確保してください。",
+        'mango_temp_low': "マンゴーはより暖かい温度（>20°C）が必要です。",
+        'cotton_temp_low': "綿は暖かい温度で生育します。",
+        'millet_sorghum_temp_low': "暖かい気候はキビ/ソルガムに理想的です。",
+        'coffee_temp_low': "コーヒーは18-24°Cの範囲で生育します。",
+        'jute_temp_low': "ジュートは25-30°Cでよく育ちます。",
+        'papaya_temp_low': "パパイヤは21-33°Cの範囲を好みます。",
+        'pomegranate_temp_low': "理想的な温度は20°C以上です。",
+        'melon_temp_low': "温度が暖かい（>25°C）ことを確認してください。",
+        'coconut_temp_low': "ココナッツの理想的な温度は25°C以上です。",
+        'mothbeans_temp_low': "温度は22°C以上である必要があります。",
+        'mungbean_temp_low': "緑豆は最適な成長のために暖かい条件が必要です。",
+        'blackgram_temp_low': "理想的な温度範囲は25-35°Cです。",
+        'lentil_temp_low': "レンズ豆は18-30°Cでよく育ちます。",
+        'general_temp_low': "一般的なアドバイス：低温は成長を妨げる可能性があります。保護対策を検討してください。",
+        'general_temp_high': "一般的なアドバイス：高温は熱ストレスを引き起こす可能性があります。十分な水と日陰を確保してください。",
+        'wheat_hum_high': "真菌感染症に注意してください – 空気循環を確保してください。",
+        'rice_hum_low': "周囲の湿度を上げるか、マルチを使用してください。",
+        'banana_hum_low': "バナナは高い湿度が必要です。ミストまたはマルチングを検討してください。",
+        'grapes_hum_high': "高湿度は真菌感染症につながる可能性があります。",
+        'coffee_hum_low': "コーヒーは高い湿度を好みます。",
+        'orange_hum_high': "空気循環を改善し、真菌の問題を防ぐために木を剪定してください。",
+        'general_hum_low': "一般的なアドバイス：低湿度はしおれを引き起こす可能性があります。ミストまたは土壌水分の増加を検討してください。",
+        'general_hum_high': "一般的なアドバイス：高湿度は真菌性疾患のリスクを高めます。換気を良くしてください。",
+        'wheat_ph_low': "わずかに酸性 – pHを上げるために石灰の施用を検討してください。",
+        'rice_ph_off': "イネにはわずかに酸性の土壌を維持してください（pH 5.5-6.5）。",
+        'maize_ph_off': "土壌pHを5.8-7.0の間に維持してください。",
+        'papaya_ph_low': "パパイヤにはわずかに酸性から中性の土壌が最適です。",
+        'orange_ph_off': "オレンジの理想的な土壌pHは6.0-7.5です。",
+        'general_ph_very_low': "一般的なアドバイス：土壌が酸性すぎます。pHを上げ、栄養素の利用可能性を改善するために石灰を施用してください。",
+        'general_ph_very_high': "一般的なアドバイス：土壌がアルカリ性すぎます。pHを下げるために硫黄または有機物を施用してください。",
+        'general_ph_off': "一般的なアドバイス：ほとんどの作物にとって最適なpH範囲は5.5-7.5です。必要に応じて調整してください。",
+        'wheat_light_low': "作物が十分な日光を浴びるようにしてください。",
+        'rice_light_low': "イネが十分な日照を浴びるようにしてください。",
+        'general_light_low': "一般的なアドバイス：光が不足すると光合成が妨げられる可能性があります。補助照明または剪定を検討してください。",
+        'general_light_high': "一般的なアドバイス：過剰な光は焼けを引き起こす可能性があります。ピーク時間帯は日陰を検討してください。"
     },
     'bn': { # Bengali
         'intro': "বর্তমান অবস্থার উপর ভিত্তি করে, আপনি বিবেচনা করতে পারেন: ",
@@ -833,57 +890,50 @@ SEED_RECOMMENDATIONS_MESSAGES = {
     }
 }
 
-# Simulated growth stages (from file: 4)
+# Simulated growth stages and crop stages
 growth_stages = ["Germination", "Vegetative", "Flowering", "Maturity", "Wilting", "Yellowing"]
-# Define possible crop stages for sensor data (from file: 5)
 CROP_STAGES = ['seed', 'sprout', 'vegetative', 'flowering', 'mature']
 
-# --- Initialization Function ---
-def initialize_app_components():
-    """Initializes Firebase, loads AI model, scalers, and crop encoder."""
-    global firebase_app, model, input_scaler, output_scaler, crop_encoder, \
-           market_price_model, market_crop_encoder, market_price_features, all_crop_labels, \
-           firebase_db_ref, firebase_camera_ref
+# --- Initialization Functions ---
+def initialize_firebase():
+    """Initializes Firebase Admin SDK."""
+    global firebase_app, firebase_db_ref, firebase_camera_ref
+    if firebase_admin._apps: # Prevent double initialization
+        firebase_app = firebase_admin.get_app()
+        print("Firebase already initialized.")
+        return
 
-    # --- Firebase Secure Setup ---
     firebase_key_b64 = os.getenv("FIREBASE_KEY_B64")
     firebase_cred_path = None
     try:
-        if not firebase_admin._apps: # Prevent double initialization
-            if firebase_key_b64:
-                decoded_json = base64.b64decode(firebase_key_b64).decode('utf-8')
-                # Use tempfile to create a temporary file for the credentials
-                with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as f:
-                    f.write(decoded_json)
-                firebase_cred_path = f.name
-                cred = credentials.Certificate(firebase_cred_path)
-                print("Firebase credentials loaded from environment variable.")
-            else:
-                # Fallback for local development if environment variable is not set
-                # Ensure 'agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json' is in your project root
-                # IMPORTANT: For production, always use FIREBASE_KEY_B64
-                cred = credentials.Certificate("agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json")
-                print("Firebase credentials loaded from local file (development fallback).")
-
-            firebase_app = firebase_admin.initialize_app(cred, {
-                'databaseURL': 'https://agriastrax-website-default-rtdb.firebaseio.com/'
-            })
-            print("Firebase initialized successfully.")
+        if firebase_key_b64:
+            decoded_json = base64.b64decode(firebase_key_b64).decode('utf-8')
+            with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as f:
+                f.write(decoded_json)
+            firebase_cred_path = f.name
+            cred = credentials.Certificate(firebase_cred_path)
+            print("Firebase credentials loaded from environment variable.")
         else:
-            firebase_app = firebase_admin.get_app() # Get existing app if already initialized
-            print("Firebase already initialized.")
+            # Fallback for local development if environment variable is not set
+            # IMPORTANT: For production, always use FIREBASE_KEY_B64
+            # Make sure 'agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json' is in your project root
+            # You might need to adjust this path if your service account key is elsewhere
+            cred = credentials.Certificate("agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json")
+            print("Firebase credentials loaded from local file (development fallback).")
 
-        firebase_db_ref = db.reference('sensors/farm1')
-        firebase_camera_ref = db.reference('camera_feed/farm1')
-        print("Firebase database references obtained.")
+        firebase_app = firebase_admin.initialize_app(cred, {
+            'databaseURL': 'https://agriastrax-website-default-rtdb.firebaseio.com/' # Replace with your actual Firebase DB URL
+        })
+        firebase_db_ref = db.reference('sensors/farm1') # Path for sensor data
+        firebase_camera_ref = db.reference('camera_feed/farm1') # Path for camera feed
+        print("Firebase initialized successfully and references obtained.")
 
     except Exception as e:
         print(f"❌ Firebase initialization failed: {e}")
-        firebase_app = None # Mark as failed
+        firebase_app = None
         firebase_db_ref = None
         firebase_camera_ref = None
     finally:
-        # Clean up the temporary file if it was created
         if firebase_key_b64 and firebase_cred_path and os.path.exists(firebase_cred_path):
             try:
                 os.remove(firebase_cred_path)
@@ -891,11 +941,14 @@ def initialize_app_components():
             except Exception as e_clean:
                 print(f"Warning: Could not delete temporary Firebase cred file {firebase_cred_path}: {e_clean}")
 
+def load_models_and_scalers():
+    """Loads AI models, scalers, and crop encoders."""
+    global model, input_scaler, output_scaler, crop_encoder, \
+           market_price_model, market_crop_encoder, market_price_features, all_crop_labels
 
-    # --- Load Crop Labels from CSV ---
+    # Load Crop Labels from CSV (for encoder fitting)
     try:
         # Assuming 'cleaned_sensor_data.csv' is available in the same directory as app.py
-        # For deployment, ensure this file is accessible in the deployed environment
         crop_df_for_labels = pd.read_csv("cleaned_sensor_data.csv")
         all_crop_labels = sorted(crop_df_for_labels['label'].unique().tolist())
         crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
@@ -904,88 +957,92 @@ def initialize_app_components():
         print(f"Crop labels loaded: {len(all_crop_labels)} unique crops found.")
     except FileNotFoundError:
         print("❌ 'cleaned_sensor_data.csv' not found. Crop labels and encoder will be limited or empty.")
-        all_crop_labels = []
-        crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False) # Fallback
+        all_crop_labels = ["Wheat", "Rice", "Maize", "Banana", "Mango", "Grapes", "Cotton", "Millet", "Sorghum", "Coffee", "Jute", "Pomegranate", "Melon", "Coconut", "Mothbeans", "Mungbean", "Blackgram", "Lentil"] # Default dummy crops
+        crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+        # Fit with dummy labels if CSV not found, so encoder is usable
+        if all_crop_labels:
+            crop_encoder.fit(np.array(all_crop_labels).reshape(-1, 1))
         market_crop_encoder = crop_encoder
     except Exception as e:
         print(f"❌ Error loading 'cleaned_sensor_data.csv': {e}")
-        all_crop_labels = []
-        crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False) # Fallback
+        all_crop_labels = ["Wheat", "Rice", "Maize", "Banana", "Mango", "Grapes", "Cotton", "Millet", "Sorghum", "Coffee", "Jute", "Pomegranate", "Melon", "Coconut", "Mothbeans", "Mungbean", "Blackgram", "Lentil"] # Default dummy crops
+        crop_encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+        if all_crop_labels:
+            crop_encoder.fit(np.array(all_crop_labels).reshape(-1, 1))
         market_crop_encoder = crop_encoder
 
-    # --- Load AI Model ---
+    # Load AI Model
     try:
-        # Assuming 'tdann_pnsm_model.keras' is available
-        # For deployment, ensure this file is accessible in the deployed environment
-        model = tf.keras.models.load_model("tdann_pnsm_model.keras")
-        print("AI model (tdann_pnsm_model.keras) loaded successfully.")
+        model = tf.keras.models.load_model("tdann_pnsm_model.keras") # Or 'models/growth_prediction_model.h5'
+        print("AI model loaded successfully.")
     except Exception as e:
-        print(f"❌ Error loading AI model (tdann_pnsm_model.keras): {e}")
+        print(f"❌ Error loading AI model: {e}")
         model = None
 
-    # --- Load Scalers ---
+    # Load Scalers
     try:
-        # Assuming scaler files are available
-        # For deployment, ensure these files are accessible in the deployed environment
-        input_scaler = joblib.load('tdann_input_scaler.joblib')
-        output_scaler = joblib.load('tdann_output_scaler.joblib')
+        input_scaler = joblib.load('tdann_input_scaler.joblib') # Or 'models/input_scaler.pkl'
+        output_scaler = joblib.load('tdann_output_scaler.joblib') # Or 'models/output_scaler.pkl'
         print("Input and Output scalers loaded successfully.")
     except FileNotFoundError:
-        print("❌ Scaler files (tdann_input_scaler.joblib, tdann_output_scaler.joblib) not found.")
-        input_scaler = MinMaxScaler() # Fallback
-        output_scaler = MinMaxScaler() # Fallback
-        print("Using newly initialized scalers. Predictions may be inaccurate.")
+        print("❌ Scaler files not found. Using newly initialized scalers. Predictions may be inaccurate.")
+        input_scaler = MinMaxScaler()
+        output_scaler = MinMaxScaler()
     except Exception as e:
         print(f"❌ Error loading scalers: {e}")
-        input_scaler = MinMaxScaler() # Fallback
-        output_scaler = MinMaxScaler() # Fallback
-        print("Using newly initialized scalers. Predictions may be inaccurate.")
+        input_scaler = MinMaxScaler()
+        output_scaler = MinMaxScaler()
 
-    # --- Market Price Predictor Setup ---
-    def generate_market_price_data(num_samples=1000):
-        data = []
-        crops = all_crop_labels if all_crop_labels else ['wheat', 'rice', 'maize']
+    # Market Price Predictor Setup (Simulated Training if no pre-trained model)
+    try:
+        # Attempt to load pre-trained market price model
+        market_price_model = joblib.load('market_price_model.joblib') # Or 'models/market_price_model.pkl'
+        print("Market price prediction model loaded successfully.")
+    except Exception as e:
+        print(f"❌ Error loading market price model: {e}. Training a dummy model.")
+        def generate_market_price_data(num_samples=1000):
+            data = []
+            crops = all_crop_labels if all_crop_labels else ['wheat', 'rice', 'maize']
+            for _ in range(num_samples):
+                crop_type = random.choice(crops)
+                N = random.uniform(50, 150)
+                P = random.uniform(20, 60)
+                K = random.uniform(50, 200)
+                temperature = random.uniform(20, 35)
+                humidity = random.uniform(30, 80)
+                soil_moisture = random.uniform(30, 70)
+                light_intensity = random.uniform(300, 800)
+                rainfall = random.uniform(0, 100)
+                ph = random.uniform(5.5, 7.5)
 
-        for _ in range(num_samples):
-            crop_type = random.choice(crops)
-            N = random.uniform(50, 150)
-            P = random.uniform(20, 60)
-            K = random.uniform(50, 200)
-            temperature = random.uniform(20, 35)
-            humidity = random.uniform(30, 80)
+                base_price = 100
+                if crop_type == 'wheat': price = base_price * 1.2
+                elif crop_type == 'rice': price = base_price * 1.5
+                elif crop_type == 'maize': price = base_price * 1.1
+                else: price = base_price * 1.0
+                price += (N / 10) + (P / 5) + (K / 10)
+                price += (temperature - 25) * 2
+                price += (humidity - 50) * 1.5
+                price += (soil_moisture - 50) * 0.5
+                price += (light_intensity - 500) * 0.1
+                price += (rainfall - 50) * 0.2
+                price += (ph - 6.5) * 5
+                price += random.uniform(-10, 10)
+                price = max(50, price)
+                data.append([N, P, K, temperature, humidity, soil_moisture, light_intensity, rainfall, ph, crop_type, price])
+            df_prices = pd.DataFrame(data, columns=['N', 'P', 'K', 'temperature', 'humidity', 'soil_moisture', 'light_intensity', 'rainfall', 'ph', 'crop_type', 'price'])
+            return df_prices
 
-            base_price = 100
-
-            if crop_type == 'wheat':
-                price = base_price * 1.2
-            elif crop_type == 'rice':
-                price = base_price * 1.5
-            elif crop_type == 'maize':
-                price = base_price * 1.1
-            else:
-                price = base_price * 1.0
-
-            price += (N / 10) + (P / 5) + (K / 10)
-            price += (temperature - 25) * 2
-            price += (humidity - 50) * 1.5
-
-            price += random.uniform(-10, 10)
-            price = max(50, price)
-
-            data.append([N, P, K, temperature, humidity, crop_type, price])
-
-        df_prices = pd.DataFrame(data, columns=['N', 'P', 'K', 'temperature', 'humidity', 'crop_type', 'price'])
-        return df_prices
-
-    if crop_encoder: # Ensure crop_encoder is available for market price model training
         df_prices = generate_market_price_data(num_samples=2000)
-        market_price_features = ['N', 'P', 'K', 'temperature', 'humidity']
-
-        # Ensure crop_encoder is fitted with 'crop_type' if it's used here
-        X_categorical = market_crop_encoder.transform(df_prices[['crop_type']])
-        X_categorical_df = pd.DataFrame(X_categorical, columns=market_crop_encoder.get_feature_names_out(['crop_type']))
+        market_price_features = ['N', 'P', 'K', 'temperature', 'humidity', 'soil_moisture', 'light_intensity', 'rainfall', 'ph']
 
         X_numerical = df_prices[market_price_features]
+        # Ensure market_crop_encoder is fitted with all possible crop types
+        if market_crop_encoder and not market_crop_encoder.categories_[0].tolist():
+             market_crop_encoder.fit(np.array(df_prices['crop_type'].unique()).reshape(-1, 1))
+
+        X_categorical = market_crop_encoder.transform(df_prices[['crop_type']])
+        X_categorical_df = pd.DataFrame(X_categorical, columns=market_crop_encoder.get_feature_names_out(['crop_type']))
 
         X_train_market = pd.concat([X_numerical, X_categorical_df], axis=1)
         y_train_market = df_prices['price']
@@ -993,49 +1050,52 @@ def initialize_app_components():
         market_price_model = LinearRegression()
         market_price_model.fit(X_train_market, y_train_market)
         print("Market price prediction model trained (simulated data).")
-    else:
-        print("❌ Cannot train market price model: Crop encoder not initialized.")
 
 
-# --- Data Simulation Functions (Integrated from dummy_camera_simulator.py and insert-sample-data.py) ---
+# --- Dummy Data Generation (for unavailable sensors and initial simulation) ---
+def generate_dummy_sensor_data_values():
+    """Generates dummy data for pH, NPK, and Rainfall if not provided by ESP32."""
+    return {
+        "ph": round(random.uniform(5.5, 7.5), 2),
+        "N": round(random.uniform(20, 100), 2),
+        "P": round(random.uniform(10, 50), 2),
+        "K": round(random.uniform(30, 120), 2),
+        "rainfall": round(random.uniform(0, 10), 2),
+        "crop_stage": random.choice(CROP_STAGES),
+        "growth_factor": round(random.uniform(0.5, 1.5), 2)
+    }
 
-def run_camera_simulator():
+def generate_dummy_camera_data():
+    """Generates dummy camera data for demonstration."""
+    advisories = ["Healthy Growth", "Low Leaf Color Index", "Possible Disease Detected", "Needs Fertilizer", "Check Irrigation"]
+    return {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "stage": random.choice(growth_stages),
+        "alert": random.choice(advisories),
+        "image_url": "https://placehold.co/150x150/E0E0E0/333333?text=Camera+Feed" # Placeholder image
+    }
+
+# --- Sensor Data Inserter and Camera Simulator Threads ---
+def run_camera_simulator_thread():
     """Simulates camera feed data and pushes to Firebase."""
     print("Starting dummy camera feed simulation thread...")
-    if firebase_camera_ref is None:
-        print("Firebase camera reference not initialized. Camera simulation will only print locally.")
-        local_print_only = True
-    else:
-        local_print_only = False
-        print("Connected to Firebase path for camera feed: camera_feed/farm1")
-
     while True:
-        event = {
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "stage": random.choice(growth_stages),
-            "alert": random.choice([
-                "Healthy Growth",
-                "Low Leaf Color Index",
-                "Possible Disease Detected",
-                "Needs Fertilizer",
-                "Check Irrigation"
-            ])
-        }
-
-        if not local_print_only:
+        if firebase_camera_ref:
             try:
-                firebase_camera_ref.push(event)
-                # print(f"Simulated Camera Data pushed to Firebase: {event}") # Too verbose for continuous run
+                dummy_camera = generate_dummy_camera_data()
+                firebase_camera_ref.push(dummy_camera)
+                # print(f"Simulated Camera Data pushed to Firebase: {dummy_camera}") # Too verbose
+                # Keep only the latest 10 camera entries for simplicity
+                snapshots = firebase_camera_ref.order_by_child('timestamp').get()
+                if snapshots and len(snapshots) > 10:
+                    oldest_keys = sorted(snapshots.keys(), key=lambda k: snapshots[k]['timestamp'])
+                    for i in range(len(oldest_keys) - 10):
+                        firebase_camera_ref.child(oldest_keys[i]).delete()
             except Exception as e:
-                print(f"❌ Error pushing camera data to Firebase: {e}. Falling back to local printing.")
-                local_print_only = True # Stop trying to push to Firebase
-                print("Simulated Camera Data (local print):", event)
-        else:
-            print("Simulated Camera Data (local print):", event)
+                print(f"❌ Error pushing camera data to Firebase: {e}")
+        time.sleep(10) # Generate every 10 seconds
 
-        time.sleep(10)  # Generate every 10 seconds
-
-def run_sensor_data_inserter():
+def run_sensor_data_inserter_thread():
     """Inserts initial dummy sensor data and then simulates live updates to Firebase."""
     print("Starting sensor data inserter thread...")
     if firebase_db_ref is None:
@@ -1046,21 +1106,15 @@ def run_sensor_data_inserter():
         print("Connected to Firebase path for sensor data: sensors/farm1")
 
     # Insert 10 past samples
-    print("Inserting 10 enhanced dummy sensor readings with all 12 features (including crop_stage and growth_factor)...")
+    print("Inserting 10 enhanced dummy sensor readings with all features...")
     for i in range(10):
         sample_data = {
             'timestamp': (datetime.now() - timedelta(minutes=(10 - i)*5)).isoformat(),
             'soil_moisture': round(random.uniform(20, 80), 2),
-            'temperature': round(random.uniform(20, 40), 2), # Wider range
-            'humidity': round(random.uniform(30, 95), 2), # Wider range
-            'pH': round(random.uniform(4.0, 9.0), 2),
-            'light_intensity': random.randint(200, 900), # Wider range
-            'N': random.randint(0, 150), # Wider range
-            'P': random.randint(0, 70), # Wider range
-            'K': random.randint(0, 250), # Wider range
-            'rainfall': round(random.uniform(0, 250), 2), # Wider range
-            'crop_stage': random.choice(CROP_STAGES),
-            'growth_factor': round(random.uniform(0.1, 1.2), 2) # Wider range for more visible change
+            'temperature': round(random.uniform(20, 40), 2),
+            'humidity': round(random.uniform(30, 95), 2),
+            'light_intensity': random.randint(200, 900),
+            **generate_dummy_sensor_data_values() # Include dummy NPK, pH, Rainfall, crop_stage, growth_factor
         }
         if not local_print_only:
             try:
@@ -1069,7 +1123,7 @@ def run_sensor_data_inserter():
                 print(f"❌ Error pushing initial sample data to Firebase: {e}. Falling back to local printing.")
                 local_print_only = True
                 print("Initial Sample Data (local print):", sample_data)
-                break # Stop inserting if there's an error
+                break
         else:
             print("Initial Sample Data (local print):", sample_data)
     print("Successfully inserted 10 enhanced dummy sensor readings (if Firebase was available).")
@@ -1078,160 +1132,194 @@ def run_sensor_data_inserter():
     print("\nSimulating live sensor data updates. New data will be inserted every 10 seconds. Press Ctrl+C to stop.")
     while True:
         current_timestamp = datetime.now().isoformat()
-
-        current_soil_moisture = round(random.uniform(20, 60), 2)
-        current_temperature = round(random.uniform(20, 40), 2) # Wider range
-        current_humidity = round(random.uniform(30, 95), 2) # Wider range
-        current_pH = round(random.uniform(4.0, 9.0), 2) # Wider range
-        current_light_intensity = random.randint(200, 900) # Wider range
-        current_N = random.randint(0, 150) # Wider range
-        current_P = random.randint(0, 70) # Wider range
-        current_K = random.randint(0, 250) # Wider range
-        current_rainfall = round(random.uniform(0, 250), 2) # Wider range
-
-        current_crop_stage = random.choice(CROP_STAGES)
-
-        # Make growth factor more visibly dynamic
-        current_growth_factor = round(random.uniform(0.1, 1.2), 2) # Directly random for more variation
-
         live_data = {
             'timestamp': current_timestamp,
-            'soil_moisture': current_soil_moisture,
-            'temperature': current_temperature,
-            'humidity': current_humidity,
-            'pH': current_pH,
-            'light_intensity': current_light_intensity,
-            'N': current_N,
-            'P': current_P,
-            'K': current_K,
-            'rainfall': current_rainfall,
-            'crop_stage': current_crop_stage,
-            'growth_factor': current_growth_factor
+            'soil_moisture': round(random.uniform(20, 60), 2),
+            'temperature': round(random.uniform(20, 40), 2),
+            'humidity': round(random.uniform(30, 95), 2),
+            'light_intensity': random.randint(200, 900),
+            **generate_dummy_sensor_data_values() # Include dummy NPK, pH, Rainfall, crop_stage, growth_factor
         }
-
         if not local_print_only:
             try:
                 firebase_db_ref.push(live_data)
-                # print(f"Inserted real-time enriched sensor data at {current_timestamp}.") # Too verbose
             except Exception as e:
                 print(f"❌ Error pushing real-time data to Firebase: {e}. Falling back to local printing.")
                 local_print_only = True
                 print("Live Sensor Data (local print):", live_data)
         else:
             print("Live Sensor Data (local print):", live_data)
-
         time.sleep(10)
 
-# --- Helper Functions ---
+# --- Helper Functions for Data Fetching and Processing ---
 
-def fetch_sensor_data_backend():
-    """Fetches sensor data from Firebase Realtime Database."""
+def get_latest_sensor_data():
+    """Fetches the latest sensor data from Firebase, adding dummy values for missing fields."""
     if firebase_db_ref is None:
         print("Firebase DB reference not initialized. Cannot fetch sensor data.")
-        return pd.DataFrame()
+        return None
+
     try:
-        snapshot = firebase_db_ref.get()
-        if not snapshot:
-            return pd.DataFrame()
+        latest_data_snapshot = firebase_db_ref.order_by_child('timestamp').limit_to_last(1).get()
+        if not latest_data_snapshot:
+            print("No sensor data found in Firebase. Generating dummy data for latest.")
+            # Generate a full dummy entry if no data exists
+            dummy_values = generate_dummy_sensor_data_values()
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "temperature": round(random.uniform(20, 30), 2),
+                "humidity": round(random.uniform(50, 70), 2),
+                "soil_moisture": round(random.uniform(40, 60), 2),
+                "light_intensity": random.randint(5000, 10000),
+                **dummy_values
+            }
 
-        if isinstance(snapshot, dict):
-            data_list = []
-            for key, value in snapshot.items():
-                if isinstance(value, dict):
-                    data_list.append(value)
-                else:
-                    print(f"Skipping non-dict entry in Firebase sensor data: {key}: {value}")
-            df = pd.DataFrame(data_list)
-        else:
-            df = pd.DataFrame(snapshot)
+        latest_data = list(latest_data_snapshot.values())[0]
 
+        # Ensure all expected fields are present, filling with dummy if missing
+        expected_fields = ['temperature', 'humidity', 'soil_moisture', 'light_intensity',
+                            'N', 'P', 'K', 'ph', 'rainfall', 'crop_stage', 'growth_factor']
+        dummy_fill_values = generate_dummy_sensor_data_values()
+
+        for field in expected_fields:
+            if field not in latest_data or latest_data[field] is None:
+                latest_data[field] = dummy_fill_values.get(field) # Use dummy values for NPK, pH, Rainfall
+            # Convert any numpy NaN values to None for proper JSON serialization
+            if isinstance(latest_data[field], (np.float64, np.int64)) and np.isnan(latest_data[field]):
+                latest_data[field] = None
+        
+        # Handle 'pH' column name consistency if it comes as 'pH' from Firebase
+        if 'pH' in latest_data and 'ph' not in latest_data:
+            latest_data['ph'] = latest_data['pH']
+            del latest_data['pH']
+
+        return latest_data
+    except Exception as e:
+        print(f"Error fetching latest sensor data from Firebase: {e}")
+        # Fallback to full dummy data on error
+        dummy_values = generate_dummy_sensor_data_values()
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "temperature": round(random.uniform(20, 30), 2),
+            "humidity": round(random.uniform(50, 70), 2),
+            "soil_moisture": round(random.uniform(40, 60), 2),
+            "light_intensity": random.randint(5000, 10000),
+            **dummy_values
+        }
+
+def get_historical_sensor_data(days=7):
+    """Fetches historical sensor data from Firebase for the last 'days'."""
+    if firebase_db_ref is None:
+        print("Firebase DB reference not initialized. Cannot fetch historical sensor data.")
+        return []
+    try:
+        start_time = (datetime.now() - timedelta(days=days)).isoformat()
+        historical_data_snapshot = firebase_db_ref.order_by_child('timestamp').start_at(start_time).get()
+        if not historical_data_snapshot:
+            return []
+
+        data_list = []
+        for key, value in historical_data_snapshot.items():
+            if isinstance(value, dict):
+                # Ensure 'ph' consistency and fill missing values with dummy data
+                if 'pH' in value and 'ph' not in value:
+                    value['ph'] = value['pH']
+                    del value['pH']
+                
+                dummy_fill_values = generate_dummy_sensor_data_values()
+                for field in ['N', 'P', 'K', 'ph', 'rainfall', 'crop_stage', 'growth_factor']:
+                    if field not in value or value[field] is None:
+                        value[field] = dummy_fill_values.get(field)
+                
+                data_list.append(value)
+            else:
+                print(f"Skipping non-dict entry in Firebase historical data: {key}: {value}")
+        
+        df = pd.DataFrame(data_list)
         if df.empty:
-            return pd.DataFrame()
+            return []
 
-        numeric_cols = ['N', 'P', 'K', 'pH', 'rainfall', 'temperature', 'humidity',
+        numeric_cols = ['N', 'P', 'K', 'ph', 'rainfall', 'temperature', 'humidity',
                         'soil_moisture', 'light_intensity', 'growth_factor']
         for col in numeric_cols:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
             else:
-                df[col] = np.nan
-
-        # Handle 'pH' column name consistency: Firebase might send 'pH', trainer expects 'ph'
-        if 'pH' in df.columns and 'ph' not in df.columns:
-            df['ph'] = df['pH']
-        if 'pH' in df.columns:
-            df = df.drop(columns=['pH'])
-
-        # Impute specific problematic columns if NaN with a sensible default
-        if 'ph' in df.columns and df['ph'].isnull().any():
-            df['ph'] = df['ph'].fillna(6.5)
+                df[col] = np.nan # Ensure column exists even if all NaNs
 
         df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
         df = df.dropna(subset=['timestamp'])
-        df = df.sort_values('timestamp')
-        return df.reset_index(drop=True)
+        df = df.sort_values('timestamp').reset_index(drop=True)
+        
+        # Convert any numpy NaN values to None for proper JSON serialization later
+        df = df.replace({np.nan: None})
+
+        return df.to_dict(orient='records')
     except Exception as e:
-        print(f"Error fetching sensor data from Firebase: {e}")
-        return pd.DataFrame()
+        print(f"Error fetching historical sensor data from Firebase: {e}")
+        return []
 
 def fetch_camera_feed_data_backend():
-    """Fetches camera feed data (growth events) from Firebase Realtime Database."""
+    """Fetches the latest camera feed data (growth events) from Firebase Realtime Database."""
     if firebase_camera_ref is None:
         print("Firebase camera reference not initialized. Cannot fetch camera data.")
-        return None
-    try:
-        snapshot = firebase_camera_ref.get()
-        if not snapshot:
-            return None
+        return generate_dummy_camera_data() # Fallback to dummy
 
-        if isinstance(snapshot, dict):
-            last_key = sorted(snapshot.keys())[-1]
-            return snapshot[last_key]
-        else:
-            if isinstance(snapshot, list) and snapshot:
-                return snapshot[-1]
-            return None
+    try:
+        snapshot = firebase_camera_ref.order_by_child('timestamp').limit_to_last(1).get()
+        if not snapshot:
+            print("No camera data found in Firebase. Returning dummy data.")
+            return generate_dummy_camera_data()
+
+        latest_camera_entry = list(snapshot.values())[0]
+        return latest_camera_entry
     except Exception as e:
         print(f"Error fetching camera feed data from Firebase: {e}")
-        return None
+        return generate_dummy_camera_data() # Fallback to dummy on error
 
-def predict_growth_backend(df_latest_data, selected_crop_type):
+def predict_growth_backend(historical_df, selected_crop_type):
     """
     Predicts soil moisture, light intensity, and nutrient sum using the loaded AI model.
-    Assumes the model was trained with specific input features and multiple outputs.
+    Assumes the model was trained with specific input features and multiple outputs (time-series).
     """
     if model is None or input_scaler is None or output_scaler is None or crop_encoder is None:
         return None, None, None, "AI model, scalers, or encoder not loaded."
 
-    LOOKBACK_WINDOW = 5
+    LOOKBACK_WINDOW = 5 # As per original code 1's TDANN model expectation
 
     base_sensor_features = ['N', 'P', 'K', 'temperature', 'humidity', 'ph', 'rainfall']
-    biological_features = ['growth_factor']
+    biological_features = ['growth_factor'] # Included in Code 1's TDANN input
+    
+    # Combine all features expected by the TDANN model
+    all_tdann_input_features = base_sensor_features + biological_features
 
-    present_biological_features = [f for f in biological_features if f in df_latest_data.columns]
-    final_tdann_input_features = base_sensor_features + present_biological_features
+    # Ensure historical_df has all necessary columns, fill missing with dummy values
+    df_for_prediction = historical_df.copy()
+    dummy_values = generate_dummy_sensor_data_values()
+    for col in all_tdann_input_features:
+        if col not in df_for_prediction.columns or df_for_prediction[col].isnull().all():
+            # If column is entirely missing or all NaN, fill with a sensible dummy
+            df_for_prediction[col] = dummy_values.get(col, 0) # Default to 0 if no specific dummy
+        df_for_prediction[col] = pd.to_numeric(df_for_prediction[col], errors='coerce').fillna(dummy_values.get(col, 0)) # Ensure numeric and fill any remaining NaNs
 
-    available_tdann_features = [f for f in final_tdann_input_features if f in df_latest_data.columns]
-
-    if len(available_tdann_features) != len(final_tdann_input_features):
-        missing = set(final_tdann_input_features) - set(available_tdann_features)
-        return None, None, None, f"Missing expected TDANN input features in sensor data: {list(missing)}. Ensure Firebase is sending all required sensor data."
-
-    processed_data_for_prediction = df_latest_data[available_tdann_features].tail(LOOKBACK_WINDOW)
+    processed_data_for_prediction = df_for_prediction[all_tdann_input_features].tail(LOOKBACK_WINDOW)
+    
+    # Fill any remaining NaNs (e.g., if only part of the tail has NaNs)
     processed_data_for_prediction = processed_data_for_prediction.fillna(method='ffill').fillna(method='bfill').fillna(0)
 
-    if len(processed_data_for_prediction) < LOOKBACK_WINDOW:
-        return None, None, None, f"Not enough complete data points ({len(processed_data_for_prediction)} < {LOOKBACK_WINDOW}) even after filling NaNs. Need at least {LOOKBACK_WINDOW} consecutive entries with non-NaNs initially."
 
-    encoded_crop_feature_names = crop_encoder.get_feature_names_out(['label'])
+    if len(processed_data_for_prediction) < LOOKBACK_WINDOW:
+        return None, None, None, f"Not enough complete data points ({len(processed_data_for_prediction)} < {LOOKBACK_WINDOW}) after processing. Need at least {LOOKBACK_WINDOW} consecutive entries."
+
+    try:
+        crop_type_input = np.array([selected_crop_type]).reshape(-1, 1)
+        encoded_crop_single = crop_encoder.transform(crop_type_input)
+    except Exception as e:
+        return None, None, None, f"Error encoding crop type '{selected_crop_type}': {e}. Is it in the trained labels?"
 
     full_input_features_sequence = []
-
-    crop_type_input = np.array([selected_crop_type]).reshape(-1, 1)
-    encoded_crop_single = crop_encoder.transform(crop_type_input)
-
     for i in range(LOOKBACK_WINDOW):
-        numerical_features_at_timestep = processed_data_for_prediction.iloc[i][available_tdann_features].values
+        numerical_features_at_timestep = processed_data_for_prediction.iloc[i][all_tdann_input_features].values
         combined_features_at_timestep = np.hstack((numerical_features_at_timestep, encoded_crop_single[0]))
         full_input_features_sequence.append(combined_features_at_timestep)
 
@@ -1254,7 +1342,7 @@ def predict_growth_backend(df_latest_data, selected_crop_type):
 
 def predict_market_price_backend(latest_data, selected_crop_type):
     """
-    Predicts the market price based on latest sensor data and crop type.
+    Predicts the market price based on latest sensor data and crop type using the loaded model.
     """
     if market_price_model is None or market_crop_encoder is None or market_price_features is None:
         return None, "Market prediction model, encoder, or features not initialized."
@@ -1262,183 +1350,149 @@ def predict_market_price_backend(latest_data, selected_crop_type):
     if not latest_data:
         return None, "No latest sensor data available for market price prediction."
 
-    input_values = {}
+    # Prepare features for the market price model, using dummy data if real data is missing
+    features = {}
+    dummy_values = generate_dummy_sensor_data_values()
+    # Ensure all features expected by market_price_features are present
     for feature in market_price_features:
         val = latest_data.get(feature)
         if val is not None and not pd.isna(val):
-            input_values[feature] = val
+            features[feature] = val
         else:
-            print(f"Missing or NaN feature '{feature}' for market price prediction. Imputing with 0.")
-            input_values[feature] = 0
+            # Use dummy values for NPK, pH, Rainfall, or a default 0 for others
+            features[feature] = dummy_values.get(feature, 0)
 
-    input_df_numerical = pd.DataFrame([input_values])
+    input_df_numerical = pd.DataFrame([features])
 
-    crop_type_input = np.array([selected_crop_type]).reshape(-1, 1)
-    encoded_crop = market_crop_encoder.transform(crop_type_input)
-    encoded_crop_df = pd.DataFrame(encoded_crop, columns=market_crop_encoder.get_feature_names_out(['crop_type']))
+    # One-hot encode crop type
+    try:
+        crop_type_input = np.array([selected_crop_type]).reshape(-1, 1)
+        encoded_crop = market_crop_encoder.transform(crop_type_input)
+        encoded_crop_df = pd.DataFrame(encoded_crop, columns=market_crop_encoder.get_feature_names_out(['crop_type']))
+    except Exception as e:
+        return None, f"Error encoding crop type '{selected_crop_type}' for market price: {e}"
 
     X_predict_market = pd.concat([input_df_numerical, encoded_crop_df], axis=1)
 
+    # Ensure all columns expected by the trained model are present and in order
+    expected_cols = market_price_features + market_crop_encoder.get_feature_names_out(['crop_type']).tolist()
+    for col in expected_cols:
+        if col not in X_predict_market.columns:
+            X_predict_market[col] = 0 # Add missing columns with 0
+    X_predict_market = X_predict_market[expected_cols] # Reorder columns
+
     try:
         predicted_price = market_price_model.predict(X_predict_market)[0]
+        predicted_price = max(0, predicted_price) # Ensure price is not negative
         return round(predicted_price, 2), None
     except Exception as e:
         print(f"Error during market price prediction: {e}")
         return None, f"Error during market price prediction: {e}"
 
-def crop_care_advice_backend(df, crop_type, lang='en'):
+def crop_care_advice_backend(latest_data, crop_type, lang='en'):
     """Provides crop-specific care advice based on latest sensor readings."""
     messages = ADVICE_MESSAGES.get(lang, ADVICE_MESSAGES['en']) # Fallback to English
 
-    if df.empty:
+    if not latest_data:
         return [messages['no_data']]
 
-    latest = df.iloc[-1].to_dict()
     tips = []
-
     ct = crop_type.lower()
 
-    npk_advice = {
+    # NPK Advice (using values from latest_data, which are filled with dummies if real are missing)
+    npk_advice_thresholds = {
         'N': {'min': 50, 'max': 150, 'low_msg': messages['npk_n_low'], 'high_msg': messages['npk_n_high']},
         'P': {'min': 20, 'max': 60, 'low_msg': messages['npk_p_low'], 'high_msg': messages['npk_p_high']},
         'K': {'min': 50, 'max': 200, 'low_msg': messages['npk_k_low'], 'high_msg': messages['npk_k_high']},
     }
-
-    for nutrient, thresholds in npk_advice.items():
-        if nutrient in latest and not pd.isna(latest.get(nutrient)):
-            value = latest[nutrient]
+    for nutrient, thresholds in npk_advice_thresholds.items():
+        value = latest_data.get(nutrient)
+        if value is not None and not pd.isna(value):
             if value < thresholds['min']:
                 tips.append(messages['npk_low'].format(nutrient=nutrient, value=value, message=thresholds['low_msg']))
             elif value > thresholds['max']:
                 tips.append(messages['npk_high'].format(nutrient=nutrient, value=value, message=thresholds['high_msg']))
 
-    # Specific crop advice
-    if 'soil_moisture' in latest and not pd.isna(latest.get('soil_moisture')):
-        sm = latest['soil_moisture']
-        if ct == 'wheat':
-            if sm < 35: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['wheat_sm_low']))
-        elif ct == 'rice':
-            if sm < 60: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['rice_sm_low']))
-        elif ct == 'maize':
-            if sm < 40: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['maize_sm_low']))
-        elif ct == 'banana':
-            if sm < 50: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['banana_sm_low']))
-        elif ct == 'mango':
-            if sm > 60: tips.append(messages['soil_moisture_high'].format(sm=sm, message=messages['mango_sm_high']))
-        elif ct == 'grapes':
-            if sm > 50: tips.append(messages['soil_moisture_high'].format(sm=sm, message=messages['grapes_sm_high']))
-        elif ct == 'cotton':
-            if sm < 30: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['cotton_sm_low']))
-        elif ct == 'millet' or ct == 'sorghum':
-            if sm < 25: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['millet_sorghum_sm_low']))
-        elif ct == 'jute':
-            if sm < 50: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['jute_sm_low']))
-        elif ct == 'pomegranate':
-            if sm > 50: tips.append(messages['soil_moisture_high'].format(sm=sm, message=messages['pomegranate_sm_high']))
-        elif ct == 'muskmelon' or ct == 'watermelon':
-            if sm < 30: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['melon_sm_low']))
-        elif ct == 'coconut':
-            if sm < 50: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['coconut_sm_low']))
-        elif ct == 'mothbeans':
-            if sm < 25: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['mothbeans_sm_low']))
-        elif ct == 'mungbean':
-            if sm < 30: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['mungbean_sm_low']))
-        elif ct == 'blackgram':
-            if sm < 35: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['blackgram_sm_low']))
-        elif ct == 'lentil':
-            if sm < 25: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['lentil_sm_low']))
-        # General advice if not crop-specific
-        if sm < 30: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['general_sm_low']))
+    # Soil Moisture Advice
+    sm = latest_data.get('soil_moisture')
+    if sm is not None and not pd.isna(sm):
+        if ct == 'wheat' and sm < 35: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['wheat_sm_low']))
+        elif ct == 'rice' and sm < 60: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['rice_sm_low']))
+        elif ct == 'maize' and sm < 40: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['maize_sm_low']))
+        elif ct == 'banana' and sm < 50: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['banana_sm_low']))
+        elif ct == 'mango' and sm > 60: tips.append(messages['soil_moisture_high'].format(sm=sm, message=messages['mango_sm_high']))
+        elif ct == 'grapes' and sm > 50: tips.append(messages['soil_moisture_high'].format(sm=sm, message=messages['grapes_sm_high']))
+        elif ct == 'cotton' and sm < 30: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['cotton_sm_low']))
+        elif (ct == 'millet' or ct == 'sorghum') and sm < 25: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['millet_sorghum_sm_low']))
+        elif ct == 'jute' and sm < 50: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['jute_sm_low']))
+        elif ct == 'pomegranate' and sm > 50: tips.append(messages['soil_moisture_high'].format(sm=sm, message=messages['pomegranate_sm_high']))
+        elif (ct == 'muskmelon' or ct == 'watermelon') and sm < 30: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['melon_sm_low']))
+        elif ct == 'coconut' and sm < 50: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['coconut_sm_low']))
+        elif ct == 'mothbeans' and sm < 25: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['mothbeans_sm_low']))
+        elif ct == 'mungbean' and sm < 30: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['mungbean_sm_low']))
+        elif ct == 'blackgram' and sm < 35: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['blackgram_sm_low']))
+        elif ct == 'lentil' and sm < 25: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['lentil_sm_low']))
+        elif sm < 30: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['general_sm_low']))
         elif sm > 70: tips.append(messages['soil_moisture_high'].format(sm=sm, message=messages['general_sm_high']))
 
-    if 'temperature' in latest and not pd.isna(latest.get('temperature')):
-        temp = latest['temperature']
-        if ct == 'wheat':
-            if temp > 32: tips.append(messages['temp_high'].format(temp=temp, message=messages['wheat_temp_high']))
-        elif ct == 'rice':
-            if temp > 38: tips.append(messages['temp_high'].format(temp=temp, message=messages['rice_temp_high']))
-        elif ct == 'maize':
-            if temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['maize_temp_low']))
-        elif ct == 'banana':
-            if temp < 15: tips.append(messages['temp_low'].format(temp=temp, message=messages['banana_temp_low']))
-        elif ct == 'mango':
-            if temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['mango_temp_low']))
-        elif ct == 'cotton':
-            if temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['cotton_temp_low']))
-        elif ct == 'millet' or ct == 'sorghum':
-            if temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['millet_sorghum_temp_low']))
-        elif ct == 'coffee':
-            if temp < 18: tips.append(messages['temp_low'].format(temp=temp, message=messages['coffee_temp_low']))
-        elif ct == 'jute':
-            if temp < 25: tips.append(messages['temp_low'].format(temp=temp, message=messages['jute_temp_low']))
-        elif ct == 'papaya':
-            if temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['papaya_temp_low']))
-        elif ct == 'pomegranate':
-            if temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['pomegranate_temp_low']))
-        elif ct == 'muskmelon' or ct == 'watermelon':
-            if temp < 25: tips.append(messages['temp_low'].format(temp=temp, message=messages['melon_temp_low']))
-        elif ct == 'coconut':
-            if temp < 25: tips.append(messages['temp_low'].format(temp=temp, message=messages['coconut_temp_low']))
-        elif ct == 'mothbeans':
-            if temp < 22: tips.append(messages['temp_low'].format(temp=temp, message=messages['mothbeans_temp_low']))
-        elif ct == 'mungbean':
-            if temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['mungbean_temp_low']))
-        elif ct == 'blackgram':
-            if temp < 18: tips.append(messages['temp_low'].format(temp=temp, message=messages['blackgram_temp_low']))
-        elif ct == 'lentil':
-            if temp < 15: tips.append(messages['temp_low'].format(temp=temp, message=messages['lentil_temp_low']))
-        # General advice
-        if temp < 18: tips.append(messages['temp_low'].format(temp=temp, message=messages['general_temp_low']))
+    # Temperature Advice
+    temp = latest_data.get('temperature')
+    if temp is not None and not pd.isna(temp):
+        if ct == 'wheat' and temp > 32: tips.append(messages['temp_high'].format(temp=temp, message=messages['wheat_temp_high']))
+        elif ct == 'rice' and temp > 38: tips.append(messages['temp_high'].format(temp=temp, message=messages['rice_temp_high']))
+        elif ct == 'maize' and temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['maize_temp_low']))
+        elif ct == 'banana' and temp < 15: tips.append(messages['temp_low'].format(temp=temp, message=messages['banana_temp_low']))
+        elif ct == 'mango' and temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['mango_temp_low']))
+        elif ct == 'cotton' and temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['cotton_temp_low']))
+        elif (ct == 'millet' or ct == 'sorghum') and temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['millet_sorghum_temp_low']))
+        elif ct == 'coffee' and temp < 18: tips.append(messages['temp_low'].format(temp=temp, message=messages['coffee_temp_low']))
+        elif ct == 'jute' and temp < 25: tips.append(messages['temp_low'].format(temp=temp, message=messages['jute_temp_low']))
+        elif ct == 'papaya' and temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['papaya_temp_low']))
+        elif ct == 'pomegranate' and temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['pomegranate_temp_low']))
+        elif (ct == 'muskmelon' or ct == 'watermelon') and temp < 25: tips.append(messages['temp_low'].format(temp=temp, message=messages['melon_temp_low']))
+        elif ct == 'coconut' and temp < 25: tips.append(messages['temp_low'].format(temp=temp, message=messages['coconut_temp_low']))
+        elif ct == 'mothbeans' and temp < 22: tips.append(messages['temp_low'].format(temp=temp, message=messages['mothbeans_temp_low']))
+        elif ct == 'mungbean' and temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['mungbean_temp_low']))
+        elif ct == 'blackgram' and temp < 18: tips.append(messages['temp_low'].format(temp=temp, message=messages['blackgram_temp_low']))
+        elif ct == 'lentil' and temp < 15: tips.append(messages['temp_low'].format(temp=temp, message=messages['lentil_temp_low']))
+        elif temp < 18: tips.append(messages['temp_low'].format(temp=temp, message=messages['general_temp_low']))
         elif temp > 35: tips.append(messages['temp_high'].format(temp=temp, message=messages['general_temp_high']))
 
-    if 'humidity' in latest and not pd.isna(latest.get('humidity')):
-        hum = latest['humidity']
-        if ct == 'wheat':
-            if hum > 70: tips.append(messages['humidity_high'].format(hum=hum, message=messages['wheat_hum_high']))
-        elif ct == 'rice':
-            if hum < 60: tips.append(messages['humidity_low'].format(hum=hum, message=messages['rice_hum_low']))
-        elif ct == 'banana':
-            if hum < 60: tips.append(messages['humidity_low'].format(hum=hum, message=messages['banana_hum_low']))
-        elif ct == 'grapes':
-            if hum > 70: tips.append(messages['humidity_high'].format(hum=hum, message=messages['grapes_hum_high']))
-        elif ct == 'coffee':
-            if hum < 60: tips.append(messages['humidity_low'].format(hum=hum, message=messages['coffee_hum_low']))
-        elif ct == 'orange':
-            if hum > 70: tips.append(messages['humidity_high'].format(hum=hum, message=messages['orange_hum_high']))
-        # General advice
-        if hum < 40: tips.append(messages['humidity_low'].format(hum=hum, message=messages['general_hum_low']))
+    # Humidity Advice
+    hum = latest_data.get('humidity')
+    if hum is not None and not pd.isna(hum):
+        if ct == 'wheat' and hum > 70: tips.append(messages['humidity_high'].format(hum=hum, message=messages['wheat_hum_high']))
+        elif ct == 'rice' and hum < 60: tips.append(messages['humidity_low'].format(hum=hum, message=messages['rice_hum_low']))
+        elif ct == 'banana' and hum < 60: tips.append(messages['humidity_low'].format(hum=hum, message=messages['banana_hum_low']))
+        elif ct == 'grapes' and hum > 70: tips.append(messages['humidity_high'].format(hum=hum, message=messages['grapes_hum_high']))
+        elif ct == 'coffee' and hum < 60: tips.append(messages['humidity_low'].format(hum=hum, message=messages['coffee_hum_low']))
+        elif ct == 'orange' and hum > 70: tips.append(messages['humidity_high'].format(hum=hum, message=messages['orange_hum_high']))
+        elif hum < 40: tips.append(messages['humidity_low'].format(hum=hum, message=messages['general_hum_low']))
         elif hum > 80: tips.append(messages['humidity_high'].format(hum=hum, message=messages['general_hum_high']))
 
-    # Note: Using 'ph' from fetched data after consistency handling
-    if 'ph' in latest and not pd.isna(latest.get('ph')):
-        ph_val = latest['ph']
-        if ct == 'wheat':
-            if ph_val < 6.0: tips.append(messages['ph_low'].format(ph_val=ph_val, message=messages['wheat_ph_low']))
-        elif ct == 'rice':
-            if ph_val < 5.5 or ph_val > 6.5: tips.append(messages['ph_off'].format(ph_val=ph_val, message=messages['rice_ph_off']))
-        elif ct == 'maize':
-            if ph_val < 5.8 or ph_val > 7: tips.append(messages['ph_off'].format(ph_val=ph_val, message=messages['maize_ph_off']))
-        elif ct == 'papaya':
-            if ph_val < 6: tips.append(messages['ph_low'].format(ph_val=ph_val, message=messages['papaya_ph_low']))
-        elif ct == 'orange':
-            if ph_val < 6 or ph_val > 7.5: tips.append(messages['ph_off'].format(ph_val=ph_val, message=messages['orange_ph_off']))
-        # General advice
-        if ph_val < 5.5: tips.append(messages['ph_low'].format(ph_val=ph_val, message=messages['general_ph_very_low']))
+    # pH Advice
+    ph_val = latest_data.get('ph')
+    if ph_val is not None and not pd.isna(ph_val):
+        if ct == 'wheat' and ph_val < 6.0: tips.append(messages['ph_low'].format(ph_val=ph_val, message=messages['wheat_ph_low']))
+        elif ct == 'rice' and (ph_val < 5.5 or ph_val > 6.5): tips.append(messages['ph_off'].format(ph_val=ph_val, message=messages['rice_ph_off']))
+        elif ct == 'maize' and (ph_val < 5.8 or ph_val > 7): tips.append(messages['ph_off'].format(ph_val=ph_val, message=messages['maize_ph_off']))
+        elif ct == 'papaya' and ph_val < 6: tips.append(messages['ph_low'].format(ph_val=ph_val, message=messages['papaya_ph_low']))
+        elif ct == 'orange' and (ph_val < 6 or ph_val > 7.5): tips.append(messages['ph_off'].format(ph_val=ph_val, message=messages['orange_ph_off']))
+        elif ph_val < 5.5: tips.append(messages['ph_low'].format(ph_val=ph_val, message=messages['general_ph_very_low']))
         elif ph_val > 7.5: tips.append(messages['ph_high'].format(ph_val=ph_val, message=messages['general_ph_very_high']))
         elif not (5.5 <= ph_val <= 7.5): tips.append(messages['ph_off'].format(ph_val=ph_val, message=messages['general_ph_off']))
 
-    if 'light_intensity' in latest and not pd.isna(latest.get('light_intensity')):
-        light = latest['light_intensity']
-        if ct == 'wheat':
-            if light < 400: tips.append(messages['light_low'].format(light=light, message=messages['wheat_light_low']))
-        elif ct == 'rice':
-            if light < 500: tips.append(messages['light_low'].format(light=light, message=messages['rice_light_low']))
-        # General advice
-        if light < 300: tips.append(messages['light_low'].format(light=light, message=messages['general_light_low']))
+    # Light Intensity Advice
+    light = latest_data.get('light_intensity')
+    if light is not None and not pd.isna(light):
+        if ct == 'wheat' and light < 400: tips.append(messages['light_low'].format(light=light, message=messages['wheat_light_low']))
+        elif ct == 'rice' and light < 500: tips.append(messages['light_low'].format(light=light, message=messages['rice_light_low']))
+        elif light < 300: tips.append(messages['light_low'].format(light=light, message=messages['general_light_low']))
         elif light > 800: tips.append(messages['light_high'].format(light=light, message=messages['general_light_high']))
 
-    if 'rainfall' in latest and not pd.isna(latest.get('rainfall')):
-        rain = latest['rainfall']
+    # Rainfall Advice
+    rain = latest_data.get('rainfall')
+    if rain is not None and not pd.isna(rain):
         if rain < 50:
             tips.append(messages['rainfall_low_msg'].format(rain=rain, message=messages['rainfall_low_msg']))
         elif rain > 200:
@@ -1446,47 +1500,21 @@ def crop_care_advice_backend(df, crop_type, lang='en'):
 
     return tips if tips else [messages['all_good']]
 
-def recommend_seeds_backend(ph, temperature, rainfall, soil_moisture=None, lang='en'):
+def recommend_seeds_backend(soil_moisture_pred, lang='en'):
     """
-    Suggests suitable crops based on environmental conditions.
+    Suggests suitable crops based on predicted soil moisture.
+    Simplified as per code 2's seed recommendation logic.
     """
     messages = SEED_RECOMMENDATIONS_MESSAGES.get(lang, SEED_RECOMMENDATIONS_MESSAGES['en'])
-    recommendations = []
 
-    if ph is not None:
-        if ph < 5.5:
-            recommendations.append(messages['acid_tolerant'])
-        elif ph > 7.5:
-            recommendations.append(messages['alkaline_tolerant'])
-        else:
-            recommendations.append(messages['neutral_ph'])
-
-    if temperature is not None:
-        if temperature > 35:
-            recommendations.append(messages['heat_tolerant'])
-        elif temperature < 15:
-            recommendations.append(messages['cold_hardy'])
-        else:
-            recommendations.append(messages['warm_season'])
-
-    if rainfall is not None:
-        if rainfall < 50:
-            recommendations.append(messages['drought_resistant'])
-        elif rainfall > 200:
-            recommendations.append(messages['water_loving'])
-        else:
-            recommendations.append(messages['moderate_rainfall'])
-
-    if soil_moisture is not None:
-        if soil_moisture < 30:
-            recommendations.append(messages['very_dry'])
-        elif soil_moisture > 80:
-            recommendations.append(messages['very_wet'])
-
-    if not recommendations:
-        return messages['no_specific']
-
-    return messages['intro'] + ", ".join(recommendations) + messages['outro']
+    if soil_moisture_pred is None or pd.isna(soil_moisture_pred) or not (0 <= soil_moisture_pred <= 100):
+        return messages['no_specific'] + " (Predicted soil moisture is out of typical range or not available, hindering specific crop suggestions.)"
+    elif soil_moisture_pred < 30:
+        return f"{messages['intro']} {messages['drought_resistant']}{messages['outro']}"
+    elif soil_moisture_pred > 70:
+        return f"{messages['intro']} {messages['water_loving']}{messages['outro']}"
+    else:
+        return f"{messages['intro']} {messages['moderate_rainfall']}{messages['outro']}"
 
 def speak_tip_backend(text, lang='en'):
     """Generates speech from text using gTTS and returns audio bytes."""
@@ -1506,54 +1534,94 @@ def speak_tip_backend(text, lang='en'):
 def index():
     return send_file('index.html')
 
+@app.route('/api/sensor_data', methods=['POST'])
+def receive_sensor_data():
+    """
+    Receives sensor data from ESP32.
+    Expected JSON: { "temperature": X, "humidity": Y, "soil_moisture": Z, "light_intensity": A }
+    pH, NPK, Rainfall, crop_stage, growth_factor are assumed to be generated as dummy if not provided.
+    """
+    if not firebase_db_ref:
+        return jsonify({"status": "error", "message": "Firebase not initialized."}), 500
+
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"status": "error", "message": "Invalid JSON data."}), 400
+
+        # Extract real sensor data from payload
+        sensor_entry = {
+            "timestamp": datetime.now().isoformat(),
+            "temperature": data.get('temperature'),
+            "humidity": data.get('humidity'),
+            "soil_moisture": data.get('soil_moisture'),
+            "light_intensity": data.get('light_intensity'),
+        }
+
+        # Add dummy data for fields not provided by ESP32, or use provided if available
+        dummy_values = generate_dummy_sensor_data_values()
+        sensor_entry['ph'] = data.get('ph', dummy_values['ph'])
+        sensor_entry['N'] = data.get('N', dummy_values['N'])
+        sensor_entry['P'] = data.get('P', dummy_values['P'])
+        sensor_entry['K'] = data.get('K', dummy_values['K'])
+        sensor_entry['rainfall'] = data.get('rainfall', dummy_values['rainfall'])
+        sensor_entry['crop_stage'] = data.get('crop_stage', dummy_values['crop_stage'])
+        sensor_entry['growth_factor'] = data.get('growth_factor', dummy_values['growth_factor'])
+
+        firebase_db_ref.push(sensor_entry)
+        print(f"Received and stored sensor data: {sensor_entry}")
+
+        # Keep only the latest 100 entries for simplicity in Firebase
+        snapshots = firebase_db_ref.order_by_child('timestamp').get()
+        if snapshots and len(snapshots) > 100:
+            oldest_keys = sorted(snapshots.keys(), key=lambda k: snapshots[k]['timestamp'])
+            for i in range(len(oldest_keys) - 100):
+                firebase_db_ref.child(oldest_keys[i]).delete()
+
+        return jsonify({"status": "success", "message": "Sensor data received and stored."})
+    except Exception as e:
+        print(f"Error receiving sensor data: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/data')
 def get_dashboard_data():
     """Fetches all data required for the dashboard."""
-    df = fetch_sensor_data_backend()
-    latest_data = {}
-    if not df.empty:
-        latest_data = df.iloc[-1].to_dict()
-        # Convert Timestamp objects to string for JSON serialization
-        # And convert any numpy NaN values to None for proper JSON serialization
-        for key, value in latest_data.items():
-            if isinstance(value, pd.Timestamp):
-                latest_data[key] = value.isoformat()
-            elif pd.isna(value): # Check for numpy NaN
-                latest_data[key] = None
+    latest_data = get_latest_sensor_data() # This now handles dummy data if no real data
+    historical_data_list = get_historical_sensor_data(days=7) # Returns list of dicts
 
-    camera_data = fetch_camera_feed_data_backend()
+    camera_data = fetch_camera_feed_data_backend() # This now handles dummy data if no real data
 
     # Prepare data for plotting sensor trends
-    plot_features = ['soil_moisture', 'temperature', 'humidity', 'ph', 'light_intensity', 'N', 'P', 'K', 'rainfall', 'growth_factor']
-    existing_plot_features = [f for f in plot_features if f in df.columns]
-
     plot_data_list = []
-    if not df.empty and len(existing_plot_features) > 0:
-        plot_df_melted = df.dropna(subset=existing_plot_features + ['timestamp']).melt(
-            id_vars=['timestamp'],
-            value_vars=existing_plot_features,
-            var_name='Sensor Metric',
-            value_name='Reading'
-        )
-        # Convert timestamps to string for JSON
-        plot_df_melted['timestamp'] = plot_df_melted['timestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S')
+    if historical_data_list:
+        df_hist = pd.DataFrame(historical_data_list)
+        # Ensure timestamp is datetime and sort
+        df_hist['timestamp'] = pd.to_datetime(df_hist['timestamp'])
+        df_hist = df_hist.sort_values(by='timestamp')
 
-        # Convert any NaN in the 'Reading' column to None
-        plot_df_melted['Reading'] = plot_df_melted['Reading'].apply(lambda x: None if pd.isna(x) else x)
+        # Define metrics to plot (from available sensors)
+        plot_features = ['soil_moisture', 'temperature', 'humidity', 'ph', 'light_intensity', 'N', 'P', 'K', 'rainfall', 'growth_factor']
+        existing_plot_features = [f for f in plot_features if f in df_hist.columns]
 
-        plot_data_list = plot_df_melted.to_dict(orient='records')
+        if not df_hist.empty and len(existing_plot_features) > 0:
+            plot_df_melted = df_hist.dropna(subset=existing_plot_features + ['timestamp']).melt(
+                id_vars=['timestamp'],
+                value_vars=existing_plot_features,
+                var_name='Sensor Metric',
+                value_name='Reading'
+            )
+            plot_df_melted['timestamp'] = plot_df_melted['timestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S')
+            plot_df_melted['Reading'] = plot_df_melted['Reading'].apply(lambda x: None if pd.isna(x) else x)
+            plot_data_list = plot_df_melted.to_dict(orient='records')
 
-    # Prepare raw data table
+    # Prepare raw data table (latest 10 entries)
     raw_data_list = []
-    if not df.empty:
-        # Convert timestamps to string for JSON
-        df_raw = df.tail(10).copy()
+    if historical_data_list:
+        df_raw = pd.DataFrame(historical_data_list).tail(10).copy()
         if 'timestamp' in df_raw.columns:
-            df_raw['timestamp'] = df_raw['timestamp'].apply(lambda x: x.isoformat())
-
-        # Convert any NaN in the entire DataFrame to None for JSON serialization
-        # This is a more robust way to handle NaNs for the raw data table
+            df_raw['timestamp'] = pd.to_datetime(df_raw['timestamp']).dt.strftime('%Y-%m-%d %H:%M:%S')
         raw_data_list = df_raw.replace({np.nan: None}).to_dict(orient='records')
+
 
     return jsonify({
         'latest_data': latest_data,
@@ -1561,7 +1629,7 @@ def get_dashboard_data():
         'plot_data': plot_data_list,
         'raw_data': raw_data_list,
         'crop_labels': all_crop_labels,
-        'status': 'success' if not df.empty else 'no_data'
+        'status': 'success' if latest_data else 'no_data' # Status based on if any data (real or dummy) is available
     })
 
 @app.route('/api/predict_growth', methods=['POST'])
@@ -1569,11 +1637,18 @@ def api_predict_growth():
     data = request.get_json()
     selected_crop_type = data.get('selected_crop_type')
 
-    df = fetch_sensor_data_backend()
-    if df.empty:
-        return jsonify({'error': 'No sensor data available for prediction.'}), 400
+    # Fetch historical data as DataFrame for the TDANN model
+    historical_data_dicts = get_historical_sensor_data(days=7)
+    if not historical_data_dicts:
+        return jsonify({'error': 'No sensor data available for prediction. Please send data to /api/sensor_data.'}), 400
+    
+    df_historical = pd.DataFrame(historical_data_dicts)
+    # Ensure 'ph' column name consistency before passing to backend function
+    if 'pH' in df_historical.columns and 'ph' not in df_historical.columns:
+        df_historical['ph'] = df_historical['pH']
+        df_historical = df_historical.drop(columns=['pH'])
 
-    soil_moisture_pred, light_intensity_pred, nutrient_sum_pred, error_msg = predict_growth_backend(df, selected_crop_type)
+    soil_moisture_pred, light_intensity_pred, nutrient_sum_pred, error_msg = predict_growth_backend(df_historical, selected_crop_type)
 
     if error_msg:
         return jsonify({'error': error_msg}), 500
@@ -1589,12 +1664,11 @@ def api_market_price():
     data = request.get_json()
     selected_crop_type = data.get('selected_crop_type')
 
-    df = fetch_sensor_data_backend()
-    if df.empty:
+    latest_sensor_data = get_latest_sensor_data() # This will provide dummy data if real is missing
+    if not latest_sensor_data:
         return jsonify({'error': 'No sensor data available for market price prediction.'}), 400
 
-    latest_sensor_data_for_price = df.iloc[-1].to_dict()
-    predicted_price, error_msg = predict_market_price_backend(latest_sensor_data_for_price, selected_crop_type)
+    predicted_price, error_msg = predict_market_price_backend(latest_sensor_data, selected_crop_type)
 
     if error_msg:
         return jsonify({'error': error_msg}), 500
@@ -1607,11 +1681,11 @@ def api_care_advice():
     selected_crop_type = data.get('selected_crop_type')
     lang = data.get('lang', 'en') # Get language from request
 
-    df = fetch_sensor_data_backend()
-    if df.empty:
+    latest_data = get_latest_sensor_data() # This will provide dummy data if real is missing
+    if not latest_data:
         return jsonify({'advice': [ADVICE_MESSAGES.get(lang, ADVICE_MESSAGES['en'])['no_data']]})
 
-    care_tips = crop_care_advice_backend(df, selected_crop_type, lang)
+    care_tips = crop_care_advice_backend(latest_data, selected_crop_type, lang)
     return jsonify({'advice': care_tips})
 
 @app.route('/api/seed_recommendations', methods=['POST'])
@@ -1620,27 +1694,9 @@ def api_seed_recommendations():
     soil_moisture_pred = data.get('soil_moisture_pred')
     lang = data.get('lang', 'en') # Get language from request
 
-    df = fetch_sensor_data_backend()
-    if df.empty:
-        return jsonify({'recommendation': SEED_RECOMMENDATIONS_MESSAGES.get(lang, SEED_RECOMMENDATIONS_MESSAGES['en'])['no_specific']})
-
-    latest_sensor_data_for_suggestion = df.iloc[-1].to_dict()
-    current_ph = latest_sensor_data_for_suggestion.get('ph')
-    current_temp = latest_sensor_data_for_suggestion.get('temperature')
-    current_rainfall = latest_sensor_data_for_suggestion.get('rainfall')
-
-    current_ph = None if pd.isna(current_ph) else current_ph
-    current_temp = None if pd.isna(current_temp) else current_temp
-    current_rainfall = None if pd.isna(current_rainfall) else current_rainfall
-
-    if soil_moisture_pred is not None and not pd.isna(soil_moisture_pred) and 0 <= soil_moisture_pred <= 100:
-        if all(v is not None for v in [current_ph, current_temp, current_rainfall]):
-            seed_recommendation = recommend_seeds_backend(current_ph, current_temp, current_rainfall, soil_moisture_pred, lang)
-            return jsonify({'recommendation': seed_recommendation})
-        else:
-            return jsonify({'recommendation': SEED_RECOMMENDATIONS_MESSAGES.get(lang, SEED_RECOMMENDATIONS_MESSAGES['en'])['no_specific'] + " (Missing current sensor data: pH, temperature, or rainfall)"})
-    else:
-        return jsonify({'recommendation': SEED_RECOMMENDATIONS_MESSAGES.get(lang, SEED_RECOMMENDATIONS_MESSAGES['en'])['no_specific'] + " (Predicted soil moisture is out of typical range or not available, hindering specific crop suggestions.)"})
+    # The recommendation is now solely based on predicted soil moisture, as per code 2's simplified logic
+    seed_recommendation = recommend_seeds_backend(soil_moisture_pred, lang)
+    return jsonify({'recommendation': seed_recommendation})
 
 @app.route('/api/voice_alert', methods=['POST'])
 def api_voice_alert():
@@ -1666,23 +1722,30 @@ def api_voice_alert():
 def get_crop_labels():
     return jsonify({'crop_labels': all_crop_labels})
 
-# Initialize app components (models, scalers, Firebase, etc.)
-with app.app_context():
-    initialize_app_components()
+# Ensure models and Firebase are loaded when the app starts
+@app.before_request
+def before_first_request():
+    if not firebase_app:
+        initialize_firebase()
+    if model is None or input_scaler is None or output_scaler is None or crop_encoder is None or market_price_model is None:
+        load_models_and_scalers()
 
 if __name__ == '__main__':
+    # Initialize app components (models, scalers, Firebase, etc.) in the main thread before starting others
+    with app.app_context():
+        initialize_firebase()
+        load_models_and_scalers()
 
     # Start camera simulator in a separate thread
-    camera_thread = threading.Thread(target=run_camera_simulator)
+    camera_thread = threading.Thread(target=run_camera_simulator_thread)
     camera_thread.daemon = True # Allow main program to exit even if threads are running
     camera_thread.start()
 
     # Start sensor data inserter in a separate thread
-    sensor_inserter_thread = threading.Thread(target=run_sensor_data_inserter)
+    sensor_inserter_thread = threading.Thread(target=run_sensor_data_inserter_thread)
     sensor_inserter_thread.daemon = True
     sensor_inserter_thread.start()
 
     # Run the Flask app
     port = int(os.environ.get("PORT", 5000))
-    # Set debug to False for production environments
     app.run(host="0.0.0.0", port=port, debug=False)
