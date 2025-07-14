@@ -204,7 +204,7 @@ ADVICE_MESSAGES = {
         'wheat_light_low': "सुनिश्चित करें कि फसल को पर्याप्त धूप मिले।",
         'rice_light_low': "सुनिश्चित करें कि चावल को पूरी धूप मिले।",
         'general_light_low': "सामान्य सलाह: अपर्याप्त प्रकाश प्रकाश संश्लेषण में बाधा डाल सकता है। पूरक प्रकाश या छंटाई पर विचार करें।",
-        'general_light_high': "सामान्य सलाह: अत्यधिक प्रकाश से झुलसना हो सकता है। चरम घंटों के दौरान छाया पर विचार करें।"
+        'general_light_high': "सामान्य सलाह: अत्यधिक प्रकाश से गर्मी का तनाव हो सकता है। पर्याप्त पानी और छाया सुनिश्चित करें।"
     },
     'es': { # Spanish
         'no_data': "No hay datos del sensor disponibles para proporcionar asesoramiento.",
@@ -866,11 +866,7 @@ SEED_RECOMMENDATIONS_MESSAGES = {
         'orange_ph_off': "オレンジの理想的な土壌pHは6.0-7.5です。",
         'general_ph_very_low': "一般的なアドバイス：土壌が酸性すぎます。pHを上げ、栄養素の利用可能性を改善するために石灰を施用してください。",
         'general_ph_very_high': "一般的なアドバイス：土壌がアルカリ性すぎます。pHを下げるために硫黄または有機物を施用してください。",
-        'general_ph_off': "一般的なアドバイス：ほとんどの作物にとって最適なpH範囲は5.5-7.5です。必要に応じて調整してください。",
-        'wheat_light_low': "作物が十分な日光を浴びるようにしてください。",
-        'rice_light_low': "イネが十分な日照を浴びるようにしてください。",
-        'general_light_low': "一般的なアドバイス：光が不足すると光合成が妨げられる可能性があります。補助照明または剪定を検討してください。",
-        'general_light_high': "一般的なアドバイス：過剰な光は焼けを引き起こす可能性があります。ピーク時間帯は日陰を検討してください。"
+        'general_ph_off': "一般的なアドバイス：ほとんどの作物にとって最適なpH範囲は5.5-7.5です。必要に応じて調整してください。"
     },
     'bn': { # Bengali
         'intro': "বর্তমান অবস্থার উপর ভিত্তি করে, আপনি বিবেচনা করতে পারেন: ",
@@ -1014,6 +1010,7 @@ def load_models_and_scalers():
                 light_intensity = random.uniform(300, 800)
                 rainfall = random.uniform(0, 100)
                 ph = random.uniform(5.5, 7.5)
+                ds18b20_temperature = random.uniform(15, 40) # New sensor data
 
                 base_price = 100
                 if crop_type == 'wheat': price = base_price * 1.2
@@ -1027,14 +1024,16 @@ def load_models_and_scalers():
                 price += (light_intensity - 500) * 0.1
                 price += (rainfall - 50) * 0.2
                 price += (ph - 6.5) * 5
+                price += (ds18b20_temperature - 25) * 1.0 # Factor in new temperature sensor
                 price += random.uniform(-10, 10)
                 price = max(50, price)
-                data.append([N, P, K, temperature, humidity, soil_moisture, light_intensity, rainfall, ph, crop_type, price])
-            df_prices = pd.DataFrame(data, columns=['N', 'P', 'K', 'temperature', 'humidity', 'soil_moisture', 'light_intensity', 'rainfall', 'ph', 'crop_type', 'price'])
+                data.append([N, P, K, temperature, humidity, soil_moisture, light_intensity, rainfall, ph, ds18b20_temperature, crop_type, price])
+            df_prices = pd.DataFrame(data, columns=['N', 'P', 'K', 'temperature', 'humidity', 'soil_moisture', 'light_intensity', 'rainfall', 'ph', 'ds18b20_temperature', 'crop_type', 'price'])
             return df_prices
 
         df_prices = generate_market_price_data(num_samples=2000)
-        market_price_features = ['N', 'P', 'K', 'temperature', 'humidity', 'soil_moisture', 'light_intensity', 'rainfall', 'ph']
+        # Add 'ds18b20_temperature' to the market_price_features
+        market_price_features = ['N', 'P', 'K', 'temperature', 'humidity', 'soil_moisture', 'light_intensity', 'rainfall', 'ph', 'ds18b20_temperature']
 
         X_numerical = df_prices[market_price_features]
         # Ensure market_crop_encoder is fitted with all possible crop types
@@ -1054,13 +1053,14 @@ def load_models_and_scalers():
 
 # --- Dummy Data Generation (for unavailable sensors and initial simulation) ---
 def generate_dummy_sensor_data_values():
-    """Generates dummy data for pH, NPK, and Rainfall if not provided by ESP32."""
+    """Generates dummy data for pH, NPK, Rainfall, DS18B20 Temperature, and other fields if not provided by ESP32."""
     return {
         "ph": round(random.uniform(5.5, 7.5), 2),
         "N": round(random.uniform(20, 100), 2),
         "P": round(random.uniform(10, 50), 2),
         "K": round(random.uniform(30, 120), 2),
         "rainfall": round(random.uniform(0, 10), 2),
+        "ds18b20_temperature": round(random.uniform(15, 40), 2), # New DS18B20 temperature sensor
         "crop_stage": random.choice(CROP_STAGES),
         "growth_factor": round(random.uniform(0.5, 1.5), 2)
     }
@@ -1114,6 +1114,7 @@ def run_sensor_data_inserter_thread():
             'temperature': round(random.uniform(20, 40), 2),
             'humidity': round(random.uniform(30, 95), 2),
             'light_intensity': random.randint(200, 900),
+            'ds18b20_temperature': round(random.uniform(15, 40), 2), # Include DS18B20 temperature
             **generate_dummy_sensor_data_values() # Include dummy NPK, pH, Rainfall, crop_stage, growth_factor
         }
         if not local_print_only:
@@ -1138,6 +1139,7 @@ def run_sensor_data_inserter_thread():
             'temperature': round(random.uniform(20, 40), 2),
             'humidity': round(random.uniform(30, 95), 2),
             'light_intensity': random.randint(200, 900),
+            'ds18b20_temperature': round(random.uniform(15, 40), 2), # Include DS18B20 temperature
             **generate_dummy_sensor_data_values() # Include dummy NPK, pH, Rainfall, crop_stage, growth_factor
         }
         if not local_print_only:
@@ -1171,19 +1173,20 @@ def get_latest_sensor_data():
                 "humidity": round(random.uniform(50, 70), 2),
                 "soil_moisture": round(random.uniform(40, 60), 2),
                 "light_intensity": random.randint(5000, 10000),
+                "ds18b20_temperature": round(random.uniform(15, 40), 2), # Include DS18B20 temperature
                 **dummy_values
             }
 
         latest_data = list(latest_data_snapshot.values())[0]
 
         # Ensure all expected fields are present, filling with dummy if missing
-        expected_fields = ['temperature', 'humidity', 'soil_moisture', 'light_intensity',
+        expected_fields = ['temperature', 'humidity', 'soil_moisture', 'light_intensity', 'ds18b20_temperature',
                             'N', 'P', 'K', 'ph', 'rainfall', 'crop_stage', 'growth_factor']
         dummy_fill_values = generate_dummy_sensor_data_values()
 
         for field in expected_fields:
             if field not in latest_data or latest_data[field] is None:
-                latest_data[field] = dummy_fill_values.get(field) # Use dummy values for NPK, pH, Rainfall
+                latest_data[field] = dummy_fill_values.get(field) # Use dummy values for NPK, pH, Rainfall, DS18B20 Temp
             # Convert any numpy NaN values to None for proper JSON serialization
             if isinstance(latest_data[field], (np.float64, np.int64)) and np.isnan(latest_data[field]):
                 latest_data[field] = None
@@ -1204,6 +1207,7 @@ def get_latest_sensor_data():
             "humidity": round(random.uniform(50, 70), 2),
             "soil_moisture": round(random.uniform(40, 60), 2),
             "light_intensity": random.randint(5000, 10000),
+            "ds18b20_temperature": round(random.uniform(15, 40), 2), # Include DS18B20 temperature
             **dummy_values
         }
 
@@ -1227,7 +1231,7 @@ def get_historical_sensor_data(days=7):
                     del value['pH']
                 
                 dummy_fill_values = generate_dummy_sensor_data_values()
-                for field in ['N', 'P', 'K', 'ph', 'rainfall', 'crop_stage', 'growth_factor']:
+                for field in ['N', 'P', 'K', 'ph', 'rainfall', 'ds18b20_temperature', 'crop_stage', 'growth_factor']:
                     if field not in value or value[field] is None:
                         value[field] = dummy_fill_values.get(field)
                 
@@ -1240,7 +1244,7 @@ def get_historical_sensor_data(days=7):
             return []
 
         numeric_cols = ['N', 'P', 'K', 'ph', 'rainfall', 'temperature', 'humidity',
-                        'soil_moisture', 'light_intensity', 'growth_factor']
+                        'soil_moisture', 'light_intensity', 'ds18b20_temperature', 'growth_factor'] # Added ds18b20_temperature
         for col in numeric_cols:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -1287,7 +1291,8 @@ def predict_growth_backend(historical_df, selected_crop_type):
 
     LOOKBACK_WINDOW = 5 # As per original code 1's TDANN model expectation
 
-    base_sensor_features = ['N', 'P', 'K', 'temperature', 'humidity', 'ph', 'rainfall']
+    # Added 'ds18b20_temperature' to base_sensor_features
+    base_sensor_features = ['N', 'P', 'K', 'temperature', 'humidity', 'ph', 'rainfall', 'ds18b20_temperature']
     biological_features = ['growth_factor'] # Included in Code 1's TDANN input
     
     # Combine all features expected by the TDANN model
@@ -1354,12 +1359,12 @@ def predict_market_price_backend(latest_data, selected_crop_type):
     features = {}
     dummy_values = generate_dummy_sensor_data_values()
     # Ensure all features expected by market_price_features are present
-    for feature in market_price_features:
+    for feature in market_price_features: # market_price_features now includes 'ds18b20_temperature'
         val = latest_data.get(feature)
         if val is not None and not pd.isna(val):
             features[feature] = val
         else:
-            # Use dummy values for NPK, pH, Rainfall, or a default 0 for others
+            # Use dummy values for NPK, pH, Rainfall, DS18B20 Temp, or a default 0 for others
             features[feature] = dummy_values.get(feature, 0)
 
     input_df_numerical = pd.DataFrame([features])
@@ -1435,28 +1440,38 @@ def crop_care_advice_backend(latest_data, crop_type, lang='en'):
         elif sm < 30: tips.append(messages['soil_moisture_low'].format(sm=sm, message=messages['general_sm_low']))
         elif sm > 70: tips.append(messages['soil_moisture_high'].format(sm=sm, message=messages['general_sm_high']))
 
-    # Temperature Advice
+    # Temperature Advice (combining 'temperature' and 'ds18b20_temperature')
     temp = latest_data.get('temperature')
-    if temp is not None and not pd.isna(temp):
-        if ct == 'wheat' and temp > 32: tips.append(messages['temp_high'].format(temp=temp, message=messages['wheat_temp_high']))
-        elif ct == 'rice' and temp > 38: tips.append(messages['temp_high'].format(temp=temp, message=messages['rice_temp_high']))
-        elif ct == 'maize' and temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['maize_temp_low']))
-        elif ct == 'banana' and temp < 15: tips.append(messages['temp_low'].format(temp=temp, message=messages['banana_temp_low']))
-        elif ct == 'mango' and temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['mango_temp_low']))
-        elif ct == 'cotton' and temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['cotton_temp_low']))
-        elif (ct == 'millet' or ct == 'sorghum') and temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['millet_sorghum_temp_low']))
-        elif ct == 'coffee' and temp < 18: tips.append(messages['temp_low'].format(temp=temp, message=messages['coffee_temp_low']))
-        elif ct == 'jute' and temp < 25: tips.append(messages['temp_low'].format(temp=temp, message=messages['jute_temp_low']))
-        elif ct == 'papaya' and temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['papaya_temp_low']))
-        elif ct == 'pomegranate' and temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['pomegranate_temp_low']))
-        elif (ct == 'muskmelon' or ct == 'watermelon') and temp < 25: tips.append(messages['temp_low'].format(temp=temp, message=messages['melon_temp_low']))
-        elif ct == 'coconut' and temp < 25: tips.append(messages['temp_low'].format(temp=temp, message=messages['coconut_temp_low']))
-        elif ct == 'mothbeans' and temp < 22: tips.append(messages['temp_low'].format(temp=temp, message=messages['mothbeans_temp_low']))
-        elif ct == 'mungbean' and temp < 20: tips.append(messages['temp_low'].format(temp=temp, message=messages['mungbean_temp_low']))
-        elif ct == 'blackgram' and temp < 18: tips.append(messages['temp_low'].format(temp=temp, message=messages['blackgram_temp_low']))
-        elif ct == 'lentil' and temp < 15: tips.append(messages['temp_low'].format(temp=temp, message=messages['lentil_temp_low']))
-        elif temp < 18: tips.append(messages['temp_low'].format(temp=temp, message=messages['general_temp_low']))
-        elif temp > 35: tips.append(messages['temp_high'].format(temp=temp, message=messages['general_temp_high']))
+    ds_temp = latest_data.get('ds18b20_temperature')
+
+    # Prioritize ds_temp if available and within a reasonable range, otherwise use temp
+    # Or, provide advice based on both if they differ significantly
+    effective_temp = None
+    if ds_temp is not None and not pd.isna(ds_temp) and 0 <= ds_temp <= 50: # Assuming reasonable range for DS18B20
+        effective_temp = ds_temp
+    elif temp is not None and not pd.isna(temp):
+        effective_temp = temp
+
+    if effective_temp is not None:
+        if ct == 'wheat' and effective_temp > 32: tips.append(messages['temp_high'].format(temp=effective_temp, message=messages['wheat_temp_high']))
+        elif ct == 'rice' and effective_temp > 38: tips.append(messages['temp_high'].format(temp=effective_temp, message=messages['rice_temp_high']))
+        elif ct == 'maize' and effective_temp < 20: tips.append(messages['temp_low'].format(temp=effective_temp, message=messages['maize_temp_low']))
+        elif ct == 'banana' and effective_temp < 15: tips.append(messages['temp_low'].format(temp=effective_temp, message=messages['banana_temp_low']))
+        elif ct == 'mango' and effective_temp < 20: tips.append(messages['temp_low'].format(temp=effective_temp, message=messages['mango_temp_low']))
+        elif ct == 'cotton' and effective_temp < 20: tips.append(messages['temp_low'].format(temp=effective_temp, message=messages['cotton_temp_low']))
+        elif (ct == 'millet' or ct == 'sorghum') and effective_temp < 20: tips.append(messages['temp_low'].format(temp=effective_temp, message=messages['millet_sorghum_temp_low']))
+        elif ct == 'coffee' and effective_temp < 18: tips.append(messages['temp_low'].format(temp=effective_temp, message=messages['coffee_temp_low']))
+        elif ct == 'jute' and effective_temp < 25: tips.append(messages['temp_low'].format(temp=effective_temp, message=messages['jute_temp_low']))
+        elif ct == 'papaya' and effective_temp < 20: tips.append(messages['temp_low'].format(temp=effective_temp, message=messages['papaya_temp_low']))
+        elif ct == 'pomegranate' and effective_temp < 20: tips.append(messages['temp_low'].format(temp=effective_temp, message=messages['pomegranate_temp_low']))
+        elif (ct == 'muskmelon' or ct == 'watermelon') and effective_temp < 25: tips.append(messages['temp_low'].format(temp=effective_temp, message=messages['melon_temp_low']))
+        elif ct == 'coconut' and effective_temp < 25: tips.append(messages['temp_low'].format(temp=effective_temp, message=messages['coconut_temp_low']))
+        elif ct == 'mothbeans' and effective_temp < 22: tips.append(messages['temp_low'].format(temp=effective_temp, message=messages['mothbeans_temp_low']))
+        elif ct == 'mungbean' and effective_temp < 20: tips.append(messages['temp_low'].format(temp=effective_temp, message=messages['mungbean_temp_low']))
+        elif ct == 'blackgram' and effective_temp < 18: tips.append(messages['temp_low'].format(temp=effective_temp, message=messages['blackgram_temp_low']))
+        elif ct == 'lentil' and effective_temp < 15: tips.append(messages['temp_low'].format(temp=effective_temp, message=messages['lentil_temp_low']))
+        elif effective_temp < 18: tips.append(messages['temp_low'].format(temp=effective_temp, message=messages['general_temp_low']))
+        elif effective_temp > 35: tips.append(messages['temp_high'].format(temp=effective_temp, message=messages['general_temp_high']))
 
     # Humidity Advice
     hum = latest_data.get('humidity')
@@ -1538,7 +1553,7 @@ def index():
 def receive_sensor_data():
     """
     Receives sensor data from ESP32.
-    Expected JSON: { "temperature": X, "humidity": Y, "soil_moisture": Z, "light_intensity": A }
+    Expected JSON: { "temperature": X, "humidity": Y, "soil_moisture": Z, "light_intensity": A, "ds18b20_temperature": B }
     pH, NPK, Rainfall, crop_stage, growth_factor are assumed to be generated as dummy if not provided.
     """
     if not firebase_db_ref:
@@ -1556,6 +1571,7 @@ def receive_sensor_data():
             "humidity": data.get('humidity'),
             "soil_moisture": data.get('soil_moisture'),
             "light_intensity": data.get('light_intensity'),
+            "ds18b20_temperature": data.get('ds18b20_temperature'), # New DS18B20 temperature
         }
 
         # Add dummy data for fields not provided by ESP32, or use provided if available
@@ -1599,8 +1615,8 @@ def get_dashboard_data():
         df_hist['timestamp'] = pd.to_datetime(df_hist['timestamp'])
         df_hist = df_hist.sort_values(by='timestamp')
 
-        # Define metrics to plot (from available sensors)
-        plot_features = ['soil_moisture', 'temperature', 'humidity', 'ph', 'light_intensity', 'N', 'P', 'K', 'rainfall', 'growth_factor']
+        # Define metrics to plot (from available sensors) - Added ds18b20_temperature
+        plot_features = ['soil_moisture', 'temperature', 'humidity', 'ph', 'light_intensity', 'N', 'P', 'K', 'rainfall', 'ds18b20_temperature', 'growth_factor']
         existing_plot_features = [f for f in plot_features if f in df_hist.columns]
 
         if not df_hist.empty and len(existing_plot_features) > 0:
