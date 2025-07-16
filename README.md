@@ -1,1 +1,1 @@
-Check out the website here: https://smart-agritech-streamlit-dashbard.onrender.com
+Check out the website here: https://smart-agritech-dashbard.netlify.app/
