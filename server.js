@@ -275,8 +275,8 @@ const ADVICE_MESSAGES = {
         'general_ph_off': "Consejo general: El rango de pH óptimo para la mayoría de los cultivos es 5.5-7.5. Ajuste según sea necesario.",
         'wheat_light_low': "Asegure que el cultivo reciba suficiente luz solar.",
         'rice_light_low': "Asegure que el arroz reciba plena exposición al sol.",
-        'general_light_low': "Consejo general: La luz insuficiente puede dificultar la fotosíntesis. Considere la iluminación suplementaria o la poda.",
-        'general_light_high': "Consejo general: La luz excesiva puede causar quemaduras. Considere la sombra durante las horas pico."
+        'general_light_low': "General advice: Insufficient light can hinder photosynthesis. Consider supplemental lighting or pruning.",
+        'general_light_high': "General advice: Excessive light can cause scorching. Consider shading during peak hours."
     },
     'fr': {
         'no_data': "Aucune donnée de capteur disponible pour fournir des conseils.",
@@ -357,8 +357,8 @@ const ADVICE_MESSAGES = {
         'general_ph_off': "Conseil général : La plage de pH optimale pour la plupart des cultures est de 5.5 à 7.5. Ajustez si nécessaire.",
         'wheat_light_low': "Assurez-vous que la culture reçoit suffisamment de lumière du soleil.",
         'rice_light_low': "Assurez-vous que le riz reçoit une exposition complète au soleil.",
-        'general_light_low': "Conseil général : Une lumière insuffisante peut entraver la photosynthèse. Envisagez un éclairage supplémentaire ou une taille.",
-        'general_light_high': "Conseil général : Une lumière excessive peut provoquer des brûlures. Envisagez l'ombrage pendant les heures de pointe."
+        'general_light_low': "General advice: Insufficient light can hinder photosynthesis. Consider supplemental lighting or pruning.",
+        'general_light_high': "General advice: Excessive light can cause scorching. Consider shading during peak hours."
     },
     'de': {
         'no_data': "Keine Sensordaten verfügbar, um Ratschläge zu geben.",
@@ -437,10 +437,10 @@ const ADVICE_MESSAGES = {
         'general_ph_very_low': "Allgemeiner Ratschlag: Der Boden ist zu sauer. Wenden Sie Kalk an, um den pH-Wert zu erhöhen und die Nährstoffverfügbarkeit zu verbessern.",
         'general_ph_very_high': "Allgemeiner Ratschlag: Der Boden ist zu alkalisch. Wenden Sie Schwefel oder organische Substanz an, um den pH-Wert zu senken.",
         'general_ph_off': "Allgemeiner Ratschlag: Der optimale pH-Bereich für die meisten Kulturen liegt bei 5.5-7.5. Passen Sie ihn bei Bedarf an.",
-        'wheat_light_low': "Stellen Sie sicher, dass die Ernte ausreichend Sonnenlicht erhält.",
-        'rice_light_low': "Stellen Sie sicher, dass Reis volle Sonneneinstrahlung erhält.",
-        'general_light_low': "Allgemeiner Ratschlag: Unzureichendes Licht kann die Photosynthese behindern. Erwägen Sie zusätzliche Beleuchtung oder Beschneidung.",
-        'general_light_high': "Allgemeiner Ratschlag: Übermäßiges Licht kann Verbrennungen verursachen. Erwägen Sie Beschattung während der Spitzenzeiten."
+        'wheat_light_low': "Ensure the crop gets enough sunlight.",
+        'rice_light_low': "Ensure rice gets full sun exposure.",
+        'general_light_low': "General advice: Insufficient light can hinder photosynthesis. Consider supplemental lighting or pruning.",
+        'general_light_high': "General advice: Excessive light can cause scorching. Consider shading during peak hours."
     },
     'ar': {
         'no_data': "لا توجد بيانات مستشعر متاحة لتقديم المشورة.",
@@ -829,17 +829,17 @@ function initializeFirebase() {
         if (firebaseKeyB64) {
             const decodedJson = Buffer.from(firebaseKeyB64, 'base64').toString('utf8');
             serviceAccount = JSON.parse(decodedJson);
-            console.log("Firebase credentials loaded from environment variable.");
+            console.log("Firebase credentials loaded from FIREBASE_KEY_B64 environment variable.");
         } else {
             // Fallback for local development if environment variable is not set
-            // IMPORTANT: For production, always use FIREBASE_KEY_B64
-            // Ensure 'agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json' is in your project root
+            // WARNING: This local file fallback should NOT be used in production.
+            // For production, ensure FIREBASE_KEY_B64 is set.
             const serviceAccountPath = path.resolve(__dirname, 'agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json');
             if (fs.existsSync(serviceAccountPath)) {
                 serviceAccount = require(serviceAccountPath);
-                console.log("Firebase credentials loaded from local file (development fallback).");
+                console.warn("⚠️ Firebase credentials loaded from local file (development fallback). For production, set FIREBASE_KEY_B64 environment variable.");
             } else {
-                throw new Error("Firebase service account key not found. Please set FIREBASE_KEY_B64 environment variable or place 'agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json' in the project root.");
+                throw new Error("Firebase service account key not found. Please set FIREBASE_KEY_B64 environment variable (recommended for production) or place 'agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json' in the project root for local development.");
             }
         }
 
