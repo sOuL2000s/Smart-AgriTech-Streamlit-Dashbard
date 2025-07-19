@@ -1,0 +1,1580 @@
+// server.js - Node.js Backend for Smart Agriculture System
+
+const express = require('express');
+const cors = require('cors');
+const admin = require('firebase-admin');
+const path = require('path');
+const fs = require('fs'); // For reading service account key
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Middleware
+app.use(cors()); // Enable CORS for all routes (consider restricting in production)
+app.use(express.json()); // Enable JSON body parsing
+
+// --- Global Variables for Firebase, Models, Scalers, etc. ---
+let firebaseApp = null;
+let firebaseDbRef = null; // Global reference for Firebase DB (sensor data)
+let firebaseCameraRef = null; // Global reference for Firebase camera feed
+
+// --- New Global Variable for Simulation Mode ---
+// False means "Real-Time Testing" (expecting some real data, generating dummies for others)
+// True means "Simulation" (generating all dummy data)
+let simulationMode = false;
+
+// Simulated Crop Labels (based on Python's all_crop_labels)
+const allCropLabels = [
+    "Wheat", "Rice", "Maize", "Banana", "Mango", "Grapes", "Cotton", "Millet",
+    "Sorghum", "Coffee", "Jute", "Pomegranate", "Melon", "Coconut",
+    "Mothbeans", "Mungbean", "Blackgram", "Lentil"
+];
+
+// Multilingual Advice Messages (Translated from Python)
+const ADVICE_MESSAGES = {
+    'en': {
+        'no_data': "No sensor data available to provide advice.",
+        'npk_low': "🌱 **{nutrient} is low ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient} is high ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **Soil Moisture is low ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **Soil Moisture is high ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **Temperature is low ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **Temperature is high ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **Humidity is low ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **Humidity is high ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **pH is low ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **pH is high ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **pH is off ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **Light Intensity is low ({light:.1f} lux)**: {message}",
+        'light_high': "☀️ **Light Intensity is high ({light:.1f} lux)**: {message}",
+        'rainfall_low_msg': "🌧️ **Rainfall is low ({rain:.1f} mm)**: {message}",
+        'rainfall_high_msg': "🌧️ **Rainfall is high ({rain:.1f} mm)**: {message}",
+        'all_good': "✅ All major parameters look good! Keep monitoring regularly for optimal growth.",
+        'npk_n_low': "Consider applying nitrogen-rich fertilizer.",
+        'npk_n_high': "Excess nitrogen can promote leafy growth over fruit/flower development.",
+        'npk_p_low': "Consider applying phosphorus fertilizer for root development.",
+        'npk_p_high': "High phosphorus can lock up other nutrients.",
+        'npk_k_low': "Consider applying potassium fertilizer for overall plant health and fruit quality.",
+        'npk_k_high': "Excess potassium can interfere with calcium and magnesium uptake.",
+        'wheat_sm_low': "Irrigate lightly – wheat needs 35–50% soil moisture.",
+        'rice_sm_low': "Rice needs high moisture. Ensure proper irrigation.",
+        'maize_sm_low': "Maize needs moderate soil moisture levels.",
+        'banana_sm_low': "Keep soil consistently moist for banana.",
+        'mango_sm_high': "Avoid waterlogging. Mango needs well-drained soil.",
+        'grapes_sm_high': "Grapes prefer drier soil – avoid overwatering.",
+        'cotton_sm_low': "Cotton requires moderate moisture during flowering.",
+        'millet_sorghum_sm_low': "These are drought-resistant crops but still need minimal moisture.",
+        'jute_sm_low': "Jute requires ample moisture during growth.",
+        'pomegranate_sm_high': "Avoid overwatering pomegranate.",
+        'melon_sm_low': "Melons need consistent watering, especially during fruiting.",
+        'coconut_sm_low': "Coconut palms need high moisture levels.",
+        'mothbeans_sm_low': "Mothbeans are drought-tolerant but need minimal irrigation during flowering.",
+        'mungbean_sm_low': "Ensure regular irrigation during flowering and pod formation.",
+        'blackgram_sm_low': "Maintain moderate moisture especially during flowering.",
+        'lentil_sm_low': "Lentils need low to moderate moisture.",
+        'general_sm_low': "General advice: Consider irrigation to prevent drought stress.",
+        'general_sm_high': "General advice: Ensure good drainage to prevent waterlogging.",
+        'wheat_temp_high': "Provide shade or irrigate in evening – temp is too high for wheat.",
+        'rice_temp_high': "Too hot for rice. Consider evening irrigation or shade.",
+        'maize_temp_low': "Maize prefers warm weather (20–30°C).",
+        'banana_temp_low': "Banana is sensitive to cold – ensure warm conditions.",
+        'mango_temp_low': "Mango requires warmer temperatures (>20°C).",
+        'cotton_temp_low': "Cotton thrives in warm temperatures.",
+        'millet_sorghum_temp_low': "Warm climate is ideal for millet/sorghum.",
+        'coffee_temp_low': "Coffee thrives in 18–24°C range.",
+        'jute_temp_low': "Jute grows well in 25–30°C.",
+        'papaya_temp_low': "Papaya prefers 21–33°C range.",
+        'pomegranate_temp_low': "Ideal temperature is above 20°C.",
+        'melon_temp_low': "Ensure temperature is warm (>25°C).",
+        'coconut_temp_low': "Ideal temperature for coconut is above 25°C.",
+        'mothbeans_temp_low': "Temperature should be above 22°C.",
+        'mungbean_temp_low': "Mungbean requires warm conditions for optimal growth.",
+        'blackgram_temp_low': "Ideal temperature range is 25–35°C.",
+        'lentil_temp_low': "Lentils grow well in 18–30°C.",
+        'general_temp_low': "General advice: Cold temperatures can stunt growth. Consider protective measures.",
+        'general_temp_high': "General advice: High temperatures can cause heat stress. Ensure adequate water and shade.",
+        'wheat_hum_high': "Watch out for fungal infections – ensure airflow.",
+        'rice_hum_low': "Increase ambient humidity or use mulch.",
+        'banana_hum_low': "Banana requires high humidity. Consider misting or mulching.",
+        'grapes_hum_high': "High humidity may lead to fungal infections.",
+        'coffee_hum_low': "Coffee prefers high humidity.",
+        'orange_hum_high': "Prune trees to improve airflow and prevent fungal issues.",
+        'general_hum_low': "General advice: Low humidity can cause wilting. Consider misting or increasing soil moisture.",
+        'general_hum_high': "General advice: High humidity increases risk of fungal diseases. Ensure good ventilation.",
+        'wheat_ph_low': "Slightly acidic – consider applying lime to raise pH.",
+        'rice_ph_off': "Maintain slightly acidic soil for rice (pH 5.5–6.5).",
+        'maize_ph_off': "Maintain soil pH between 5.8–7.0.",
+        'papaya_ph_low': "Slightly acidic to neutral soil is best for papaya.",
+        'orange_ph_off': "Ideal soil pH for orange is 6.0–7.5.",
+        'general_ph_very_low': "General advice: Soil is too acidic. Apply lime to increase pH and improve nutrient availability.",
+        'general_ph_very_high': "General advice: Soil is too alkaline. Apply sulfur or organic matter to decrease pH.",
+        'general_ph_off': "General advice: Optimal pH range for most crops is 5.5-7.5. Adjust as needed.",
+        'wheat_light_low': "Ensure the crop gets enough sunlight.",
+        'rice_light_low': "Ensure rice gets full sun exposure.",
+        'general_light_low': "General advice: Insufficient light can hinder photosynthesis. Consider supplemental lighting or pruning.",
+        'general_light_high': "General advice: Excessive light can cause scorching. Consider shading during peak hours."
+    },
+    'hi': {
+        'no_data': "सलाह देने के लिए कोई सेंसर डेटा उपलब्ध नहीं है।",
+        'npk_low': "🌱 **{nutrient} कम है ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient} अधिक है ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **मिट्टी की नमी कम है ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **मिट्टी की नमी अधिक है ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **तापमान कम है ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **तापमान अधिक है ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **आर्द्रता कम है ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **आर्द्रता अधिक है ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **पीएच कम है ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **पीएच अधिक है ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **पीएच सही नहीं है ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **प्रकाश की तीव्रता कम है ({light:.1f} लक्स)**: {message}",
+        'light_high': "☀️ **प्रकाश की तीव्रता अधिक है ({light:.1f} लक्स)**: {message}",
+        'rainfall_low_msg': "🌧️ **वर्षा कम है ({rain:.1f} मिमी)**: {message}",
+        'rainfall_high_msg': "🌧️ **वर्षा अधिक है ({rain:.1f} मिमी)**: {message}",
+        'all_good': "✅ सभी मुख्य पैरामीटर ठीक दिख रहे हैं! इष्टतम विकास के लिए नियमित रूप से निगरानी करते रहें।",
+        'npk_n_low': "नाइट्रोजन युक्त उर्वरक डालने पर विचार करें।",
+        'npk_n_high': "अतिरिक्त नाइट्रोजन फल/फूल के विकास के बजाय पत्तों के विकास को बढ़ावा दे सकता है।",
+        'npk_p_low': "जड़ के विकास के लिए फास्फोरस उर्वरक डालने पर विचार करें।",
+        'npk_p_high': "उच्च फास्फोरस अन्य पोषक तत्वों को अवरुद्ध कर सकता है।",
+        'npk_k_low': "पौधे के समग्र स्वास्थ्य और फल की गुणवत्ता के लिए पोटेशियम उर्वरक डालने पर विचार करें।",
+        'npk_k_high': "अतिरिक्त पोटेशियम कैल्शियम और मैग्नीशियम के अवशोषण में हस्तक्षेप कर सकता है।",
+        'wheat_sm_low': "हल्की सिंचाई करें – गेहूं को 35-50% मिट्टी की नमी की आवश्यकता होती है।",
+        'rice_sm_low': "चावल को अधिक नमी की आवश्यकता होती है। उचित सिंचाई सुनिश्चित करें।",
+        'maize_sm_low': "मक्का को मध्यम मिट्टी की नमी के स्तर की आवश्यकता होती है।",
+        'banana_sm_low': "केले के लिए मिट्टी को लगातार नम रखें।",
+        'mango_sm_high': "जलभराव से बचें। आम को अच्छी जल निकासी वाली मिट्टी की आवश्यकता होती है।",
+        'grapes_sm_high': "अंगूर सूखी मिट्टी पसंद करते हैं – अधिक पानी देने से बचें।",
+        'cotton_sm_low': "कपास को फूल आने के दौरान मध्यम नमी की आवश्यकता होती है।",
+        'millet_sorghum_sm_low': "ये सूखे प्रतिरोधी फसलें हैं लेकिन फिर भी न्यूनतम नमी की आवश्यकता होती है।",
+        'jute_sm_low': "जूट को विकास के दौरान पर्याप्त नमी की आवश्यकता होती है।",
+        'pomegranate_sm_high': "अनार को अधिक पानी देने से बचें।",
+        'melon_sm_low': "तरबूज को लगातार पानी की आवश्यकता होती है, खासकर फल लगने के दौरान।",
+        'coconut_sm_low': "नारियल के पेड़ों को उच्च नमी के स्तर की आवश्यकता होती है।",
+        'mothbeans_sm_low': "मोठबीन सूखे को सहन करने वाली फसलें हैं लेकिन फूल आने के दौरान न्यूनतम सिंचाई की आवश्यकता होती है।",
+        'mungbean_sm_low': "फूल आने और फली बनने के दौरान नियमित सिंचाई सुनिश्चित करें।",
+        'blackgram_sm_low': "विशेष रूप से फूल आने के दौरान मध्यम नमी बनाए रखें।",
+        'lentil_sm_low': "मसूर को कम से मध्यम नमी की आवश्यकता होती है।",
+        'general_sm_low': "सामान्य सलाह: सूखे के तनाव को रोकने के लिए सिंचाई पर विचार करें।",
+        'general_sm_high': "सामान्य सलाह: जलभराव को रोकने के लिए अच्छी जल निकासी सुनिश्चित करें।",
+        'wheat_temp_high': "शाम को छाया प्रदान करें या सिंचाई करें – गेहूं के लिए तापमान बहुत अधिक है।",
+        'rice_temp_high': "चावल के लिए बहुत गर्म है। शाम को सिंचाई या छाया पर विचार करें।",
+        'maize_temp_low': "मक्का गर्म मौसम (20-30°C) पसंद करता है।",
+        'banana_temp_low': "केला ठंड के प्रति संवेदनशील है – गर्म स्थिति सुनिश्चित करें।",
+        'mango_temp_low': "आम को गर्म तापमान (>20°C) की आवश्यकता होती है।",
+        'cotton_temp_low': "कपास गर्म तापमान में पनपती है।",
+        'millet_sorghum_temp_low': "बाजरा/ज्वार के लिए गर्म जलवायु आदर्श है।",
+        'coffee_temp_low': "कॉफी 18-24°C रेंज में पनपती है।",
+        'jute_temp_low': "जूट 25-30°C में अच्छी तरह उगता है।",
+        'papaya_temp_low': "पपीता 21-33°C रेंज पसंद करता है।",
+        'pomegranate_temp_low': "आदर्श तापमान 20°C से ऊपर है।",
+        'melon_temp_low': "सुनिश्चित करें कि तापमान गर्म (>25°C) हो।",
+        'coconut_temp_low': "नारियल के लिए आदर्श तापमान 25°C से ऊपर है।",
+        'mothbeans_temp_low': "तापमान 22°C से ऊपर होना चाहिए।",
+        'mungbean_temp_low': "मूंग को इष्टतम विकास के लिए गर्म परिस्थितियों की आवश्यकता होती है।",
+        'blackgram_temp_low': "आदर्श तापमान सीमा 25-35°C है।",
+        'lentil_temp_low': "मसूर 18-30°C में अच्छी तरह उगती है।",
+        'general_temp_low': "सामान्य सलाह: ठंडा तापमान विकास को रोक सकता है। सुरक्षात्मक उपायों पर विचार करें।",
+        'general_temp_high': "सामान्य सलाह: उच्च तापमान से गर्मी का तनाव हो सकता है। पर्याप्त पानी और छाया सुनिश्चित करें।",
+        'wheat_hum_high': "कवक संक्रमण से सावधान रहें – वायु प्रवाह सुनिश्चित करें।",
+        'rice_hum_low': "आसपास की आर्द्रता बढ़ाएँ या पलवार का उपयोग करें।",
+        'banana_hum_low': "केले को उच्च आर्द्रता की आवश्यकता होती है। धुंध या पलवार पर विचार करें।",
+        'grapes_hum_high': "उच्च आर्द्रता से कवक संक्रमण हो सकता है।",
+        'coffee_hum_low': "कॉफी उच्च आर्द्रता पसंद करती है।",
+        'orange_hum_high': "वायु प्रवाह में सुधार और कवक संबंधी समस्याओं को रोकने के लिए पेड़ों की छंटाई करें।",
+        'general_hum_low': "सामान्य सलाह: कम आर्द्रता से मुरझाना हो सकता है। धुंध या मिट्टी की नमी बढ़ाने पर विचार करें।",
+        'general_hum_high': "सामान्य सलाह: उच्च आर्द्रता से कवक रोगों का खतरा बढ़ जाता है। अच्छा वेंटिलेशन सुनिश्चित करें।",
+        'wheat_ph_low': "थोड़ा अम्लीय – पीएच बढ़ाने के लिए चूना डालने पर विचार करें।",
+        'rice_ph_off': "चावल के लिए थोड़ी अम्लीय मिट्टी बनाए रखें (पीएच 5.5-6.5)।",
+        'maize_ph_off': "मिट्टी का पीएच 5.8-7.0 के बीच बनाए रखें।",
+        'papaya_ph_low': "पपीते के लिए थोड़ी अम्लीय से तटस्थ मिट्टी सबसे अच्छी होती है।",
+        'orange_ph_off': "संतरे के लिए आदर्श मिट्टी का पीएच 6.0-7.5 है।",
+        'general_ph_very_low': "सामान्य सलाह: मिट्टी बहुत अम्लीय है। पीएच बढ़ाने और पोषक तत्वों की उपलब्धता में सुधार के लिए चूना डालें।",
+        'general_ph_very_high': "सामान्य सलाह: मिट्टी बहुत क्षारीय है। पीएच कम करने के लिए सल्फर या जैविक पदार्थ डालें।",
+        'general_ph_off': "सामान्य सलाह: अधिकांश फसलों के लिए इष्टतम पीएच रेंज 5.5-7.5 है। आवश्यकतानुसार समायोजित करें।",
+        'wheat_light_low': "सुनिश्चित करें कि फसल को पर्याप्त धूप मिले।",
+        'rice_light_low': "सुनिश्चित करें कि चावल को पूरी धूप मिले।",
+        'general_light_low': "सामान्य सलाह: अपर्याप्त प्रकाश प्रकाश संश्लेषण में बाधा डाल सकता है। पूरक प्रकाश या छंटाई पर विचार करें।",
+        'general_light_high': "सामान्य सलाह: अत्यधिक प्रकाश से गर्मी का तनाव हो सकता है। पर्याप्त पानी और छाया सुनिश्चित करें।"
+    },
+    'es': {
+        'no_data': "No hay datos del sensor disponibles para proporcionar asesoramiento.",
+        'npk_low': "🌱 **{nutrient} bajo ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient} alto ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **Humedad del suelo baja ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **Humedad del suelo alta ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **Temperatura baja ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **Temperatura alta ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **Humedad baja ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **Humedad alta ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **pH bajo ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **pH alto ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **pH incorrecto ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **Intensidad de luz baja ({light:.1f} lux)**: {message}",
+        'light_high': "☀️ **Intensidad de luz alta ({light:.1f} lux)**: {message}",
+        'rainfall_low_msg': "🌧️ **Precipitación baja ({rain:.1f} mm)**: {message}",
+        'rainfall_high_msg': "🌧️ **Precipitación alta ({rain:.1f} mm)**: {message}",
+        'all_good': "✅ ¡Todos los parámetros principales se ven bien! Siga monitoreando regularmente para un crecimiento óptimo.",
+        'npk_n_low': "Considere aplicar fertilizante rico en nitrógeno.",
+        'npk_n_high': "El exceso de nitrógeno puede promover el crecimiento foliar sobre el desarrollo de frutos/flores.",
+        'npk_p_low': "Considere aplicar fertilizante de fósforo para el desarrollo de la raíz.",
+        'npk_p_high': "El fósforo alto puede bloquear otros nutrientes.",
+        'npk_k_low': "Considere aplicar fertilizante de potasio para la salud general de la planta y la calidad de la fruta.",
+        'npk_k_high': "El exceso de potasio puede interferir con la absorción de calcio y magnesio.",
+        'wheat_sm_low': "Riegue ligeramente – el trigo necesita 35–50% de humedad del suelo.",
+        'rice_sm_low': "El arroz necesita mucha humedad. Asegure un riego adecuado.",
+        'maize_sm_low': "El maíz necesita niveles moderados de humedad del suelo.",
+        'banana_sm_low': "Mantenga el suelo constantemente húmedo para el plátano.",
+        'mango_sm_high': "Evite el encharcamiento. El mango necesita un suelo bien drenado.",
+        'grapes_sm_high': "Las uvas prefieren un suelo más seco – evite el riego excesivo.",
+        'cotton_sm_low': "El algodón requiere humedad moderada durante la floración.",
+        'millet_sorghum_sm_low': "Estos son cultivos resistentes a la sequía pero aún necesitan humedad mínima.",
+        'jute_sm_low': "El yute requiere mucha humedad durante el crecimiento.",
+        'pomegranate_sm_high': "Evite el riego excesivo de la granada.",
+        'melon_sm_low': "Los melones necesitan riego constante, especialmente durante la fructificación.",
+        'coconut_sm_low': "Las palmas de coco necesitan altos niveles de humedad.",
+        'mothbeans_sm_low': "Las judías polilla son tolerantes a la sequía pero necesitan riego mínimo durante la floración.",
+        'mungbean_sm_low': "Asegure un riego regular durante la floración y la formación de vainas.",
+        'blackgram_sm_low': "Mantenga una humedad moderada especialmente durante la floración.",
+        'lentil_sm_low': "Las lentejas necesitan humedad baja a moderada.",
+        'general_sm_low': "Consejo general: Considere el riego para prevenir el estrés por sequía.",
+        'general_sm_high': "Consejo general: Asegure un buen drenaje para prevenir el encharcamiento.",
+        'wheat_temp_high': "Proporcione sombra o riegue por la noche – la temperatura es demasiado alta para el trigo.",
+        'rice_temp_high': "Demasiado calor para el arroz. Considere el riego nocturno o la sombra.",
+        'maize_temp_low': "El maíz prefiere el clima cálido (20–30°C).",
+        'banana_temp_low': "El plátano es sensible al frío – asegure condiciones cálidas.",
+        'mango_temp_low': "El mango requiere temperaturas más cálidas (>20°C).",
+        'cotton_temp_low': "El algodón prospera en temperaturas cálidas.",
+        'millet_sorghum_temp_low': "El clima cálido es ideal para el mijo/sorgo.",
+        'coffee_temp_low': "El café prospera en el rango de 18–24°C.",
+        'jute_temp_low': "El yute crece bien a 25–30°C.",
+        'papaya_temp_low': "La papaya prefiere el rango de 21–33°C.",
+        'pomegranate_temp_low': "La temperatura ideal es superior a 20°C.",
+        'melon_temp_low': "Asegure que la temperatura sea cálida (>25°C).",
+        'coconut_temp_low': "La temperatura ideal para el coco es superior a 25°C.",
+        'mothbeans_temp_low': "La temperatura debe ser superior a 22°C.",
+        'mungbean_temp_low': "La judía mungo requiere condiciones cálidas para un crecimiento óptimo.",
+        'blackgram_temp_low': "El rango de temperatura ideal es de 25–35°C.",
+        'lentil_temp_low': "Las lentejas crecen bien a 18–30°C.",
+        'general_temp_low': "Consejo general: Las bajas temperaturas pueden atrofiar el crecimiento. Considere medidas de protección.",
+        'general_temp_high': "Consejo general: Las altas temperaturas pueden causar estrés por calor. Asegure agua y sombra adecuadas.",
+        'wheat_hum_high': "Tenga cuidado con las infecciones fúngicas – asegure el flujo de aire.",
+        'rice_hum_low': "Aumente la humedad ambiental o use mantillo.",
+        'banana_hum_low': "El plátano requiere alta humedad. Considere la nebulización o el acolchado.",
+        'grapes_hum_high': "La alta humedad puede provocar infecciones fúngicas.",
+        'coffee_hum_low': "El café prefiere alta humedad.",
+        'orange_hum_high': "Pode los árboles para mejorar el flujo de aire y prevenir problemas fúngicos.",
+        'general_hum_low': "Consejo general: La baja humedad puede causar marchitamiento. Considere la nebulización o el aumento de la humedad del suelo.",
+        'general_hum_high': "Consejo general: La alta humedad aumenta el riesgo de enfermedades fúngicas. Asegure una buena ventilación.",
+        'wheat_ph_low': "Ligeramente ácido – considere aplicar cal para aumentar el pH.",
+        'rice_ph_off': "Mantenga el suelo ligeramente ácido para el arroz (pH 5.5–6.5).",
+        'maize_ph_off': "Mantenga el pH del suelo entre 5.8–7.0.",
+        'papaya_ph_low': "El suelo ligeramente ácido a neutro es el mejor para la papaya.",
+        'orange_ph_off': "El pH ideal del suelo para la naranja es 6.0–7.5.",
+        'general_ph_very_low': "Consejo general: El suelo es demasiado ácido. Aplique cal para aumentar el pH y mejorar la disponibilidad de nutrientes.",
+        'general_ph_very_high': "Consejo general: El suelo es demasiado alcalino. Aplique azufre o materia orgánica para disminuir el pH.",
+        'general_ph_off': "Consejo general: El rango de pH óptimo para la mayoría de los cultivos es 5.5-7.5. Ajuste según sea necesario.",
+        'wheat_light_low': "Asegure que el cultivo reciba suficiente luz solar.",
+        'rice_light_low': "Asegure que el arroz reciba plena exposición al sol.",
+        'general_light_low': "Consejo general: La luz insuficiente puede dificultar la fotosíntesis. Considere la iluminación suplementaria o la poda.",
+        'general_light_high': "Consejo general: La luz excesiva puede causar quemaduras. Considere la sombra durante las horas pico."
+    },
+    'fr': {
+        'no_data': "Aucune donnée de capteur disponible pour fournir des conseils.",
+        'npk_low': "🌱 **{nutrient} est faible ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient} est élevé ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **Humidité du sol faible ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **Humidité du sol élevée ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **Température basse ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **Température élevée ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **Humidité faible ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **Humidité élevée ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **pH faible ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **pH élevé ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **pH incorrect ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **Intensité lumineuse faible ({light:.1f} lux)**: {message}",
+        'light_high': "☀️ **Intensité lumineuse élevée ({light:.1f} lux)**: {message}",
+        'rainfall_low_msg': "🌧️ **Précipitations faibles ({rain:.1f} mm)**: {message}",
+        'rainfall_high_msg': "🌧️ **Précipitations élevées ({rain:.1f} mm)**: {message}",
+        'all_good': "✅ Tous les paramètres majeurs semblent bons ! Continuez à surveiller régulièrement pour une croissance optimale.",
+        'npk_n_low': "Envisagez d'appliquer un engrais riche en azote.",
+        'npk_n_high': "L'excès d'azote peut favoriser la croissance des feuilles au détriment du développement des fruits/fleurs.",
+        'npk_p_low': "Envisagez d'appliquer un engrais phosphoré pour le développement des racines.",
+        'npk_p_high': "Un niveau élevé de phosphore peut bloquer d'autres nutriments.",
+        'npk_k_low': "Envisagez d'appliquer un engrais potassique pour la santé générale des plantes et la qualité des fruits.",
+        'npk_k_high': "L'excès de potassium peut interférer avec l'absorption du calcium et du magnésium.",
+        'wheat_sm_low': "Arrosez légèrement – le blé a besoin de 35 à 50% d'humidité du sol.",
+        'rice_sm_low': "Le riz a besoin de beaucoup d'humidité. Assurez une irrigation adéquate.",
+        'maize_sm_low': "Le maïs a besoin de niveaux d'humidité du sol modérés.",
+        'banana_sm_low': "Gardez le sol constamment humide pour la banane.",
+        'mango_sm_high': "Évitez l'engorgement. La mangue a besoin d'un sol bien drainé.",
+        'grapes_sm_high': "Les raisins préfèrent un sol plus sec – évitez le sur-arrosage.",
+        'cotton_sm_low': "Le coton nécessite une humidité modérée pendant la floraison.",
+        'millet_sorghum_sm_low': "Ce sont des cultures résistantes à la sécheresse mais nécessitent tout de même une humidité minimale.",
+        'jute_sm_low': "Le jute nécessite une humidité abondante pendant la croissance.",
+        'pomegranate_sm_high': "Évitez de trop arroser la grenade.",
+        'melon_sm_low': "Les melons ont besoin d'un arrosage constant, surtout pendant la fructification.",
+        'coconut_sm_low': "Les cocotiers ont besoin de niveaux d'humidité élevés.",
+        'mothbeans_sm_low': "Les haricots papillons sont tolérants à la sécheresse mais nécessitent une irrigation minimale pendant la floraison.",
+        'mungbean_sm_low': "Assurez un arrosage régulier pendant la floraison et la formation des gousses.",
+        'blackgram_sm_low': "Maintenez une humidité modérée, surtout pendant la floraison.",
+        'lentil_sm_low': "Les lentilles ont besoin d'une humidité faible à modérée.",
+        'general_sm_low': "Conseil général : Envisagez l'irrigation pour prévenir le stress hydrique.",
+        'general_sm_high': "Conseil général : Assurez un bon drainage pour prévenir l'engorgement.",
+        'wheat_temp_high': "Fournissez de l'ombre ou arrosez le soir – la température est trop élevée pour le blé.",
+        'rice_temp_high': "Trop chaud pour le riz. Envisagez l'irrigation nocturne ou l'ombre.",
+        'maize_temp_low': "Le maïs préfère le temps chaud (20–30°C).",
+        'banana_temp_low': "La banane est sensible au froid – assurez des conditions chaudes.",
+        'mango_temp_low': "La mangue nécessite des températures plus chaudes (>20°C).",
+        'cotton_temp_low': "Le coton prospère sous des températures chaudes.",
+        'millet_sorghum_temp_low': "Le climat chaud est idéal pour le millet/sorgho.",
+        'coffee_temp_low': "Le café prospère dans la plage de 18–24°C.",
+        'jute_temp_low': "Le jute pousse bien entre 25 et 30°C.",
+        'papaya_temp_low': "La papaye préfère la plage de 21–33°C.",
+        'pomegranate_temp_low': "La température idéale est supérieure à 20°C.",
+        'melon_temp_low': "Assurez-vous que la température est chaude (>25°C).",
+        'coconut_temp_low': "La température idéale pour la noix de coco est supérieure à 25°C.",
+        'mothbeans_temp_low': "La température doit être supérieure à 22°C.",
+        'mungbean_temp_low': "Le haricot mungo nécessite des conditions chaudes pour une croissance optimale.",
+        'blackgram_temp_low': "La plage de température idéale est de 25–35°C.",
+        'lentil_temp_low': "Les lentilles poussent bien entre 18 et 30°C.",
+        'general_temp_low': "Conseil général : Les basses températures peuvent retarder la croissance. Envisagez des mesures de protection.",
+        'general_temp_high': "Conseil général : Les températures élevées peuvent provoquer un stress thermique. Assurez un apport suffisant en eau et en ombre.",
+        'wheat_hum_high': "Attention aux infections fongiques – assurez une bonne circulation de l'air.",
+        'rice_hum_low': "Augmentez l'humidité ambiante ou utilisez du paillis.",
+        'banana_hum_low': "La banane nécessite une humidité élevée. Envisagez la brumisation ou le paillage.",
+        'grapes_hum_high': "Une humidité élevée peut entraîner des infections fongiques.",
+        'coffee_hum_low': "Le café préfère une humidité élevée.",
+        'orange_hum_high': "Taillez les arbres pour améliorer la circulation de l'air et prévenir les problèmes fongiques.",
+        'general_hum_low': "Conseil général : Une faible humidité peut provoquer le flétrissement. Envisagez la brumisation ou l'augmentation de l'humidité du sol.",
+        'general_hum_high': "Conseil général : Une humidité élevée augmente le risque de maladies fongiques. Assurez une bonne ventilation.",
+        'wheat_ph_low': "Légèrement acide – envisagez d'appliquer de la chaux pour augmenter le pH.",
+        'rice_ph_off': "Maintenez un sol légèrement acide pour le riz (pH 5.5–6.5).",
+        'maize_ph_off': "Maintenez le pH du sol entre 5.8 et 7.0.",
+        'papaya_ph_low': "Un sol légèrement acide à neutre est le meilleur pour la papaye.",
+        'orange_ph_off': "Le pH idéal du sol pour l'orange est de 6.0 à 7.5.",
+        'general_ph_very_low': "Conseil général : Le sol est trop acide. Appliquez de la chaux pour augmenter le pH et améliorer la disponibilité des nutriments.",
+        'general_ph_very_high': "Conseil général : Le sol est trop alcalin. Appliquez du soufre ou de la matière organique pour diminuer le pH.",
+        'general_ph_off': "Conseil général : La plage de pH optimale pour la plupart des cultures est de 5.5 à 7.5. Ajustez si nécessaire.",
+        'wheat_light_low': "Assurez-vous que la culture reçoit suffisamment de lumière du soleil.",
+        'rice_light_low': "Assurez-vous que le riz reçoit une exposition complète au soleil.",
+        'general_light_low': "Conseil général : Une lumière insuffisante peut entraver la photosynthèse. Envisagez un éclairage supplémentaire ou une taille.",
+        'general_light_high': "Conseil général : Une lumière excessive peut provoquer des brûlures. Envisagez l'ombrage pendant les heures de pointe."
+    },
+    'de': {
+        'no_data': "Keine Sensordaten verfügbar, um Ratschläge zu geben.",
+        'npk_low': "🌱 **{nutrient} ist niedrig ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient} ist hoch ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **Bodenfeuchtigkeit niedrig ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **Bodenfeuchtigkeit hoch ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **Temperatur niedrig ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **Temperatur hoch ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **Luftfeuchtigkeit niedrig ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **Luftfeuchtigkeit hoch ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **pH-Wert niedrig ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **pH-Wert hoch ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **pH-Wert nicht optimal ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **Lichtintensität niedrig ({light:.1f} Lux)**: {message}",
+        'light_high': "☀️ **Lichtintensität hoch ({light:.1f} Lux)**: {message}",
+        'rainfall_low_msg': "🌧️ **Niederschlag niedrig ({rain:.1f} mm)**: {message}",
+        'rainfall_high_msg': "🌧️ **Niederschlag hoch ({rain:.1f} mm)**: {message}",
+        'all_good': "✅ Alle wichtigen Parameter sehen gut aus! Überwachen Sie regelmäßig für optimales Wachstum.",
+        'npk_n_low': "Erwägen Sie die Anwendung von stickstoffreichem Dünger.",
+        'npk_n_high': "Überschüssiger Stickstoff kann das Blattwachstum gegenüber der Frucht-/Blütenentwicklung fördern.",
+        'npk_p_low': "Erwägen Sie die Anwendung von Phosphordünger für die Wurzelentwicklung.",
+        'npk_p_high': "Hoher Phosphor kann andere Nährstoffe blockieren.",
+        'npk_k_low': "Erwägen Sie die Anwendung von Kaliumdünger für die allgemeine Pflanzengesundheit und Fruchtqualität.",
+        'npk_k_high': "Überschüssiges Kalium kann die Aufnahme von Kalzium und Magnesium beeinträchtigen.",
+        'wheat_sm_low': "Leicht bewässern – Weizen benötigt 35–50% Bodenfeuchtigkeit.",
+        'rice_sm_low': "Reis benötigt hohe Feuchtigkeit. Sorgen Sie für eine ordnungsgemäße Bewässerung.",
+        'maize_sm_low': "Mais benötigt moderate Bodenfeuchtigkeitswerte.",
+        'banana_sm_low': "Halten Sie den Boden für Bananen stets feucht.",
+        'mango_sm_high': "Vermeiden Sie Staunässe. Mangos benötigen gut durchlässigen Boden.",
+        'grapes_sm_high': "Trauben bevorzugen trockeneren Boden – vermeiden Sie Überwässerung.",
+        'cotton_sm_low': "Baumwolle benötigt während der Blütezeit moderate Feuchtigkeit.",
+        'millet_sorghum_sm_low': "Dies sind trockenheitstolerante Kulturen, benötigen aber dennoch minimale Feuchtigkeit.",
+        'jute_sm_low': "Jute benötigt während des Wachstums reichlich Feuchtigkeit.",
+        'pomegranate_sm_high': "Vermeiden Sie Überwässerung bei Granatäpfeln.",
+        'melon_sm_low': "Melonen benötigen konstante Bewässerung, besonders während der Fruchtbildung.",
+        'coconut_sm_low': "Kokospalmen benötigen hohe Feuchtigkeitswerte.",
+        'mothbeans_sm_low': "Mothbohnen sind trockenheitstolerant, benötigen aber während der Blütezeit minimale Bewässerung.",
+        'mungbean_sm_low': "Sorgen Sie für regelmäßige Bewässerung während der Blüte und Hülsenbildung.",
+        'blackgram_sm_low': "Halten Sie die Feuchtigkeit besonders während der Blüte moderat.",
+        'lentil_sm_low': "Linsen benötigen geringe bis moderate Feuchtigkeit.",
+        'general_sm_low': "Allgemeiner Ratschlag: Erwägen Sie Bewässerung, um Trockenstress vorzubeugen.",
+        'general_sm_high': "Allgemeiner Ratschlag: Sorgen Sie für eine gute Drainage, um Staunässe zu vermeiden.",
+        'wheat_temp_high': "Schatten spenden oder abends bewässern – Temperatur ist zu hoch für Weizen.",
+        'rice_temp_high': "Zu heiß für Reis. Erwägen Sie abendliche Bewässerung oder Schatten.",
+        'maize_temp_low': "Mais bevorzugt warmes Wetter (20–30°C).",
+        'banana_temp_low': "Banane ist kälteempfindlich – sorgen Sie für warme Bedingungen.",
+        'mango_temp_low': "Mango benötigt wärmere Temperaturen (>20°C).",
+        'cotton_temp_low': "Baumwolle gedeiht bei warmen Temperaturen.",
+        'millet_sorghum_temp_low': "Warmes Klima ist ideal für Hirse/Sorghum.",
+        'coffee_temp_low': "Kaffee gedeiht im Bereich von 18–24°C.",
+        'jute_temp_low': "Jute wächst gut bei 25–30°C.",
+        'papaya_temp_low': "Papaya bevorzugt den Bereich von 21–33°C.",
+        'pomegranate_temp_low': "Ideale Temperatur liegt über 20°C.",
+        'melon_temp_low': "Stellen Sie sicher, dass die Temperatur warm ist (>25°C).",
+        'coconut_temp_low': "Ideale Temperatur für Kokosnuss liegt über 25°C.",
+        'mothbeans_temp_low': "Die Temperatur sollte über 22°C liegen.",
+        'mungbean_temp_low': "Mungbohnen benötigen warme Bedingungen für optimales Wachstum.",
+        'blackgram_temp_low': "Der ideale Temperaturbereich liegt bei 25–35°C.",
+        'lentil_temp_low': "Linsen wachsen gut bei 18–30°C.",
+        'general_temp_low': "Allgemeiner Ratschlag: Kalte Temperaturen können das Wachstum hemmen. Erwägen Sie Schutzmaßnahmen.",
+        'general_temp_high': "Allgemeiner Ratschlag: Hohe Temperaturen können Hitzestress verursachen. Sorgen Sie für ausreichend Wasser und Schatten.",
+        'wheat_hum_high': "Achten Sie auf Pilzinfektionen – sorgen Sie für Luftzirkulation.",
+        'rice_hum_low': "Erhöhen Sie die Umgebungsfeuchtigkeit oder verwenden Sie Mulch.",
+        'banana_hum_low': "Banane benötigt hohe Luftfeuchtigkeit. Erwägen Sie Besprühen oder Mulchen.",
+        'grapes_hum_high': "Hohe Luftfeuchtigkeit kann zu Pilzinfektionen führen.",
+        'coffee_hum_low': "Kaffee bevorzugt hohe Luftfeuchtigkeit.",
+        'orange_hum_high': "Beschneiden Sie Bäume, um die Luftzirkulation zu verbessern und Pilzprobleme zu vermeiden.",
+        'general_hum_low': "Allgemeiner Ratschlag: Geringe Luftfeuchtigkeit kann Welken verursachen. Erwägen Sie Besprühen oder Erhöhung der Bodenfeuchtigkeit.",
+        'general_hum_high': "Allgemeiner Ratschlag: Hohe Luftfeuchtigkeit erhöht das Risiko von Pilzkrankheiten. Sorgen Sie für gute Belüftung.",
+        'wheat_ph_low': "Leicht sauer – erwägen Sie die Anwendung von Kalk, um den pH-Wert zu erhöhen.",
+        'rice_ph_off': "Halten Sie den Boden für Reis leicht sauer (pH 5.5–6.5).",
+        'maize_ph_off': "Halten Sie den Boden-pH-Wert zwischen 5.8–7.0.",
+        'papaya_ph_low': "Leicht saurer bis neutraler Boden ist am besten für Papaya.",
+        'orange_ph_off': "Der ideale Boden-pH-Wert für Orangen liegt bei 6.0–7.5.",
+        'general_ph_very_low': "Allgemeiner Ratschlag: Der Boden ist zu sauer. Wenden Sie Kalk an, um den pH-Wert zu erhöhen und die Nährstoffverfügbarkeit zu verbessern.",
+        'general_ph_very_high': "Allgemeiner Ratschlag: Der Boden ist zu alkalisch. Wenden Sie Schwefel oder organische Substanz an, um den pH-Wert zu senken.",
+        'general_ph_off': "Allgemeiner Ratschlag: Der optimale pH-Bereich für die meisten Kulturen liegt bei 5.5-7.5. Passen Sie ihn bei Bedarf an.",
+        'wheat_light_low': "Stellen Sie sicher, dass die Ernte ausreichend Sonnenlicht erhält.",
+        'rice_light_low': "Stellen Sie sicher, dass Reis volle Sonneneinstrahlung erhält.",
+        'general_light_low': "Allgemeiner Ratschlag: Unzureichendes Licht kann die Photosynthese behindern. Erwägen Sie zusätzliche Beleuchtung oder Beschneidung.",
+        'general_light_high': "Allgemeiner Ratschlag: Übermäßiges Licht kann Verbrennungen verursachen. Erwägen Sie Beschattung während der Spitzenzeiten."
+    },
+    'ar': {
+        'no_data': "لا توجد بيانات مستشعر متاحة لتقديم المشورة.",
+        'npk_low': "🌱 **{nutrient} منخفض ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient} مرتفع ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **رطوبة التربة منخفضة ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **رطوبة التربة مرتفعة ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **درجة الحرارة منخفضة ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **درجة الحرارة مرتفعة ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **الرطوبة منخفضة ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **الرطوبة مرتفعة ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **الرقم الهيدروجيني منخفض ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **الرقم الهيدروجيني مرتفع ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **الرقم الهيدروجيني غير صحيح ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **شدة الإضاءة منخفضة ({light:.1f} لوكس)**: {message}",
+        'light_high': "☀️ **شدة الإضاءة مرتفعة ({light:.1f} لوكس)**: {message}",
+        'rainfall_low_msg': "🌧️ **هطول الأمطار منخفض ({rain:.1f} مم)**: {message}",
+        'rainfall_high_msg': "🌧️ **هطول الأمطار مرتفع ({rain:.1f} مم)**: {message}",
+        'all_good': "✅ جميع المعلمات الرئيسية تبدو جيدة! استمر في المراقبة بانتظام للنمو الأمثل.",
+        'npk_n_low': "فكر في استخدام سماد غني بالنيتروجين.",
+        'npk_n_high': "النيتروجين الزائد يمكن أن يعزز نمو الأوراق على حساب نمو الفاكهة/الزهور.",
+        'npk_p_low': "فكر في استخدام سماد الفوسفور لتنمية الجذور.",
+        'npk_p_high': "الفوسفور العالي يمكن أن يمنع امتصاص العناصر الغذائية الأخرى.",
+        'npk_k_low': "فكر في استخدام سماد البوتاسيوم لصحة النبات بشكل عام وجودة الفاكهة.",
+        'npk_k_high': "البوتاسيوم الزائد يمكن أن يتداخل مع امتصاص الكالسيوم والمغنيسيوم.",
+        'wheat_sm_low': "الري الخفيف – القمح يحتاج إلى 35-50% رطوبة التربة.",
+        'rice_sm_low': "الأرز يحتاج إلى رطوبة عالية. تأكد من الري المناسب.",
+        'maize_sm_low': "الذرة تحتاج إلى مستويات رطوبة تربة معتدلة.",
+        'banana_sm_low': "حافظ على رطوبة التربة باستمرار للموز.",
+        'mango_sm_high': "تجنب تشبع التربة بالماء. المانجو يحتاج إلى تربة جيدة التصريف.",
+        'grapes_sm_high': "العنب يفضل التربة الأكثر جفافاً – تجنب الإفراط في الري.",
+        'cotton_sm_low': "القطن يتطلب رطوبة معتدلة أثناء الإزهار.",
+        'millet_sorghum_sm_low': "هذه محاصيل مقاومة للجفاف ولكنها لا تزال بحاجة إلى الحد الأدنى من الرطوبة.",
+        'jute_sm_low': "الجوت يتطلب رطوبة وفيرة أثناء النمو.",
+        'pomegranate_sm_high': "تجنب الإفراط في ري الرمان.",
+        'melon_sm_low': "البطيخ يحتاج إلى ري مستمر، خاصة أثناء الإثمار.",
+        'coconut_sm_low': "أشجار النخيل تحتاج إلى مستويات رطوبة عالية.",
+        'mothbeans_sm_low': "المحاصيل البقولية مقاومة للجفاف ولكنها تحتاج إلى الحد الأدنى من الري أثناء الإزهار.",
+        'mungbean_sm_low': "تأكد من الري المنتظم أثناء الإزهار وتكوين القرون.",
+        'blackgram_sm_low': "حافظ على رطوبة معتدلة خاصة أثناء الإزهار.",
+        'lentil_sm_low': "العدس ينمو جيدًا في 18-30 درجة مئوية.",
+        'general_sm_low': "نصيحة عامة: فكر في الري لمنع إجهاد الجفاف.",
+        'general_sm_high': "نصيحة عامة: تأكد من التصريف الجيد لمنع تشبع التربة بالماء.",
+        'wheat_temp_high': "وفر الظل أو الري في المساء – درجة الحرارة مرتفعة جدًا للقمح.",
+        'rice_temp_high': "ساخن جدًا للأرز. فكر في الري المسائي أو الظل.",
+        'maize_temp_low': "الذرة تفضل الطقس الدافئ (20-30 درجة مئوية).",
+        'banana_temp_low': "الموز حساس للبرد – تأكد من توفر ظروف دافئة.",
+        'mango_temp_low': "المانجو يتطلب درجات حرارة أكثر دفئًا (>20 درجة مئوية).",
+        'cotton_temp_low': "القطن يزدهر في درجات الحرارة الدافئة.",
+        'millet_sorghum_temp_low': "المناخ الدافئ مثالي للدخن/الذرة الرفيعة.",
+        'coffee_temp_low': "القهوة تزدهر في نطاق 18-24 درجة مئوية.",
+        'jute_temp_low': "الجوت ينمو جيدًا في 25-30 درجة مئوية.",
+        'papaya_temp_low': "البابايا تفضل نطاق 21-33 درجة مئوية.",
+        'pomegranate_temp_low': "درجة الحرارة المثالية أعلى من 20 درجة مئوية.",
+        'melon_temp_low': "تأكد من أن درجة الحرارة دافئة (>25 درجة مئوية).",
+        'coconut_temp_low': "درجة الحرارة المثالية لجوز الهند أعلى من 25 درجة مئوية.",
+        'mothbeans_temp_low': "يجب أن تكون درجة الحرارة أعلى من 22 درجة مئوية.",
+        'mungbean_temp_low': "المحاصيل البقولية تحتاج إلى ظروف دافئة للنمو الأمثل.",
+        'blackgram_temp_low': "نطاق درجة الحرارة المثالي هو 25-35 درجة مئوية.",
+        'lentil_temp_low': "العدس ينمو جيدًا في 18-30 درجة مئوية.",
+        'general_temp_low': "نصيحة عامة: درجات الحرارة المنخفضة يمكن أن تعيق النمو. فكر في تدابير وقائية.",
+        'general_temp_high': "نصيحة عامة: درجات الحرارة المرتفعة يمكن أن تسبب إجهادًا حراريًا. تأكد من توفر الماء والظل الكافيين.",
+        'wheat_hum_high': "احذر من الالتهابات الفطرية – تأكد من تدفق الهواء.",
+        'rice_hum_low': "زيادة الرطوبة المحيطة أو استخدام النشارة.",
+        'banana_hum_low': "الموز يتطلب رطوبة عالية. فكر في الرش أو التغطية بالنشارة.",
+        'grapes_hum_high': "الرطوبة العالية قد تؤدي إلى التهابات فطرية.",
+        'coffee_hum_low': "القهوة تفضل الرطوبة العالية.",
+        'orange_hum_high': "تقليم الأشجار لتحسين تدفق الهواء ومنع مشاكل الفطريات.",
+        'general_hum_low': "نصيحة عامة: الرطوبة المنخفضة يمكن أن تسبب الذبول. فكر في الرش أو زيادة رطوبة التربة.",
+        'general_hum_high': "نصيحة عامة: الرطوبة العالية تزيد من خطر الأمراض الفطرية. تأكد من التهوية الجيدة.",
+        'wheat_ph_low': "حمضي قليلاً – فكر في استخدام الجير لرفع الرقم الهيدروجيني.",
+        'rice_ph_off': "حافظ على تربة حمضية قليلاً للأرز (الرقم الهيدروجيني 5.5-6.5).",
+        'maize_ph_off': "حافظ على الرقم الهيدروجيني للتربة بين 5.8-7.0.",
+        'papaya_ph_low': "التربة الحمضية قليلاً إلى المحايدة هي الأفضل للبابايا.",
+        'orange_ph_off': "الرقم الهيدروجيني المثالي للتربة للبرتقال هو 6.0-7.5.",
+        'general_ph_very_low': "نصيحة عامة: التربة شديدة الحموضة. استخدم الجير لزيادة الرقم الهيدروجيني وتحسين توافر المغذيات.",
+        'general_ph_very_high': "نصيحة عامة: التربة شديدة القلوية. استخدم الكبريت أو المواد العضوية لتقليل الرقم الهيدروجيني.",
+        'general_ph_off': "نصيحة عامة: نطاق الرقم الهيدروجيني الأمثل لمعظم المحاصيل هو 5.5-7.5. اضبط حسب الحاجة."
+    },
+    'ja': {
+        'no_data': "アドバイスを提供するためのセンサーデータがありません。",
+        'npk_low': "🌱 **{nutrient}が低い ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient}が高い ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **土壌水分が低い ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **土壌水分が高い ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **温度が低い ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **温度が高い ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **湿度が低い ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **湿度が高い ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **pHが低い ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **pHが高い ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **pHが適切ではありません ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **光強度が低い ({light:.1f} ルクス)**: {message}",
+        'light_high': "☀️ **光強度が高い ({light:.1f} ルクス)**: {message}",
+        'rainfall_low_msg': "🌧️ **降水量が少ない ({rain:.1f} mm)**: {message}",
+        'rainfall_high_msg': "🌧️ **降水量が多い ({rain:.1f} mm)**: {message}",
+        'all_good': "✅ すべての主要なパラメーターは良好です！最適な成長のために定期的に監視を続けてください。",
+        'npk_n_low': "窒素が豊富な肥料の施用を検討してください。",
+        'npk_n_high': "過剰な窒素は、果実/花の成長よりも葉の成長を促進する可能性があります。",
+        'npk_p_low': "根の発育のためにリン酸肥料の施用を検討してください。",
+        'npk_p_high': "リン酸が高いと他の栄養素が吸収されにくくなることがあります。",
+        'npk_k_low': "植物全体の健康と果実の品質のためにカリウム肥料の施用を検討してください。",
+        'npk_k_high': "過剰なカリウムは、カルシウムとマグネシウムの吸収を妨げる可能性があります。",
+        'wheat_sm_low': "軽く灌漑してください – 小麦は35-50%の土壌水分が必要です。",
+        'rice_sm_low': "イネは高い水分が必要です。適切な灌漑を確保してください。",
+        'maize_sm_low': "トウモロコシは中程度の土壌水分レベルが必要です。",
+        'banana_sm_low': "バナナには土壌を常に湿らせておいてください。",
+        'mango_sm_high': "水浸しを避けてください。マンゴーは水はけの良い土壌が必要です。",
+        'grapes_sm_high': "ブドウは乾燥した土壌を好みます – 水のやりすぎを避けてください。",
+        'cotton_sm_low': "綿は開花中に中程度の水分が必要です。",
+        'millet_sorghum_sm_low': "これらは干ばつに強い作物ですが、それでも最小限の水分が必要です。",
+        'jute_sm_low': "ジュートは成長中に十分な水分が必要です。",
+        'pomegranate_sm_high': "ザクロの水のやりすぎを避けてください。",
+        'melon_sm_low': "メロンは、特に結実中に継続的な水やりが必要です。",
+        'coconut_sm_low': "ココヤシは高い水分レベルが必要です。",
+        'mothbeans_sm_low': "モース豆は干ばつに強いですが、開花中に最小限の灌漑が必要です。",
+        'mungbean_sm_low': "開花および莢形成中に定期的な灌漑を確保してください。",
+        'blackgram_sm_low': "特に開花中に中程度の水分を維持してください。",
+        'lentil_sm_low': "レンズ豆は低から中程度の水分が必要です。",
+        'general_sm_low': "一般的なアドバイス：干ばつストレスを防ぐために灌漑を検討してください。",
+        'general_sm_high': "一般的なアドバイス：水浸しを防ぐために良好な排水を確保してください。",
+        'wheat_temp_high': "日陰を提供するか、夕方に灌漑してください – 小麦には温度が高すぎます。",
+        'rice_temp_high': "イネには暑すぎます。夕方の灌漑または日陰を検討してください。",
+        'maize_temp_low': "トウモロコシは暖かい気候（20-30°C）を好みます。",
+        'banana_temp_low': "バナナは寒さに敏感です – 暖かい条件を確保してください。",
+        'mango_temp_low': "マンゴーはより暖かい温度（>20°C）が必要です。",
+        'cotton_temp_low': "綿は暖かい温度で生育します。",
+        'millet_sorghum_temp_low': "暖かい気候はキビ/ソルガムに理想的です。",
+        'coffee_temp_low': "コーヒーは18-24°Cの範囲で生育します。",
+        'jute_temp_low': "ジュートは25-30°Cでよく育ちます。",
+        'papaya_temp_low': "パパイヤは21-33°Cの範囲を好みます。",
+        'pomegranate_temp_low': "理想的な温度は20°C以上です。",
+        'melon_temp_low': "温度が暖かい（>25°C）ことを確認してください。",
+        'coconut_temp_low': "ココナッツの理想的な温度は25°C以上です。",
+        'mothbeans_temp_low': "温度は22°C以上である必要があります。",
+        'mungbean_temp_low': "緑豆は最適な成長のために暖かい条件が必要です。",
+        'blackgram_temp_low': "理想的な温度範囲は25-35°Cです。",
+        'lentil_temp_low': "レンズ豆は18-30°Cでよく育ちます。",
+        'general_temp_low': "一般的なアドバイス：低温は成長を妨げる可能性があります。保護対策を検討してください。",
+        'general_temp_high': "一般的なアドバイス：高温は熱ストレスを引き起こす可能性があります。十分な水と日陰を確保してください。",
+        'wheat_hum_high': "真菌感染症に注意してください – 空気循環を確保してください。",
+        'rice_hum_low': "周囲の湿度を上げるか、マルチを使用してください。",
+        'banana_hum_low': "バナナは高い湿度が必要です。ミストまたはマルチングを検討してください。",
+        'grapes_hum_high': "高湿度は真菌感染症につながる可能性があります。",
+        'coffee_hum_low': "コーヒーは高い湿度を好みます。",
+        'orange_hum_high': "空気循環を改善し、真菌の問題を防ぐために木を剪定してください。",
+        'general_hum_low': "一般的なアドバイス：低湿度はしおれを引き起こす可能性があります。ミストまたは土壌水分の増加を検討してください。",
+        'general_hum_high': "一般的なアドバイス：高湿度は真菌性疾患のリスクを高めます。換気を良くしてください。",
+        'wheat_ph_low': "わずかに酸性 – pHを上げるために石灰の施用を検討してください。",
+        'rice_ph_off': "イネにはわずかに酸性の土壌を維持してください（pH 5.5-6.5）。",
+        'maize_ph_off': "土壌pHを5.8-7.0の間に維持してください。",
+        'papaya_ph_low': "パパイヤにはわずかに酸性から中性の土壌が最適です。",
+        'orange_ph_off': "オレンジの理想的な土壌pHは6.0-7.5です。",
+        'general_ph_very_low': "一般的なアドバイス：土壌が酸性すぎます。pHを上げ、栄養素の利用可能性を改善するために石灰を施用してください。",
+        'general_ph_very_high': "一般的なアドバイス：土壌がアルカリ性すぎます。pHを下げるために硫黄または有機物を施用してください。",
+        'general_ph_off': "一般的なアドバイス：ほとんどの作物にとって最適なpH範囲は5.5-7.5です。必要に応じて調整してください。"
+    },
+    'bn': {
+        'no_data': "পরামর্শ দেওয়ার জন্য কোনো সেন্সর ডেটা উপলব্ধ নেই।",
+        'npk_low': "🌱 **{nutrient} কম আছে ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient} বেশি আছে ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **মাটির আর্দ্রতা কম ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **মাটির আর্দ্রতা বেশি ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **তাপমাত্রা কম ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **তাপমাত্রা বেশি ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **আর্দ্রতা কম ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **আর্দ্রতা বেশি ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **pH কম ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **pH বেশি ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **pH সঠিক নয় ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **আলোর তীব্রতা কম ({light:.1f} lux)**: {message}",
+        'light_high': "☀️ **আলোর তীব্রতা বেশি ({light:.1f} lux)**: {message}",
+        'rainfall_low_msg': "🌧️ **বৃষ্টিপাত কম ({rain:.1f} মিমি)**: {message}",
+        'rainfall_high_msg': "🌧️ **বৃষ্টিপাত বেশি ({rain:.1f} মিমি)**: {message}",
+        'all_good': "✅ সমস্ত প্রধান পরামিতি ভালো দেখাচ্ছে! সর্বোত্তম বৃদ্ধির জন্য নিয়মিত পর্যবেক্ষণ চালিয়ে যান।",
+        'npk_n_low': "নাইট্রোজেন সমৃদ্ধ সার প্রয়োগের কথা বিবেচনা করুন।",
+        'npk_n_high': "অতিরিক্ত নাইট্রোজেন ফল/ফুলের বিকাশের চেয়ে পাতার বৃদ্ধিকে উৎসাহিত করতে পারে।",
+        'npk_p_low': "মূল বিকাশের জন্য ফসফরাস সার প্রয়োগের কথা বিবেচনা করুন।",
+        'npk_p_high': "উচ্চ ফসফরাস অন্যান্য পুষ্টি উপাদানকে আবদ্ধ করতে পারে।",
+        'npk_k_low': "সামগ্রিক গাছের স্বাস্থ্য এবং ফলের গুণমানের জন্য পটাশিয়াম সার প্রয়োগের কথা বিবেচনা করুন।",
+        'npk_k_high': "অতিরিক্ত পটাশিয়াম ক্যালসিয়াম এবং ম্যাগনেসিয়ামের শোষণে হস্তক্ষেপ করতে পারে।",
+        'wheat_sm_low': "হালকা সেচ দিন – গমের জন্য ৩৫-৫০% মাটির আর্দ্রতা প্রয়োজন।",
+        'rice_sm_low': "ধানের জন্য উচ্চ আর্দ্রতা প্রয়োজন। সঠিক সেচ নিশ্চিত করুন।",
+        'maize_sm_low': "ভূট্টার জন্য মাঝারি মাটির আর্দ্রতা স্তর প্রয়োজন।",
+        'banana_sm_low': "কলার জন্য মাটি consistently moist রাখুন।",
+        'mango_sm_high': "জল জমে যাওয়া এড়িয়ে চলুন। আমের জন্য ভালো নিষ্কাশনযুক্ত মাটি প্রয়োজন।",
+        'grapes_sm_high': "আঙ্গুর শুষ্ক মাটি পছন্দ করে – অতিরিক্ত জল দেওয়া এড়িয়ে চলুন।",
+        'cotton_sm_low': "তুলা ফুল ফোটার সময় মাঝারি আর্দ্রতা প্রয়োজন।",
+        'millet_sorghum_sm_low': "এগুলি খরা-প্রতিরোধী ফসল তবে ন্যূনতম আর্দ্রতা প্রয়োজন।",
+        'jute_sm_low': "পাটের বৃদ্ধির সময় প্রচুর আর্দ্রতা প্রয়োজন।",
+        'pomegranate_sm_high': "ডালিমের অতিরিক্ত জল দেওয়া এড়িয়ে চলুন।",
+        'melon_sm_low': "তরমুজের জন্য নিয়মিত জল দেওয়া প্রয়োজন, বিশেষ করে ফল ধরার সময়।",
+        'coconut_sm_low': "নারকেল গাছের জন্য উচ্চ আর্দ্রতা স্তর প্রয়োজন।",
+        'mothbeans_sm_low': "মোথবীন খরা-সহনশীল তবে ফুল ফোটার সময় ন্যূনতম সেচ প্রয়োজন।",
+        'mungbean_sm_low': "ফুল ফোটা এবং শুঁটি গঠনের সময় নিয়মিত সেচ নিশ্চিত করুন।",
+        'blackgram_sm_low': "বিশেষ করে ফুল ফোটার সময় মাঝারি আর্দ্রতা বজায় রাখুন।",
+        'lentil_sm_low': "মসুরের জন্য কম থেকে মাঝারি আর্দ্রতা প্রয়োজন।",
+        'general_sm_low': "সাধারণ পরামর্শ: খরা চাপ প্রতিরোধের জন্য সেচ বিবেচনা করুন।",
+        'general_sm_high': "সাধারণ পরামর্শ: জল জমে যাওয়া প্রতিরোধের জন্য ভালো নিষ্কাশন নিশ্চিত করুন।",
+        'wheat_temp_high': "ছায়া প্রদান করুন বা সন্ধ্যায় সেচ দিন – গমের জন্য তাপমাত্রা খুব বেশি।",
+        'rice_temp_high': "ধানের জন্য খুব গরম। সন্ধ্যায় সেচ বা ছায়া বিবেচনা করুন।",
+        'maize_temp_low': "ভূট্টা উষ্ণ আবহাওয়া (২০-৩০°C) পছন্দ করে।",
+        'banana_temp_low': "কলা ঠান্ডার প্রতি সংবেদনশীল – উষ্ণ অবস্থা নিশ্চিত করুন।",
+        'mango_temp_low': "আমের জন্য উষ্ণ তাপমাত্রা (>২০°C) প্রয়োজন।",
+        'cotton_temp_low': "তুলা উষ্ণ তাপমাত্রায় ভালো জন্মায়।",
+        'millet_sorghum_temp_low': "উষ্ণ জলবায়ু বাজরা/জোয়ারের জন্য আদর্শ।",
+        'coffee_temp_low': "কফি ১৮-২৪°C পরিসরে ভালো জন্মায়।",
+        'jute_temp_low': "পাট ২৫-৩০°C এ ভালো জন্মায়।",
+        'papaya_temp_low': "পেঁপে ২১-৩৩°C পরিসর পছন্দ করে।",
+        'pomegranate_temp_low': "আদর্শ তাপমাত্রা ২০°C এর উপরে।",
+        'melon_temp_low': "তাপমাত্রা উষ্ণ (>২৫°C) নিশ্চিত করুন।",
+        'coconut_temp_low': "নারকেলের জন্য আদর্শ তাপমাত্রা ২৫°C এর উপরে।",
+        'mothbeans_temp_low': "মোথবীন খরা-সহনশীল তবে ফুল ফোটার সময় ন্যূনতম সেচ প্রয়োজন।",
+        'mungbean_temp_low': "মুগ ডালের সর্বোত্তম বৃদ্ধির জন্য উষ্ণ অবস্থার প্রয়োজন।",
+        'blackgram_temp_low': "আদর্শ তাপমাত্রা পরিসর ২৫-৩৫°C।",
+        'lentil_temp_low': "মসুর ১৮-৩০°C এ ভালো জন্মায়।",
+        'general_temp_low': "সাধারণ পরামর্শ: ঠান্ডা তাপমাত্রা বৃদ্ধি ব্যাহত করতে পারে। সুরক্ষামূলক ব্যবস্থা বিবেচনা করুন।",
+        'general_temp_high': "সাধারণ পরামর্শ: উচ্চ তাপমাত্রা তাপ চাপ সৃষ্টি করতে পারে। পর্যাপ্ত জল এবং ছায়া নিশ্চিত করুন।",
+        'wheat_hum_high': "ছত্রাক সংক্রমণ থেকে সাবধান – বায়ু চলাচল নিশ্চিত করুন।",
+        'rice_hum_low': "পরিবেষ্টিত আর্দ্রতা বাড়ান বা মালচ ব্যবহার করুন।",
+        'banana_hum_low': "কলা উচ্চ আর্দ্রতা প্রয়োজন। কুয়াশা বা মালচিং বিবেচনা করুন।",
+        'grapes_hum_high': "উচ্চ আর্দ্রতা ছত্রাক সংক্রমণের কারণ হতে পারে।",
+        'coffee_hum_low': "কফি উচ্চ আর্দ্রতা পছন্দ করে।",
+        'orange_hum_high': "বায়ু চলাচল উন্নত করতে এবং ছত্রাকজনিত সমস্যা প্রতিরোধের জন্য গাছ ছাঁটাই করুন।",
+        'general_hum_low': "সাধারণ পরামর্শ: কম আর্দ্রতা শুকিয়ে যেতে পারে। কুয়াশা বা মাটির আর্দ্রতা বাড়ানোর কথা বিবেচনা করুন।",
+        'general_hum_high': "সাধারণ পরামর্শ: উচ্চ আর্দ্রতা ছত্রাক রোগের ঝুঁকি বাড়ায়। ভালো বায়ুচলাচল নিশ্চিত করুন।",
+        'wheat_ph_low': "সামান্য অম্লীয় – pH বাড়ানোর জন্য চুন প্রয়োগের কথা বিবেচনা করুন।",
+        'rice_ph_off': "ধানের জন্য সামান্য অম্লীয় মাটি বজায় রাখুন (pH ৫.৫-৬.৫)।",
+        'maize_ph_off': "মাটির pH ৫.৮-৭.০ এর মধ্যে বজায় রাখুন।",
+        'papaya_ph_low': "পেঁপের জন্য সামান্য অম্লীয় থেকে নিরপেক্ষ মাটি সবচেয়ে ভালো।",
+        'orange_ph_off': "কমলার জন্য আদর্শ মাটির pH ৬.০-৭.৫।",
+        'general_ph_very_low': "সাধারণ পরামর্শ: মাটি খুব অম্লীয়। pH বাড়াতে এবং পুষ্টির প্রাপ্যতা উন্নত করতে চুন প্রয়োগ করুন।",
+        'general_ph_very_high': "সাধারণ পরামর্শ: মাটি খুব ক্ষারীয়। pH কমাতে সালফার বা জৈব পদার্থ প্রয়োগ করুন।",
+        'general_ph_off': "সাধারণ পরামর্শ: বেশিরভাগ ফসলের জন্য সর্বোত্তম pH পরিসর ৫.৫-৭.৫। প্রয়োজন অনুযায়ী সামঞ্জস্য করুন।"
+    }
+};
+
+// Multilingual Seed Recommendation Messages (Translated from Python)
+const SEED_RECOMMENDATIONS_MESSAGES = {
+    'en': {
+        'intro': "Based on current conditions, you might consider: ",
+        'outro': ". Please consult local agricultural experts for precise recommendations.",
+        'acid_tolerant': "acid-tolerant crops like blueberries, potatoes, or specific rice varieties",
+        'alkaline_tolerant': "alkaline-tolerant crops such as asparagus, spinach, or specific varieties of alfalfa",
+        'neutral_ph': "a wide range of crops thrive in neutral to slightly acidic pH (5.5-7.5), including wheat, maize, and most vegetables",
+        'heat_tolerant': "heat-tolerant crops like millet, sorghum, cotton, or some varieties of beans",
+        'cold_hardy': "cold-hardy crops such as wheat (winter varieties), barley, oats, or peas",
+        'warm_season': "warm-season crops like maize, rice (tropical), most vegetables, and fruits",
+        'drought_resistant': "drought-resistant crops like millet, sorghum, chickpeas, or certain types of beans (e.g., mothbeans)",
+        'water_loving': "water-loving crops such as rice, sugarcane, jute, or crops that tolerate temporary waterlogging",
+        'moderate_rainfall': "crops suitable for moderate rainfall, including wheat, maize, and many vegetables",
+        'very_dry': "very drought-tolerant crops (e.g., desert-adapted melons or some herbs)",
+        'very_wet': "semi-aquatic crops or those highly tolerant to waterlogging (e.g., taro, some rice varieties if poorly drained)",
+        'no_specific': "No specific recommendations, as current conditions are unusual or general."
+    },
+    'hi': {
+        'intro': "वर्तमान परिस्थितियों के आधार पर, आप विचार कर सकते हैं: ",
+        'outro': ". सटीक सिफारिशों के लिए कृपया स्थानीय कृषि विशेषज्ञों से सलाह लें।",
+        'acid_tolerant': "अम्ल-सहिष्णु फसलें जैसे ब्लूबेरी, आलू, या चावल की विशिष्ट किस्में",
+        'alkaline_tolerant': "क्षार-सहिष्णु फसलें जैसे शतावरी, पालक, या अल्फाल्फा की विशिष्ट किस्में",
+        'neutral_ph': "गेहूं, मक्का, और अधिकांश सब्जियों सहित तटस्थ से थोड़े अम्लीय पीएच (5.5-7.5) में फसलों की एक विस्तृत श्रृंखला पनपती है",
+        'heat_tolerant': "गर्मी-सहिष्णु फसलें जैसे बाजरा, ज्वार, कपास, या कुछ प्रकार की फलियां",
+        'cold_hardy': "ठंड-सहिष्णु फसलें जैसे गेहूं (शीतकालीन किस्में), जौ, जई, या मटर",
+        'warm_season': "गर्मियों की फसलें जैसे मक्का, चावल (उष्णकटिबंधीय), अधिकांश सब्जियां, और फल",
+        'drought_resistant': "सूखे प्रतिरोधी फसलें जैसे बाजरा, ज्वार, चना, या कुछ प्रकार की फलियां (जैसे मोठबीन)",
+        'water_loving': "पानी पसंद करने वाली फसलें जैसे चावल, गन्ना, जूट, या वे फसलें जो अस्थायी जलभराव को सहन करती हैं",
+        'moderate_rainfall': "मध्यम वर्षा के लिए उपयुक्त फसलें, जिनमें गेहूं, मक्का, और कई सब्जियां शामिल हैं",
+        'very_dry': "बहुत सूखा-सहिष्णु फसलें (जैसे रेगिस्तान-अनुकूलित तरबूज या कुछ जड़ी-बूटियाँ)",
+        'very_wet': "अर्ध-जलीय फसलें या वे जो जलभराव के प्रति अत्यधिक सहिष्णु हैं (जैसे तारो, चावल की कुछ किस्में यदि खराब जल निकासी हो)",
+        'no_specific': "कोई विशिष्ट सिफारिश नहीं, क्योंकि वर्तमान परिस्थितियाँ असामान्य या सामान्य हैं।"
+    },
+    'es': {
+        'intro': "Basado en las condiciones actuales, podría considerar: ",
+        'outro': ". Consulte a expertos agrícolas locales para recomendaciones precisas.",
+        'acid_tolerant': "cultivos tolerantes a la acidez como arándanos, patatas o variedades específicas de arroz",
+        'alkaline_tolerant': "cultivos tolerantes a la alcalinidad como espárragos, espinacas o variedades específicas de alfalfa",
+        'neutral_ph': "una amplia gama de cultivos prosperan en pH neutro a ligeramente ácido (5.5-7.5), incluyendo trigo, maíz y la mayoría de las verduras",
+        'heat_tolerant': "cultivos tolerantes al calor como mijo, sorgo, algodón o algunas variedades de frijoles",
+        'cold_hardy': "cultivos resistentes al frío como trigo (variedades de invierno), cebada, avena o guisantes",
+        'warm_season': "cultivos de estación cálida como maíz, arroz (tropical), la mayoría de las verduras y frutas",
+        'drought_resistant': "cultivos resistentes a la sequía como mijo, sorgo, garbanzos o ciertos tipos de frijoles (por ejemplo, frijoles polilla)",
+        'water_loving': "cultivos amantes del agua como arroz, caña de azúcar, yute o cultivos que toleran el encharcamiento temporal",
+        'moderate_rainfall': "cultivos adecuados para precipitaciones moderadas, incluyendo trigo, maíz y muchas verduras",
+        'very_dry': "cultivos muy tolerantes a la sequía (por ejemplo, melones adaptados al desierto o algunas hierbas)",
+        'very_wet': "cultivos semiacuáticos o aquellos altamente tolerantes al encharcamiento (por ejemplo, taro, algunas variedades de arroz si están mal drenadas)",
+        'no_specific': "No hay recomendaciones específicas, ya que las condiciones actuales son inusuales o generales."
+    },
+    'fr': {
+        'intro': "En fonction des conditions actuelles, vous pourriez envisager : ",
+        'outro': ". Veuillez consulter des experts agricoles locaux pour des recommandations précises.",
+        'acid_tolerant': "cultures tolérantes à l'acidité comme les myrtilles, les pommes de terre ou des variétés spécifiques de riz",
+        'alkaline_tolerant': "cultures tolérantes à l'alcalinité telles que les asperges, les épinards ou des variétés spécifiques de luzerne",
+        'neutral_ph': "une large gamme de cultures prospèrent dans un pH neutre à légèrement acide (5.5-7.5), y compris le blé, le maïs et la plupart des légumes",
+        'heat_tolerant': "cultures tolérantes à la chaleur comme le millet, le sorgho, le coton ou certaines variétés de haricots",
+        'cold_hardy': "cultures résistantes au froid comme le blé (variétés d'hiver), l'orge, l'avoine ou les pois",
+        'warm_season': "cultures de saison chaude comme le maïs, le riz (tropica), la plupart des légumes et des fruits",
+        'drought_resistant': "cultures résistantes à la sécheresse comme le millet, le sorgho, les pois chiches ou certains types de haricots (par exemple, les haricots papillons)",
+        'water_loving': "cultures aimant l'eau comme le riz, la canne à sucre, le jute ou les cultures qui tolèrent l'engorgement temporaire",
+        'moderate_rainfall': "cultures adaptées aux précipitations modérées, y compris le blé, le maïs et de nombreux légumes",
+        'very_dry': "cultures très tolérantes à la sécheresse (par exemple, les melons adaptés au désert ou certaines herbes)",
+        'very_wet': "cultures semi-aquatiques ou celles très tolérantes à l'engorgement (par exemple, le taro, certaines variétés de riz si mal drainées)",
+        'no_specific': "Aucune recommandation spécifique, car les conditions actuelles sont inhabituelles ou générales."
+    },
+    'de': {
+        'intro': "Basierend auf den aktuellen Bedingungen könnten Sie Folgendes in Betracht ziehen: ",
+        'outro': ". Bitte konsultieren Sie lokale Landwirtschaftsexperten für präzise Empfehlungen.",
+        'acid_tolerant': "säuretolerante Kulturen wie Heidelbeeren, Kartoffeln oder spezifische Reissorten",
+        'alkalitolerante': "alkalitolerante Kulturen wie Spargel, Spinat oder spezifische Luzernesorten",
+        'neutral_ph': "eine breite Palette von Kulturen gedeiht in neutralem bis leicht saurem pH-Wert (5.5-7.5), einschließlich Weizen, Mais und den meisten Gemüsesorten",
+        'heat_tolerant': "hitzetolerante Kulturen wie Hirse, Sorghum, Baumwolle oder einige Bohnensorten",
+        'cold_hardy': "kälteresistente Kulturen wie Weizen (Winter сорта), Gerste, Hafer oder Erbsen",
+        'warm_season': "Warmwetterkulturen wie Mais, Reis (tropisch), die meisten Gemüsesorten und Früchte",
+        'drought_resistant': "trockenheitsresistente Kulturen wie Hirse, Sorghum, Kichererbsen oder bestimmte Bohnensorten (z.B. Mothbohnen)",
+        'water_loving': "wasserliebende Kulturen wie Reis, Zuckerrohr, Jute oder Kulturen, die vorübergehende Staunässe vertragen",
+        'moderate_rainfall': "Kulturen, die für moderate Niederschläge geeignet sind, einschließlich Weizen, Mais und viele Gemüsesorten",
+        'very_dry': "sehr trockenheitstolerante Kulturen (z.B. wüstenangepasste Melonen oder einige Kräuter)",
+        'very_wet': "semi-aquatische Kulturen oder solche, die sehr tolerant gegenüber Staunässe sind (z.B. Taro, einige Reissorten bei schlechter Drainage)",
+        'no_specific': "Keine spezifischen Empfehlungen, da die aktuellen Bedingungen ungewöhnlich oder allgemein sind."
+    },
+    'ar': {
+        'intro': "بناءً على الظروف الحالية، قد تفكر في: ",
+        'outro': ". يرجى استشارة خبراء الزراعة المحليين للحصول على توصيات دقيقة.",
+        'acid_tolerant': "محاصيل تتحمل الحموضة مثل التوت الأزرق، البطاطس، أو أصناف معينة من الأرز",
+        'alkaline_tolerant': "محاصيل تتحمل القلوية مثل الهليون، السبانخ، أو أصناف معينة من البرسيم الحجازي",
+        'neutral_ph': "مجموعة واسعة من المحاصيل تزدهر في درجة حموضة محايدة إلى حمضية قليلاً (5.5-7.5)، بما في ذلك القمح والذرة ومعظم الخضروات",
+        'heat_tolerant': "محاصيل تتحمل الحرارة مثل الدخن، الذرة الرفيعة، القطن، أو بعض أنواع الفول",
+        'cold_hardy': "محاصيل مقاومة للبرد مثل القمح (أصناف الشتاء)، الشعير، الشوفان، أو البازلاء",
+        'warm_season': "محاصيل الموسم الدافئ مثل الذرة، الأرز (الاستوائي)، معظم الخضروات، والفواكه",
+        'drought_resistant': "محاصيل مقاومة للجفاف مثل الدخن، الذرة الرفيعة، الحمص، أو أنواع معينة من الفول (مثل الماش)",
+        'water_loving': "محاصيل محبة للماء مثل الأرز، قصب السكر، الجوت، أو المحاصيل التي تتحمل التشبع بالمياه مؤقتًا",
+        'moderate_rainfall': "محاصيل مناسبة للأمطار المعتدلة، بما في ذلك القمح والذرة والعديد من الخضروات",
+        'very_dry': "محاصيل شديدة التحمل للجفاف (مثل البطيخ الصحراوي أو بعض الأعشاب)",
+        'very_wet': "محاصيل شبه مائية أو تلك شديدة التحمل للتشبع بالمياه (مثل القلقاس، بعض أصناف الأرز إذا كانت التربة سيئة التصريف)",
+        'no_specific': "لا توجد توصيات محددة، حيث أن الظروف الحالية غير عادية أو عامة."
+    },
+    'ja': {
+        'intro': "現在の状況に基づいて、次のことを検討できます。 ",
+        'outro': "。正確な推奨事項については、地域の農業専門家にご相談ください。",
+        'acid_tolerant': "ブルーベリー、ジャガイモ、特定のイネ品種など、酸性土壌に強い作物",
+        'alkaline_tolerant': "アスパラガス、ほうれん草、特定のアルファルファ品種など、アルカリ性土壌に強い作物",
+        'neutral_ph': "小麦、トウモロコシ、ほとんどの野菜など、中性から弱酸性のpH（5.5〜7.5）で育つ幅広い作物",
+        'heat_tolerant': "キビ、ソルガム、綿、一部の豆類など、暑さに強い作物",
+        'cold_hardy': "小麦（冬品種）、大麦、オート麦、エンドウ豆など、寒さに強い作物",
+        'warm_season': "トウモロコシ、イネ（熱帯）、ほとんどの野菜、果物など、温暖な季節の作物",
+        'drought_resistant': "キビ、ソルガム、ひよこ豆、特定の豆類（モース豆など）など、干ばつに強い作物",
+        'water_loving': "イネ、サトウキビ、ジュート、一時的な水浸しに耐える作物など、水を好む作物",
+        'moderate_rainfall': "小麦、トウモロコシ、多くの野菜など、適度な降水量に適した作物",
+        'very_dry': "非常に干ばつに強い作物（砂漠に適応したメロンや一部のハーブなど）",
+        'very_wet': "半水生作物または水浸しに非常に強い作物（タロイモ、排水が悪い場合の特定のイネ品種など）",
+        'no_specific': "現在の状況が異常または一般的なため、特定の推奨事項はありません。"
+    },
+    'bn': {
+        'intro': "বর্তমান পরিস্থিতির ভিত্তিতে, আপনি বিবেচনা করতে পারেন: ",
+        'outro': "। সুনির্দিষ্ট সুপারিশের জন্য স্থানীয় কৃষি বিশেষজ্ঞদের সাথে পরামর্শ করুন।",
+        'acid_tolerant': "ব্লুবেরি, আলু, বা নির্দিষ্ট ধান জাতের মতো অ্যাসিড-সহনশীল ফসল",
+        'alkaline_tolerant': "শতমূলী, পালং শাক, বা নির্দিষ্ট আলফালফা জাতের মতো ক্ষার-সহনশীল ফসল",
+        'neutral_ph': "গম, ভুট্টা, এবং বেশিরভাগ সবজি সহ নিরপেক্ষ থেকে সামান্য অম্লীয় pH (5.5-7.5) এ বিভিন্ন ধরণের ফসল ভালো জন্মায়",
+        'heat_tolerant': "বাজরা, জোয়ার, তুলা, বা কিছু ধরণের ডালের মতো তাপ-সহনশীল ফসল",
+        'cold_hardy': "গম (শীতকালীন জাত), বার্লি, ওটস, বা মটরশুঁটির মতো ঠান্ডা-সহনশীল ফসল",
+        'warm_season': "ভুট্টা, ধান (ক্রান্তীয়), বেশিরভাগ সবজি, এবং ফলের মতো উষ্ণ-মৌসুমী ফসল",
+        'drought_resistant': "বাজরা, জোয়ার, ছোলা, বা নির্দিষ্ট ধরণের ডালের (যেমন মোথবীন) মতো খরা-প্রতিরোধী ফসল",
+        'water_loving': "ধান, আখ, পাট, বা অস্থায়ী জলজমাট সহ্যকারী ফসলের মতো জল-প্রেমী ফসল",
+        'moderate_rainfall': "গম, ভুট্টা, এবং অনেক সবজি সহ মাঝারি বৃষ্টিপাতের জন্য উপযুক্ত ফসল",
+        'very_dry': "খুব খরা-সহনশীল ফসল (যেমন মরুভূমি-অভিযোজিত তরমুজ বা কিছু ভেষজ)",
+        'very_wet': "আধা-জলজ ফসল বা যেগুলি জলজমাট (যেমন কচু, খারাপ নিষ্কাশন হলে কিছু ধান জাত) এর প্রতি অত্যন্ত সহনশীল",
+        'no_specific': "কোনো সুনির্দিষ্ট সুপারিশ নেই, কারণ বর্তমান পরিস্থিতি অস্বাভাবিক বা সাধারণ।"
+    }
+};
+
+// Simulated growth stages and crop stages
+const growthStages = ["Germination", "Vegetative", "Flowering", "Maturity", "Wilting", "Yellowing"];
+const CROP_STAGES = ['seed', 'sprout', 'vegetative', 'flowering', 'mature'];
+
+// --- Initialization Functions ---
+function initializeFirebase() {
+    if (admin.apps.length > 0) {
+        firebaseApp = admin.app();
+        console.log("Firebase Admin SDK already initialized.");
+        return;
+    }
+
+    let serviceAccount;
+    const firebaseKeyB64 = process.env.FIREBASE_KEY_B64;
+
+    try {
+        if (firebaseKeyB64) {
+            const decodedJson = Buffer.from(firebaseKeyB64, 'base64').toString('utf8');
+            serviceAccount = JSON.parse(decodedJson);
+            console.log("Firebase credentials loaded from environment variable.");
+        } else {
+            // Fallback for local development if environment variable is not set
+            // IMPORTANT: For production, always use FIREBASE_KEY_B64
+            // Ensure 'agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json' is in your project root
+            const serviceAccountPath = path.resolve(__dirname, 'agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json');
+            if (fs.existsSync(serviceAccountPath)) {
+                serviceAccount = require(serviceAccountPath);
+                console.log("Firebase credentials loaded from local file (development fallback).");
+            } else {
+                throw new Error("Firebase service account key not found. Please set FIREBASE_KEY_B64 environment variable or place 'agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json' in the project root.");
+            }
+        }
+
+        firebaseApp = admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+            databaseURL: 'https://agriastrax-website-default-rtdb.firebaseio.com/' // Replace with your actual Firebase DB URL
+        });
+        firebaseDbRef = admin.database().ref('sensors/farm1'); // Path for sensor data
+        firebaseCameraRef = admin.database().ref('camera_feed/farm1'); // Path for camera feed
+        console.log("Firebase initialized successfully and references obtained.");
+
+    } catch (e) {
+        console.error(`❌ Firebase initialization failed: ${e.message}`);
+        firebaseApp = null;
+        firebaseDbRef = null;
+        firebaseCameraRef = null;
+        // Exit process if Firebase fails to initialize, as it's critical
+        process.exit(1);
+    }
+}
+
+// --- Dummy Data Generation (for unavailable sensors and initial simulation) ---
+function generateDummySensorDataValues() {
+    return {
+        "ph": parseFloat((Math.random() * (7.5 - 5.5) + 5.5).toFixed(2)),
+        "N": parseFloat((Math.random() * (100 - 20) + 20).toFixed(2)),
+        "P": parseFloat((Math.random() * (50 - 10) + 10).toFixed(2)),
+        "K": parseFloat((Math.random() * (120 - 30) + 30).toFixed(2)),
+        "rainfall": parseFloat((Math.random() * 10).toFixed(2)),
+        "ds18b20_temperature": parseFloat((Math.random() * (40 - 15) + 15).toFixed(2)),
+        "crop_stage": CROP_STAGES[Math.floor(Math.random() * CROP_STAGES.length)],
+        "growth_factor": parseFloat((Math.random() * (1.5 - 0.5) + 0.5).toFixed(2))
+    };
+}
+
+function generateDummyCameraData() {
+    const advisories = ["Healthy Growth", "Low Leaf Color Index", "Possible Disease Detected", "Needs Fertilizer", "Check Irrigation"];
+    return {
+        "timestamp": new Date().toISOString(),
+        "stage": growthStages[Math.floor(Math.random() * growthStages.length)],
+        "alert": advisories[Math.floor(Math.random() * advisories.length)],
+        "image_url": "https://placehold.co/150x150/E0E0E0/333333?text=Camera+Feed" // Placeholder image
+    };
+}
+
+// --- Sensor Data Inserter and Camera Simulator Intervals ---
+function runCameraSimulator() {
+    console.log("Starting dummy camera feed simulation...");
+    setInterval(async () => {
+        if (firebaseCameraRef) {
+            try {
+                const dummyCamera = generateDummyCameraData();
+                const newRef = firebaseCameraRef.push(dummyCamera);
+                // console.log(`Simulated Camera Data pushed to Firebase: ${dummyCamera.timestamp}`); // Too verbose
+
+                // Keep only the latest 10 camera entries for simplicity
+                const snapshot = await firebaseCameraRef.orderByChild('timestamp').once('value');
+                const entries = snapshot.val();
+                if (entries) {
+                    const keys = Object.keys(entries);
+                    if (keys.length > 10) {
+                        const sortedKeys = keys.sort((a, b) => entries[a].timestamp.localeCompare(entries[b].timestamp));
+                        for (let i = 0; i < keys.length - 10; i++) {
+                            firebaseCameraRef.child(sortedKeys[i]).remove();
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error(`❌ Error pushing camera data to Firebase: ${e.message}`);
+            }
+        }
+    }, 10000); // Generate every 10 seconds
+}
+
+function runSensorDataInserter() {
+    console.log("Starting sensor data inserter...");
+    if (!firebaseDbRef) {
+        console.error("Firebase DB reference not initialized. Sensor data insertion will only print locally.");
+        return;
+    }
+
+    // Insert 10 past samples
+    console.log("Inserting 10 enhanced dummy sensor readings with all features (for initial data)...");
+    (async () => {
+        for (let i = 0; i < 10; i++) {
+            const timestamp = new Date(Date.now() - (10 - i) * 5 * 60 * 1000).toISOString();
+            const sampleData = {
+                'timestamp': timestamp,
+                'soil_moisture': parseFloat((Math.random() * (80 - 20) + 20).toFixed(2)),
+                'temperature': parseFloat((Math.random() * (40 - 20) + 20).toFixed(2)),
+                'humidity': parseFloat((Math.random() * (95 - 30) + 30).toFixed(2)),
+                'light_intensity': Math.floor(Math.random() * (900 - 200) + 200),
+                'ds18b20_temperature': parseFloat((Math.random() * (40 - 15) + 15).toFixed(2)),
+                ...generateDummySensorDataValues()
+            };
+            try {
+                await firebaseDbRef.push(sampleData);
+            } catch (e) {
+                console.error(`❌ Error pushing initial sample data to Firebase: ${e.message}`);
+                break; // Stop if initial push fails
+            }
+        }
+        console.log("Successfully inserted 10 enhanced dummy sensor readings.");
+
+        // Simulate live updates every 10s
+        console.log("\nSimulating live sensor data updates. New data will be inserted every 10 seconds. Press Ctrl+C to stop.");
+        setInterval(async () => {
+            const currentTimestamp = new Date().toISOString();
+            let liveData = {};
+
+            if (simulationMode) {
+                // Full dummy data generation
+                liveData = {
+                    'timestamp': currentTimestamp,
+                    'soil_moisture': parseFloat((Math.random() * (80 - 20) + 20).toFixed(2)),
+                    'temperature': parseFloat((Math.random() * (40 - 20) + 20).toFixed(2)),
+                    'humidity': parseFloat((Math.random() * (95 - 30) + 30).toFixed(2)),
+                    'light_intensity': Math.floor(Math.random() * (900 - 200) + 200),
+                    'ds18b20_temperature': parseFloat((Math.random() * (40 - 15) + 15).toFixed(2)),
+                    "ph": parseFloat((Math.random() * (9.0 - 4.0) + 4.0).toFixed(2)),
+                    "N": Math.floor(Math.random() * 151),
+                    "P": Math.floor(Math.random() * 71),
+                    "K": Math.floor(Math.random() * 251),
+                    "rainfall": parseFloat((Math.random() * 250).toFixed(2)),
+                    "crop_stage": CROP_STAGES[Math.floor(Math.random() * CROP_STAGES.length)],
+                    "growth_factor": parseFloat((Math.random() * (1.2 - 0.1) + 0.1).toFixed(2))
+                };
+            } else {
+                // Semi-simulation (dummy for non-ESP32 sensors)
+                liveData = {
+                    'timestamp': currentTimestamp,
+                    'soil_moisture': parseFloat((Math.random() * (60 - 20) + 20).toFixed(2)),
+                    'temperature': parseFloat((Math.random() * (40 - 20) + 20).toFixed(2)),
+                    'humidity': parseFloat((Math.random() * (95 - 30) + 30).toFixed(2)),
+                    'light_intensity': Math.floor(Math.random() * (900 - 200) + 200),
+                    'ds18b20_temperature': parseFloat((Math.random() * (40 - 15) + 15).toFixed(2)),
+                    ...generateDummySensorDataValues()
+                };
+            }
+
+            try {
+                await firebaseDbRef.push(liveData);
+            } catch (e) {
+                console.error(`❌ Error pushing real-time data to Firebase: ${e.message}`);
+            }
+        }, 10000);
+    })();
+}
+
+// --- Helper Functions for Data Fetching and Processing ---
+
+async function getLatestSensorData() {
+    if (!firebaseDbRef) {
+        console.error("Firebase DB reference not initialized. Cannot fetch sensor data.");
+        // Fallback to full dummy data
+        const dummyValues = generateDummySensorDataValues();
+        return {
+            "timestamp": new Date().toISOString(),
+            "temperature": parseFloat((Math.random() * (30 - 20) + 20).toFixed(2)),
+            "humidity": parseFloat((Math.random() * (70 - 50) + 50).toFixed(2)),
+            "soil_moisture": parseFloat((Math.random() * (60 - 40) + 40).toFixed(2)),
+            "light_intensity": Math.floor(Math.random() * (10000 - 5000) + 5000),
+            "ds18b20_temperature": parseFloat((Math.random() * (40 - 15) + 15).toFixed(2)),
+            ...dummyValues
+        };
+    }
+
+    try {
+        const snapshot = await firebaseDbRef.orderByChild('timestamp').limitToLast(1).once('value');
+        let latestData = snapshot.val();
+
+        if (!latestData) {
+            console.log("No sensor data found in Firebase. Generating dummy data for latest.");
+            const dummyValues = generateDummySensorDataValues();
+            return {
+                "timestamp": new Date().toISOString(),
+                "temperature": parseFloat((Math.random() * (30 - 20) + 20).toFixed(2)),
+                "humidity": parseFloat((Math.random() * (70 - 50) + 50).toFixed(2)),
+                "soil_moisture": parseFloat((Math.random() * (60 - 40) + 40).toFixed(2)),
+                "light_intensity": Math.floor(Math.random() * (10000 - 5000) + 5000),
+                "ds18b20_temperature": parseFloat((Math.random() * (40 - 15) + 15).toFixed(2)),
+                ...dummyValues
+            };
+        }
+
+        latestData = Object.values(latestData)[0]; // Get the actual data object
+
+        // Ensure all expected fields are present, filling with dummy if missing
+        const expectedFields = ['temperature', 'humidity', 'soil_moisture', 'light_intensity', 'ds18b20_temperature',
+                                'N', 'P', 'K', 'ph', 'rainfall', 'crop_stage', 'growth_factor'];
+        const dummyFillValues = generateDummySensorDataValues();
+
+        for (const field of expectedFields) {
+            if (latestData[field] === undefined || latestData[field] === null || isNaN(latestData[field])) {
+                latestData[field] = dummyFillValues[field];
+            }
+        }
+
+        // Handle 'pH' column name consistency if it comes as 'pH' from Firebase
+        if (latestData.pH !== undefined && latestData.ph === undefined) {
+            latestData.ph = latestData.pH;
+            delete latestData.pH;
+        }
+
+        return latestData;
+    } catch (e) {
+        console.error(`Error fetching latest sensor data from Firebase: ${e.message}`);
+        // Fallback to full dummy data on error
+        const dummyValues = generateDummySensorDataValues();
+        return {
+            "timestamp": new Date().toISOString(),
+            "temperature": parseFloat((Math.random() * (30 - 20) + 20).toFixed(2)),
+            "humidity": parseFloat((Math.random() * (70 - 50) + 50).toFixed(2)),
+            "soil_moisture": parseFloat((Math.random() * (60 - 40) + 40).toFixed(2)),
+            "light_intensity": Math.floor(Math.random() * (10000 - 5000) + 5000),
+            "ds18b20_temperature": parseFloat((Math.random() * (40 - 15) + 15).toFixed(2)),
+            ...dummyValues
+        };
+    }
+}
+
+async function getHistoricalSensorData(days = 7) {
+    if (!firebaseDbRef) {
+        console.error("Firebase DB reference not initialized. Cannot fetch historical sensor data.");
+        return [];
+    }
+    try {
+        const startTime = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+        const snapshot = await firebaseDbRef.orderByChild('timestamp').startAt(startTime).once('value');
+        const historicalData = snapshot.val();
+
+        if (!historicalData) {
+            return [];
+        }
+
+        const dataList = [];
+        const dummyFillValues = generateDummySensorDataValues();
+
+        for (const key in historicalData) {
+            if (historicalData.hasOwnProperty(key)) {
+                const value = historicalData[key];
+                if (typeof value === 'object' && value !== null) {
+                    // Ensure 'ph' consistency and fill missing values with dummy data
+                    if (value.pH !== undefined && value.ph === undefined) {
+                        value.ph = value.pH;
+                        delete value.pH;
+                    }
+
+                    for (const field of ['N', 'P', 'K', 'ph', 'rainfall', 'ds18b20_temperature', 'crop_stage', 'growth_factor']) {
+                        if (value[field] === undefined || value[field] === null || isNaN(value[field])) {
+                            value[field] = dummyFillValues[field];
+                        }
+                    }
+                    dataList.push(value);
+                } else {
+                    console.warn(`Skipping non-object entry in Firebase historical data: ${key}: ${value}`);
+                }
+            }
+        }
+
+        // Sort by timestamp
+        dataList.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+        return dataList;
+    } catch (e) {
+        console.error(`Error fetching historical sensor data from Firebase: ${e.message}`);
+        return [];
+    }
+}
+
+async function fetchCameraFeedDataBackend() {
+    if (!firebaseCameraRef) {
+        console.error("Firebase camera reference not initialized. Cannot fetch camera data.");
+        return generateDummyCameraData(); // Fallback to dummy
+    }
+
+    try {
+        const snapshot = await firebaseCameraRef.orderByChild('timestamp').limitToLast(1).once('value');
+        const latestCameraEntry = snapshot.val();
+
+        if (!latestCameraEntry) {
+            console.log("No camera data found in Firebase. Returning dummy data.");
+            return generateDummyCameraData();
+        }
+
+        return Object.values(latestCameraEntry)[0];
+    } catch (e) {
+        console.error(`Error fetching camera feed data from Firebase: ${e.message}`);
+        return generateDummyCameraData(); // Fallback to dummy on error
+    }
+}
+
+function predictGrowthBackend(historicalData, selectedCropType) {
+    // --- SIMULATED AI PREDICTION ---
+    // This function simulates the behavior of the Python AI model.
+    // In a real application, you would convert your Keras model to TensorFlow.js
+    // and load it here using `@tensorflow/tfjs-node` or make an API call to a Python microservice.
+
+    if (!historicalData || historicalData.length === 0) {
+        return { soilMoisturePred: null, lightIntensityPred: null, nutrientSumPred: null, error: "Not enough data for simulated prediction." };
+    }
+
+    // Get the latest data point for a more "responsive" simulation
+    const latest = historicalData[historicalData.length - 1];
+
+    // Simple heuristic-based simulation
+    let soilMoisturePred = parseFloat((latest.soil_moisture * (1 + (Math.random() - 0.5) * 0.1)).toFixed(2));
+    let lightIntensityPred = parseFloat((latest.light_intensity * (1 + (Math.random() - 0.5) * 0.1)).toFixed(2));
+    let nutrientSumPred = parseFloat(((latest.N + latest.P + latest.K) * (1 + (Math.random() - 0.5) * 0.1)).toFixed(2));
+
+    // Clamp values to reasonable ranges
+    soilMoisturePred = Math.max(0, Math.min(100, soilMoisturePred));
+    lightIntensityPred = Math.max(0, lightIntensityPred); // Light can't be negative
+    nutrientSumPred = Math.max(0, nutrientSumPred); // Nutrient sum can't be negative
+
+    return { soilMoisturePred, lightIntensityPred, nutrientSumPred, error: null };
+}
+
+function predictMarketPriceBackend(latestData, selectedCropType) {
+    // --- SIMULATED AI PREDICTION ---
+    // This function simulates the behavior of the Python market price prediction model.
+    // In a real application, you would use a converted model or a dedicated microservice.
+
+    if (!latestData) {
+        return { predictedPrice: null, error: "No latest sensor data available for simulated market price prediction." };
+    }
+
+    // Simple heuristic-based simulation
+    let basePrice = 100;
+    const cropFactor = {
+        'wheat': 1.2, 'rice': 1.5, 'maize': 1.1, 'banana': 1.3, 'mango': 1.4,
+        'grapes': 1.0, 'cotton': 0.9, 'millet': 0.8, 'sorghum': 0.8, 'coffee': 1.6,
+        'jute': 0.7, 'pomegranate': 1.7, 'melon': 1.0, 'coconut': 1.5, 'mothbeans': 0.6,
+        'mungbean': 0.7, 'blackgram': 0.7, 'lentil': 0.6
+    }[selectedCropType.toLowerCase()] || 1.0;
+
+    let predictedPrice = basePrice * cropFactor;
+
+    predictedPrice += (latestData.N / 10) + (latestData.P / 5) + (latestData.K / 10);
+    predictedPrice += (latestData.temperature - 25) * 2;
+    predictedPrice += (latestData.humidity - 50) * 1.5;
+    predictedPrice += (latestData.soil_moisture - 50) * 0.5;
+    predictedPrice += (latestData.light_intensity - 500) * 0.01; // Reduced impact for light
+    predictedPrice += (latestData.rainfall - 50) * 0.2;
+    predictedPrice += (latestData.ph - 6.5) * 5;
+    predictedPrice += (latestData.ds18b20_temperature - 25) * 1.0;
+
+    // Add some random fluctuation
+    predictedPrice += (Math.random() - 0.5) * 20; // +/- 10
+
+    predictedPrice = Math.max(50, predictedPrice); // Ensure price is not too low
+
+    return { predictedPrice: parseFloat(predictedPrice.toFixed(2)), error: null };
+}
+
+function cropCareAdviceBackend(latestData, cropType, lang = 'en') {
+    const messages = ADVICE_MESSAGES[lang] || ADVICE_MESSAGES['en'];
+    if (!latestData) {
+        return [messages.no_data];
+    }
+
+    const tips = [];
+    const ct = cropType.toLowerCase();
+
+    // NPK Advice
+    const npkAdviceThresholds = {
+        'N': { min: 50, max: 150, low_msg: messages.npk_n_low, high_msg: messages.npk_n_high },
+        'P': { min: 20, max: 60, low_msg: messages.npk_p_low, high_msg: messages.npk_p_high },
+        'K': { min: 30, max: 120, low_msg: messages.npk_k_low, high_msg: messages.npk_k_high }, // Adjusted K range for dummy data consistency
+    };
+    for (const nutrient in npkAdviceThresholds) {
+        const value = latestData[nutrient];
+        const thresholds = npkAdviceThresholds[nutrient];
+        if (value !== undefined && value !== null && !isNaN(value)) {
+            if (value < thresholds.min) {
+                tips.push(messages.npk_low.replace('{nutrient}', nutrient).replace('{value:.1f}', value.toFixed(1)).replace('{message}', thresholds.low_msg));
+            } else if (value > thresholds.max) {
+                tips.push(messages.npk_high.replace('{nutrient}', nutrient).replace('{value:.1f}', value.toFixed(1)).replace('{message}', thresholds.high_msg));
+            }
+        }
+    }
+
+    // Soil Moisture Advice
+    const sm = latestData.soil_moisture;
+    if (sm !== undefined && sm !== null && !isNaN(sm)) {
+        if (ct === 'wheat' && sm < 35) tips.push(messages.soil_moisture_low.replace('{sm:.1f}', sm.toFixed(1)).replace('{message}', messages.wheat_sm_low));
+        else if (ct === 'rice' && sm < 60) tips.push(messages.soil_moisture_low.replace('{sm:.1f}', sm.toFixed(1)).replace('{message}', messages.rice_sm_low));
+        else if (ct === 'maize' && sm < 40) tips.push(messages.soil_moisture_low.replace('{sm:.1f}', sm.toFixed(1)).replace('{message}', messages.maize_sm_low));
+        else if (ct === 'banana' && sm < 50) tips.push(messages.soil_moisture_low.replace('{sm:.1f}', sm.toFixed(1)).replace('{message}', messages.banana_sm_low));
+        else if (ct === 'mango' && sm > 60) tips.push(messages.soil_moisture_high.replace('{sm:.1f}', sm.toFixed(1)).replace('{message}', messages.mango_sm_high));
+        else if (ct === 'grapes' && sm > 50) tips.push(messages.soil_moisture_high.replace('{sm:.1f}', sm.toFixed(1)).replace('{message}', messages.grapes_sm_high));
+        else if (ct === 'cotton' && sm < 30) tips.push(messages.soil_moisture_low.replace('{sm:.1f}', sm.toFixed(1)).replace('{message}', messages.cotton_sm_low));
+        else if ((ct === 'millet' || ct === 'sorghum') && sm < 25) tips.push(messages.soil_moisture_low.replace('{sm:.1f}', sm.toFixed(1)).replace('{message}', messages.millet_sorghum_sm_low));
+        else if (ct === 'jute' && sm < 50) tips.push(messages.soil_moisture_low.replace('{sm:.1f}', sm.toFixed(1)).replace('{message}', messages.jute_sm_low));
+        else if (ct === 'pomegranate' && sm > 50) tips.push(messages.soil_moisture_high.replace('{sm:.1f}', sm.toFixed(1)).replace('{message}', messages.pomegranate_sm_high));
+        else if ((ct === 'muskmelon' || ct === 'watermelon') && sm < 30) tips.push(messages.soil_moisture_low.replace('{sm:.1f}', sm.toFixed(1)).replace('{message}', messages.melon_sm_low));
+        else if (ct === 'coconut' && sm < 50) tips.push(messages.soil_moisture_low.replace('{sm:.1f}', sm.toFixed(1)).replace('{message}', messages.coconut_sm_low));
+        else if (ct === 'mothbeans' && sm < 25) tips.push(messages.soil_moisture_low.replace('{sm:.1f}', sm.toFixed(1)).replace('{message}', messages.mothbeans_sm_low));
+        else if (ct === 'mungbean' && sm < 30) tips.push(messages.soil_moisture_low.replace('{sm:.1f}', sm.toFixed(1)).replace('{message}', messages.mungbean_sm_low));
+        else if (ct === 'blackgram' && sm < 35) tips.push(messages.soil_moisture_low.replace('{sm:.1f}', sm.toFixed(1)).replace('{message}', messages.blackgram_sm_low));
+        else if (ct === 'lentil' && sm < 25) tips.push(messages.soil_moisture_low.replace('{sm:.1f}', sm.toFixed(1)).replace('{message}', messages.lentil_sm_low));
+        else if (sm < 30) tips.push(messages.soil_moisture_low.replace('{sm:.1f}', sm.toFixed(1)).replace('{message}', messages.general_sm_low));
+        else if (sm > 70) tips.push(messages.soil_moisture_high.replace('{sm:.1f}', sm.toFixed(1)).replace('{message}', messages.general_sm_high));
+    }
+
+    // Temperature Advice
+    const temp = latestData.temperature;
+    const dsTemp = latestData.ds18b20_temperature;
+    let effectiveTemp = null;
+    if (dsTemp !== undefined && dsTemp !== null && !isNaN(dsTemp) && dsTemp >= 0 && dsTemp <= 50) {
+        effectiveTemp = dsTemp;
+    } else if (temp !== undefined && temp !== null && !isNaN(temp)) {
+        effectiveTemp = temp;
+    }
+
+    if (effectiveTemp !== null) {
+        if (ct === 'wheat' && effectiveTemp > 32) tips.push(messages.temp_high.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.wheat_temp_high));
+        else if (ct === 'rice' && effectiveTemp > 38) tips.push(messages.temp_high.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.rice_temp_high));
+        else if (ct === 'maize' && effectiveTemp < 20) tips.push(messages.temp_low.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.maize_temp_low));
+        else if (ct === 'banana' && effectiveTemp < 15) tips.push(messages.temp_low.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.banana_temp_low));
+        else if (ct === 'mango' && effectiveTemp < 20) tips.push(messages.temp_low.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.mango_temp_low));
+        else if (ct === 'cotton' && effectiveTemp < 20) tips.push(messages.temp_low.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.cotton_temp_low));
+        else if ((ct === 'millet' || ct === 'sorghum') && effectiveTemp < 20) tips.push(messages.temp_low.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.millet_sorghum_temp_low));
+        else if (ct === 'coffee' && effectiveTemp < 18) tips.push(messages.temp_low.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.coffee_temp_low));
+        else if (ct === 'jute' && effectiveTemp < 25) tips.push(messages.temp_low.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.jute_temp_low));
+        else if (ct === 'papaya' && effectiveTemp < 20) tips.push(messages.temp_low.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.papaya_temp_low));
+        else if (ct === 'pomegranate' && effectiveTemp < 20) tips.push(messages.temp_low.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.pomegranate_temp_low));
+        else if ((ct === 'muskmelon' || ct === 'watermelon') && effectiveTemp < 25) tips.push(messages.temp_low.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.melon_temp_low));
+        else if (ct === 'coconut' && effectiveTemp < 25) tips.push(messages.temp_low.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.coconut_temp_low));
+        else if (ct === 'mothbeans' && effectiveTemp < 22) tips.push(messages.temp_low.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.mothbeans_temp_low));
+        else if (ct === 'mungbean' && effectiveTemp < 20) tips.push(messages.temp_low.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.mungbean_temp_low));
+        else if (ct === 'blackgram' && effectiveTemp < 18) tips.push(messages.temp_low.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.blackgram_temp_low));
+        else if (ct === 'lentil' && effectiveTemp < 15) tips.push(messages.temp_low.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.lentil_temp_low));
+        else if (effectiveTemp < 18) tips.push(messages.temp_low.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.general_temp_low));
+        else if (effectiveTemp > 35) tips.push(messages.temp_high.replace('{temp:.1f}', effectiveTemp.toFixed(1)).replace('{message}', messages.general_temp_high));
+    }
+
+    // Humidity Advice
+    const hum = latestData.humidity;
+    if (hum !== undefined && hum !== null && !isNaN(hum)) {
+        if (ct === 'wheat' && hum > 70) tips.push(messages.humidity_high.replace('{hum:.1f}', hum.toFixed(1)).replace('{message}', messages.wheat_hum_high));
+        else if (ct === 'rice' && hum < 60) tips.push(messages.humidity_low.replace('{hum:.1f}', hum.toFixed(1)).replace('{message}', messages.rice_hum_low));
+        else if (ct === 'banana' && hum < 60) tips.push(messages.humidity_low.replace('{hum:.1f}', hum.toFixed(1)).replace('{message}', messages.banana_hum_low));
+        else if (ct === 'grapes' && hum > 70) tips.push(messages.humidity_high.replace('{hum:.1f}', hum.toFixed(1)).replace('{message}', messages.grapes_hum_high));
+        else if (ct === 'coffee' && hum < 60) tips.push(messages.humidity_low.replace('{hum:.1f}', hum.toFixed(1)).replace('{message}', messages.coffee_hum_low));
+        else if (ct === 'orange' && hum > 70) tips.push(messages.humidity_high.replace('{hum:.1f}', hum.toFixed(1)).replace('{message}', messages.orange_hum_high));
+        else if (hum < 40) tips.push(messages.humidity_low.replace('{hum:.1f}', hum.toFixed(1)).replace('{message}', messages.general_hum_low));
+        else if (hum > 80) tips.push(messages.humidity_high.replace('{hum:.1f}', hum.toFixed(1)).replace('{message}', messages.general_hum_high));
+    }
+
+    // pH Advice
+    const phVal = latestData.ph;
+    if (phVal !== undefined && phVal !== null && !isNaN(phVal)) {
+        if (ct === 'wheat' && phVal < 6.0) tips.push(messages.ph_low.replace('{ph_val:.1f}', phVal.toFixed(1)).replace('{message}', messages.wheat_ph_low));
+        else if (ct === 'rice' && (phVal < 5.5 || phVal > 6.5)) tips.push(messages.ph_off.replace('{ph_val:.1f}', phVal.toFixed(1)).replace('{message}', messages.rice_ph_off));
+        else if (ct === 'maize' && (phVal < 5.8 || phVal > 7)) tips.push(messages.ph_off.replace('{ph_val:.1f}', phVal.toFixed(1)).replace('{message}', messages.maize_ph_off));
+        else if (ct === 'papaya' && phVal < 6) tips.push(messages.ph_low.replace('{ph_val:.1f}', phVal.toFixed(1)).replace('{message}', messages.papaya_ph_low));
+        else if (ct === 'orange' && (phVal < 6 || phVal > 7.5)) tips.push(messages.ph_off.replace('{ph_val:.1f}', phVal.toFixed(1)).replace('{message}', messages.orange_ph_off));
+        else if (phVal < 5.5) tips.push(messages.ph_low.replace('{ph_val:.1f}', phVal.toFixed(1)).replace('{message}', messages.general_ph_very_low));
+        else if (phVal > 7.5) tips.push(messages.ph_high.replace('{ph_val:.1f}', phVal.toFixed(1)).replace('{message}', messages.general_ph_very_high));
+        else if (!(phVal >= 5.5 && phVal <= 7.5)) tips.push(messages.ph_off.replace('{ph_val:.1f}', phVal.toFixed(1)).replace('{message}', messages.general_ph_off));
+    }
+
+    // Light Intensity Advice
+    const light = latestData.light_intensity;
+    if (light !== undefined && light !== null && !isNaN(light)) {
+        if (ct === 'wheat' && light < 400) tips.push(messages.light_low.replace('{light:.1f}', light.toFixed(1)).replace('{message}', messages.wheat_light_low));
+        else if (ct === 'rice' && light < 500) tips.push(messages.light_low.replace('{light:.1f}', light.toFixed(1)).replace('{message}', messages.rice_light_low));
+        else if (light < 300) tips.push(messages.light_low.replace('{light:.1f}', light.toFixed(1)).replace('{message}', messages.general_light_low));
+        else if (light > 800) tips.push(messages.light_high.replace('{light:.1f}', light.toFixed(1)).replace('{message}', messages.general_light_high));
+    }
+
+    // Rainfall Advice
+    const rain = latestData.rainfall;
+    if (rain !== undefined && rain !== null && !isNaN(rain)) {
+        if (rain < 50) {
+            tips.push(messages.rainfall_low_msg.replace('{rain:.1f}', rain.toFixed(1)).replace('{message}', messages.rainfall_low_msg));
+        } else if (rain > 200) {
+            tips.push(messages.rainfall_high_msg.replace('{rain:.1f}', rain.toFixed(1)).replace('{message}', messages.rainfall_high_msg));
+        }
+    }
+
+    return tips.length > 0 ? tips : [messages.all_good];
+}
+
+function recommendSeedsBackend(soilMoisturePred, lang = 'en') {
+    const messages = SEED_RECOMMENDATIONS_MESSAGES[lang] || SEED_RECOMMENDATIONS_MESSAGES['en'];
+
+    if (soilMoisturePred === null || isNaN(soilMoisturePred) || !(soilMoisturePred >= 0 && soilMoisturePred <= 100)) {
+        return messages.no_specific + " (Predicted soil moisture is out of typical range or not available, hindering specific crop suggestions.)";
+    } else if (soilMoisturePred < 30) {
+        return `${messages.intro} ${messages.drought_resistant}${messages.outro}`;
+    } else if (soilMoisturePred > 70) {
+        return `${messages.intro} ${messages.water_loving}${messages.outro}`;
+    } else {
+        return `${messages.intro} ${messages.moderate_rainfall}${messages.outro}`;
+    }
+}
+
+function speakTipBackend(text, lang = 'en') {
+    // --- SIMULATED TTS ---
+    // gTTS is Python-specific. For a real Node.js backend, you'd use a cloud TTS API
+    // (e.g., Google Cloud Text-to-Speech) or a Node.js library that wraps a system TTS engine.
+    // This returns a very simple dummy MP3 buffer.
+
+    // A minimal MP3 header for a silent 1-second audio.
+    // This is not a real audio file for the text, just a placeholder.
+    const dummyMp3Buffer = Buffer.from([
+        0x49, 0x44, 0x33, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ID3v2 header
+        0xFF, 0xFB, 0x90, 0x44, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // MPEG audio frame header (silent)
+        0x21, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // More dummy data
+        // Add more bytes if a longer dummy audio is desired
+    ]);
+    console.log(`Simulated speech for: "${text}" in language: "${lang}"`);
+    return { audioBytes: dummyMp3Buffer, error: null };
+}
+
+
+// --- API Routes ---
+
+app.get('/', (req, res) => {
+    // Serve a simple HTML file or a message indicating backend is running
+    res.send('Smart Agriculture Backend is running!');
+});
+
+app.post('/api/set_mode', (req, res) => {
+    const { mode } = req.body;
+    if (mode === 'simulation') {
+        simulationMode = true;
+        console.log("Switched to Simulation Mode (full dummy data).");
+    } else if (mode === 'real-time') {
+        simulationMode = false;
+        console.log("Switched to Real-Time Testing Mode (partial dummy, expects real).");
+    } else {
+        return res.status(400).json({ status: "error", message: "Invalid mode." });
+    }
+    res.json({ status: "success", mode: simulationMode ? "simulation" : "real-time" });
+});
+
+app.get('/api/get_mode', (req, res) => {
+    res.json({ mode: simulationMode ? "simulation" : "real-time" });
+});
+
+app.post('/api/sensor_data', async (req, res) => {
+    if (!firebaseDbRef) {
+        return res.status(500).json({ status: "error", message: "Firebase not initialized." });
+    }
+
+    try {
+        const data = req.body;
+        if (!data) {
+            return res.status(400).json({ status: "error", message: "Invalid JSON data." });
+        }
+
+        const sensorEntry = {
+            "timestamp": new Date().toISOString(),
+            "temperature": data.temperature,
+            "humidity": data.humidity,
+            "soil_moisture": data.soil_moisture,
+            "light_intensity": data.light_intensity,
+            "ds18b20_temperature": data.ds18b20_temperature,
+        };
+
+        // Add dummy data for fields not provided by ESP32, or use provided if available
+        const dummyValues = generateDummySensorDataValues();
+        sensorEntry.ph = data.ph !== undefined ? data.ph : dummyValues.ph;
+        sensorEntry.N = data.N !== undefined ? data.N : dummyValues.N;
+        sensorEntry.P = data.P !== undefined ? data.P : dummyValues.P;
+        sensorEntry.K = data.K !== undefined ? data.K : dummyValues.K;
+        sensorEntry.rainfall = data.rainfall !== undefined ? data.rainfall : dummyValues.rainfall;
+        sensorEntry.crop_stage = data.crop_stage !== undefined ? data.crop_stage : dummyValues.crop_stage;
+        sensorEntry.growth_factor = data.growth_factor !== undefined ? data.growth_factor : dummyValues.growth_factor;
+
+        await firebaseDbRef.push(sensorEntry);
+        console.log(`Received and stored sensor data: ${JSON.stringify(sensorEntry)}`);
+
+        // Keep only the latest 100 entries for simplicity in Firebase
+        const snapshot = await firebaseDbRef.orderByChild('timestamp').once('value');
+        const entries = snapshot.val();
+        if (entries) {
+            const keys = Object.keys(entries);
+            if (keys.length > 100) {
+                const sortedKeys = keys.sort((a, b) => entries[a].timestamp.localeCompare(entries[b].timestamp));
+                for (let i = 0; i < keys.length - 100; i++) {
+                    await firebaseDbRef.child(sortedKeys[i]).remove();
+                }
+            }
+        }
+
+        res.json({ status: "success", message: "Sensor data received and stored." });
+    } catch (e) {
+        console.error(`Error receiving sensor data: ${e.message}`);
+        res.status(500).json({ status: "error", message: e.message });
+    }
+});
+
+app.get('/api/data', async (req, res) => {
+    const latestData = await getLatestSensorData();
+    const historicalDataList = await getHistoricalSensorData(7);
+    const cameraData = await fetchCameraFeedDataBackend();
+
+    // Prepare data for plotting sensor trends
+    const plotDataList = [];
+    if (historicalDataList && historicalDataList.length > 0) {
+        const plotFeatures = ['soil_moisture', 'temperature', 'humidity', 'ph', 'light_intensity', 'N', 'P', 'K', 'rainfall', 'ds18b20_temperature', 'growth_factor'];
+        const existingPlotFeatures = plotFeatures.filter(f => historicalDataList.some(d => d[f] !== undefined && d[f] !== null && !isNaN(d[f])));
+
+        historicalDataList.forEach(entry => {
+            const timestamp = new Date(entry.timestamp).toISOString(); // Use ISO string for consistency
+            existingPlotFeatures.forEach(feature => {
+                const reading = entry[feature];
+                if (reading !== undefined && reading !== null && !isNaN(reading)) {
+                    plotDataList.push({
+                        timestamp: timestamp,
+                        'Sensor Metric': feature,
+                        Reading: reading
+                    });
+                }
+            });
+        });
+    }
+
+    // Prepare raw data table (latest 10 entries)
+    const rawDataList = historicalDataList ? historicalDataList.slice(-10) : [];
+    rawDataList.forEach(entry => {
+        if (entry.timestamp) {
+            entry.timestamp = new Date(entry.timestamp).toLocaleString(); // Format for display
+        }
+    });
+
+    res.json({
+        latest_data: latestData,
+        camera_data: cameraData,
+        plot_data: plotDataList,
+        raw_data: rawDataList,
+        crop_labels: allCropLabels,
+        status: latestData ? 'success' : 'no_data'
+    });
+});
+
+app.post('/api/predict_growth', async (req, res) => {
+    const { selected_crop_type } = req.body;
+
+    const historicalData = await getHistoricalSensorData(7);
+    if (!historicalData || historicalData.length === 0) {
+        return res.status(400).json({ error: 'No sensor data available for prediction.' });
+    }
+
+    const { soilMoisturePred, lightIntensityPred, nutrientSumPred, error } = predictGrowthBackend(historicalData, selected_crop_type);
+
+    if (error) {
+        return res.status(500).json({ error });
+    }
+
+    res.json({
+        soil_moisture_pred: soilMoisturePred,
+        light_intensity_pred: lightIntensityPred,
+        nutrient_sum_pred: nutrientSumPred
+    });
+});
+
+app.post('/api/market_price', async (req, res) => {
+    const { selected_crop_type } = req.body;
+
+    const latestSensorData = await getLatestSensorData();
+    if (!latestSensorData) {
+        return res.status(400).json({ error: 'No sensor data available for market price prediction.' });
+    }
+
+    const { predictedPrice, error } = predictMarketPriceBackend(latestSensorData, selected_crop_type);
+
+    if (error) {
+        return res.status(500).json({ error });
+    }
+
+    res.json({ predicted_price: predictedPrice });
+});
+
+app.post('/api/care_advice', async (req, res) => {
+    const { selected_crop_type, lang } = req.body;
+
+    const latestData = await getLatestSensorData();
+    if (!latestData) {
+        return res.json({ advice: [ADVICE_MESSAGES[lang || 'en'].no_data] });
+    }
+
+    const careTips = cropCareAdviceBackend(latestData, selected_crop_type, lang);
+    res.json({ advice: careTips });
+});
+
+app.post('/api/seed_recommendations', (req, res) => {
+    const { soil_moisture_pred, lang } = req.body;
+
+    const seedRecommendation = recommendSeedsBackend(soil_moisture_pred, lang);
+    res.json({ recommendation: seedRecommendation });
+});
+
+app.post('/api/voice_alert', (req, res) => {
+    const { text, lang } = req.body;
+
+    if (!text) {
+        return res.status(400).json({ error: 'No text provided for speech generation.' });
+    }
+
+    const { audioBytes, error } = speakTipBackend(text, lang);
+    if (error) {
+        return res.status(500).json({ error });
+    }
+
+    res.writeHead(200, {
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': audioBytes.length,
+        'Content-Disposition': 'inline; filename="alert.mp3"' // 'inline' to play in browser
+    });
+    res.end(audioBytes);
+});
+
+app.get('/api/crop_labels', (req, res) => {
+    res.json({ crop_labels: allCropLabels });
+});
+
+// --- Server Initialization ---
+async function startServer() {
+    initializeFirebase(); // Initialize Firebase Admin SDK
+    // Start background tasks only after Firebase is initialized
+    runCameraSimulator();
+    runSensorDataInserter();
+
+    app.listen(PORT, () => {
+        console.log(`Smart Agriculture Backend listening on port ${PORT}`);
+        console.log(`Access dashboard data at http://localhost:${PORT}/api/data`);
+        console.log(`Set mode (simulation/real-time) via POST to http://localhost:${PORT}/api/set_mode`);
+        console.log(`Receive sensor data from ESP32 via POST to http://localhost:${PORT}/api/sensor_data`);
+    });
+}
+
+// Start the server
+startServer();
