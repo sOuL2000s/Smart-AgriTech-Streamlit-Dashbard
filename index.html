@@ -4,53 +4,149 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart AgriTech Dashboard</title>
+    <!-- Favicon: A simple SVG icon for the browser tab -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2368D391'%3E%3Cpath d='M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z'/%3E%3Cpath d='M11 15h2v2h-2zm0-8h2v6h-2z' fill='%232D3748'/%3E%3C/svg%3E" type="image/svg+xml">
+
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Plotly.js CDN for charts -->
     <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-    <link rel="manifest" href="/site.webmanifest">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
     <style>
+        /* Base styles for body and font */
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #1a202c; /* Dark background */
+            /* More attractive radial gradient background */
+            background: radial-gradient(circle at top left, #2a3447, #1a202c 70%);
             color: #e2e8f0; /* Light text */
+            min-height: 100vh; /* Ensure full viewport height */
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden; /* Prevent horizontal scroll on animations */
         }
+
+        /* Main container for content */
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 2rem;
+            padding: 1.5rem; /* Slightly reduced padding for smaller screens */
+            flex-grow: 1; /* Allow container to grow */
+            animation: fadeIn 1s ease-out forwards; /* Fade-in animation for the whole container */
+            opacity: 0; /* Start invisible for animation */
         }
+        @media (min-width: 640px) { /* sm breakpoint */
+            .container {
+                padding: 2rem; /* Restore original padding on larger screens */
+            }
+        }
+
+        /* Card styling */
         .card {
             background-color: #2d3748; /* Darker card background */
-            border-radius: 0.75rem; /* rounded-xl */
+            border-radius: 1.5rem; /* rounded-3xl for more pronounced corners */
             padding: 1.5rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            /* Enhanced multi-layered shadow for depth */
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3), 0 5px 10px rgba(0, 0, 0, 0.2);
+            border: 1px solid #4a5568; /* Subtle border */
+            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out; /* Smooth hover effect */
+            position: relative; /* For potential pseudo-elements or overlays */
+            overflow: hidden; /* Ensure content stays within rounded corners */
         }
+
+        .card:hover {
+            transform: translateY(-8px) scale(1.01); /* Lift card more and slightly scale */
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 8px 15px rgba(0, 0, 0, 0.3); /* Stronger shadow on hover */
+        }
+
+        /* Button styling enhancements */
+        .button-primary {
+            background: linear-gradient(45deg, #48bb78, #38a169); /* Green gradient */
+            border: none;
+            color: white;
+            font-weight: bold;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem; /* rounded-xl */
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease-in-out;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .button-primary:hover {
+            background: linear-gradient(45deg, #38a169, #2f855a); /* Darker green on hover */
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .button-primary:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Secondary button for play alerts */
+        .button-secondary {
+            background: linear-gradient(45deg, #63b3ed, #4299e1); /* Blue gradient */
+            border: none;
+            color: white;
+            font-weight: bold;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem; /* rounded-xl */
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease-in-out;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .button-secondary:hover {
+            background: linear-gradient(45deg, #4299e1, #3182ce); /* Darker blue on hover */
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .button-secondary:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Fade-in animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Fixed height for gauges to ensure consistency */
         .gauge-container {
-            height: 250px; /* Fixed height for gauges */
+            height: 250px;
             display: flex;
             justify-content: center;
             align-items: center;
         }
+
         /* Custom scrollbar for raw data table */
         .dataframe-container {
             max-height: 300px;
             overflow-y: auto;
-            border-radius: 0.5rem;
+            border-radius: 0.75rem; /* rounded-xl */
             background-color: #2d3748;
+            border: 1px solid #4a5568;
         }
+
+        /* Table styling within dataframe-container */
         .dataframe-container table {
             width: 100%;
             border-collapse: collapse;
         }
+
         .dataframe-container th, .dataframe-container td {
-            padding: 0.75rem;
+            padding: 0.75rem 1rem; /* Increased padding */
             border-bottom: 1px solid #4a5568;
             text-align: left;
         }
+
         .dataframe-container th {
             background-color: #4a5568;
             font-weight: bold;
@@ -58,10 +154,21 @@
             position: sticky;
             top: 0;
             z-index: 1;
+            text-transform: uppercase; /* Uppercase headers */
+            letter-spacing: 0.05em; /* Slight letter spacing */
+        }
+
+        .dataframe-container tr:nth-child(even) {
+            background-color: #2d3748; /* Alternate row background */
+        }
+        .dataframe-container tr:nth-child(odd) {
+            background-color: #242c38; /* Alternate row background */
         }
         .dataframe-container tr:hover {
-            background-color: #4a5568;
+            background-color: #4a5568; /* Darker on hover */
         }
+
+        /* Loading spinner animation */
         .loading-spinner {
             border: 4px solid rgba(255, 255, 255, 0.3);
             border-top: 4px solid #3498db;
@@ -83,12 +190,14 @@
         #google_translate_element .goog-te-gadget-simple {
             background-color: #2d3748 !important; /* Darker card background */
             border: 1px solid #4a5568 !important;
-            border-radius: 0.5rem !important;
-            padding: 0.5rem !important;
+            border-radius: 0.75rem !important; /* rounded-xl */
+            padding: 0.5rem 0.75rem !important;
             color: #e2e8f0 !important;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
         #google_translate_element .goog-te-gadget-simple .goog-te-menu-value {
             color: #e2e8f0 !important;
+            font-weight: 500;
         }
         #google_translate_element .goog-te-gadget-simple .goog-te-menu-value span {
             color: #e2e8f0 !important;
@@ -99,28 +208,144 @@
         #google_translate_translate_element_div {
             display: none; /* Hide the default Google Translate banner */
         }
+
+        /* Toggle Switch Styles */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 90px; /* Increased width */
+            height: 34px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #4a5568; /* Darker grey when off */
+            -webkit-transition: .4s;
+            transition: .4s;
+            border-radius: 34px;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: #e2e8f0; /* Light grey knob */
+            -webkit-transition: .4s;
+            transition: .4s;
+            border-radius: 50%;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        input:checked + .slider {
+            background-color: #48bb78; /* Green when checked */
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
+        }
+
+        input:focus + .slider {
+            box-shadow: 0 0 1px #48bb78;
+        }
+
+        input:checked + .slider:before {
+            -webkit-transform: translateX(56px); /* Adjusted for wider switch */
+            -ms-transform: translateX(56px);
+            transform: translateX(56px);
+        }
+
+        /* Round sliders */
+        .slider.round {
+            border-radius: 34px;
+        }
+
+        .slider.round:before {
+            border-radius: 50%;
+        }
+
+        /* Labels for toggle switch */
+        .toggle-labels {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            transform: translateY(-50%);
+            display: flex;
+            justify-content: space-between;
+            padding: 0 10px; /* Adjusted padding */
+            color: #cbd5e0; /* Lighter text for labels */
+            font-weight: bold;
+            font-size: 0.8rem;
+            pointer-events: none; /* Make labels unclickable */
+        }
+        .toggle-labels span {
+            pointer-events: none; /* Make labels unclickable */
+        }
+
+        /* Custom select box styling */
+        select {
+            appearance: none; /* Remove default arrow */
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23A0AEC0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l4 4 4-4'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 1.5em;
+            padding-right: 2.5rem; /* Space for the custom arrow */
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen">
     <div class="container">
-        <h1 class="text-4xl font-bold text-green-400 mb-6 text-center">🌿 Smart AgriTech Dashboard</h1>
+        <h1 class="text-4xl sm:text-5xl font-extrabold text-green-400 mb-8 text-center tracking-wide">
+            <i class="fas fa-leaf mr-3"></i> Smart AgriTech Dashboard
+        </h1>
 
-        <div class="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
-            <button id="refresh-button" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
-                🔄 Refresh Data
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-8 space-y-4 sm:space-y-0">
+            <button id="refresh-button" class="button-primary w-full sm:w-auto">
+                <i class="fas fa-sync-alt mr-2"></i> Refresh Data
             </button>
-            <div class="flex items-center space-x-2">
-                <label for="google_translate_element" class="text-lg">Choose Language:</label>
-                <!-- Google Translate Dropdown -->
-                <div id="google_translate_element" style="margin-bottom: 0;"></div>
+            <div class="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6 w-full sm:w-auto">
+                <!-- Simulation Mode Toggle -->
+                <div class="flex items-center space-x-3">
+                    <span class="text-lg font-medium text-gray-300">Mode:</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="simulation-mode-toggle">
+                        <span class="slider round"></span>
+                        <div class="toggle-labels">
+                            <span class="ml-1">Real</span>
+                            <span class="mr-1">Sim</span>
+                        </div>
+                    </label>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <label for="google_translate_element" class="text-lg font-medium text-gray-300">Choose Language:</label>
+                    <!-- Google Translate Dropdown -->
+                    <div id="google_translate_element" style="margin-bottom: 0;"></div>
+                </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             <!-- Current Sensor Readings -->
             <div class="card">
-                <h2 class="text-2xl font-semibold text-green-300 mb-4">📊 Current Sensor Readings</h2>
-                <div id="gauge-charts" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <h2 class="text-2xl font-semibold text-green-300 mb-5 border-b border-gray-700 pb-3">
+                    <i class="fas fa-tachometer-alt mr-2"></i> Current Sensor Readings
+                </h2>
+                <!-- Adjusted grid for 2x2 layout on medium and large screens -->
+                <div id="gauge-charts" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div id="gauge-soil-moisture" class="gauge-container"></div>
                     <div id="gauge-temperature" class="gauge-container"></div>
                     <div id="gauge-ph" class="gauge-container"></div>
@@ -130,73 +355,95 @@
 
             <!-- Sensor Trends Over Time -->
             <div class="card">
-                <h2 class="text-2xl font-semibold text-green-300 mb-4">📈 Sensor Trends Over Time</h2>
-                <div id="sensor-trends-chart" class="w-full h-80"></div>
-                <p id="sensor-trends-status" class="text-sm text-gray-400 mt-2"></p>
+                <h2 class="text-2xl font-semibold text-green-300 mb-5 border-b border-gray-700 pb-3">
+                    <i class="fas fa-chart-line mr-2"></i> Sensor Trends Over Time
+                </h2>
+                <!-- Adjusted chart height for better responsiveness -->
+                <div id="sensor-trends-chart" class="w-full h-64 sm:h-80"></div>
+                <p id="sensor-trends-status" class="text-sm text-gray-400 mt-3 text-center"></p>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             <!-- Crop Care Recommendations & AI-Based Predictions -->
             <div class="card">
-                <h2 class="text-2xl font-semibold text-green-300 mb-4">🌿 Crop Care & AI Insights</h2>
+                <h2 class="text-2xl font-semibold text-green-300 mb-5 border-b border-gray-700 pb-3">
+                    <i class="fas fa-seedling mr-2"></i> Crop Care & AI Insights
+                </h2>
 
-                <div class="mb-4">
-                    <label for="crop-select" class="block text-lg font-medium text-gray-300 mb-2">Select Growing Crop:</label>
-                    <select id="crop-select" class="w-full bg-gray-700 text-white py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                <div class="mb-6">
+                    <label for="crop-select" class="block text-lg font-medium text-gray-300 mb-2">
+                        <i class="fas fa-leaf mr-2"></i> Select Growing Crop:
+                    </label>
+                    <select id="crop-select" class="w-full bg-gray-700 text-white py-2.5 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 border border-gray-600">
                         <!-- Options populated by JS -->
                     </select>
                 </div>
 
-                <h3 class="text-xl font-medium text-gray-200 mb-2">Crop Care Recommendations:</h3>
-                <div id="care-tips" class="bg-gray-800 p-4 rounded-lg mb-4 min-h-[80px]">
+                <h3 class="text-xl font-medium text-gray-200 mb-3"><i class="fas fa-lightbulb mr-2"></i> Crop Care Recommendations:</h3>
+                <div id="care-tips" class="bg-gray-800 p-5 rounded-lg mb-6 min-h-[100px] border border-gray-700">
                     <p class="text-gray-400">Loading recommendations...</p>
                 </div>
-                <button id="play-alerts-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 mb-4">
-                    🔊 Play Top Alerts
+                <button id="play-alerts-button" class="button-secondary w-full sm:w-auto">
+                    <i class="fas fa-volume-up mr-2"></i> Play Top Alerts
                 </button>
-                <div id="audio-status" class="text-sm text-gray-400 mb-4"></div>
+                <div id="audio-status" class="text-sm text-gray-400 mb-6 text-center"></div>
 
-                <h3 class="text-xl font-medium text-gray-200 mb-2">🤖 AI-Based Growth Prediction:</h3>
-                <div id="growth-prediction" class="bg-gray-800 p-4 rounded-lg mb-4 min-h-[80px]">
+                <h3 class="text-xl font-medium text-gray-200 mb-3"><i class="fas fa-robot mr-2"></i> AI-Based Growth Prediction:</h3>
+                <div id="growth-prediction" class="bg-gray-800 p-5 rounded-lg mb-6 min-h-[100px] border border-gray-700">
                     <p class="text-gray-400">Loading predictions...</p>
                 </div>
 
-                <h3 class="text-xl font-medium text-gray-200 mb-2">📉 Market Price Forecast:</h3>
-                <div id="market-price-forecast" class="bg-gray-800 p-4 rounded-lg mb-4 min-h-[40px]">
+                <h3 class="text-xl font-medium text-gray-200 mb-3"><i class="fas fa-chart-bar mr-2"></i> Market Price Forecast:</h3>
+                <div id="market-price-forecast" class="bg-gray-800 p-5 rounded-lg mb-6 min-h-[60px] border border-gray-700">
                     <p class="text-gray-400">Loading forecast...</p>
                 </div>
 
-                <h3 class="text-xl font-medium text-gray-200 mb-2">🌾 Crop Suggestion Based on Predicted Conditions:</h3>
-                <div id="crop-suggestion" class="bg-gray-800 p-4 rounded-lg min-h-[80px]">
+                <h3 class="text-xl font-medium text-gray-200 mb-3"><i class="fas fa-seedling mr-2"></i> Crop Suggestion Based on Predicted Conditions:</h3>
+                <div id="crop-suggestion" class="bg-gray-800 p-5 rounded-lg min-h-[100px] border border-gray-700">
                     <p class="text-gray-400">Loading suggestions...</p>
                 </div>
             </div>
 
             <!-- Real-Time Plant Monitoring & Raw Data -->
             <div class="card">
-                <h2 class="text-2xl font-semibold text-green-300 mb-4">🌿 Real-Time Plant Monitoring (Simulated)</h2>
-                <div id="camera-feed" class="bg-gray-800 p-4 rounded-lg mb-6 min-h-[100px]">
+                <h2 class="text-2xl font-semibold text-green-300 mb-5 border-b border-gray-700 pb-3">
+                    <i class="fas fa-camera mr-2"></i> Real-Time Plant Monitoring (Simulated)
+                </h2>
+                <div id="camera-feed" class="bg-gray-800 p-5 rounded-lg mb-8 min-h-[120px] border border-gray-700 flex flex-col justify-center items-center text-center">
+                    <i class="fas fa-video text-green-500 text-4xl mb-3"></i>
                     <p class="text-gray-400">Loading camera data...</p>
                 </div>
 
-                <h2 class="text-2xl font-semibold text-green-300 mb-4">📋 Latest Sensor Readings (Raw Data)</h2>
+                <h2 class="text-2xl font-semibold text-green-300 mb-5 border-b border-gray-700 pb-3">
+                    <i class="fas fa-table mr-2"></i> Latest Sensor Readings (Raw Data)
+                </h2>
                 <div id="raw-data-table" class="dataframe-container">
-                    <p class="text-gray-400 p-4">Loading raw data...</p>
+                    <p class="text-gray-400 p-4 text-center">Loading raw data...</p>
                 </div>
             </div>
         </div>
 
         <!-- Application Initialization Status (Placeholder as this is backend info) -->
-        <div class="card mb-6">
-            <h2 class="text-2xl font-semibold text-green-300 mb-4 cursor-pointer" onclick="toggleExpander('init-status-content')">
-                Application Initialization Status <span id="expander-icon" class="float-right transform rotate-0 transition-transform duration-200">▼</span>
+        <div class="card mb-8">
+            <h2 class="text-2xl font-semibold text-green-300 mb-4 cursor-pointer flex justify-between items-center" onclick="toggleExpander('init-status-content')">
+                <span><i class="fas fa-info-circle mr-2"></i> Application Initialization Status</span>
+                <span id="expander-icon" class="float-right transform rotate-0 transition-transform duration-200 text-gray-400">
+                    <i class="fas fa-chevron-down"></i>
+                </span>
             </h2>
             <div id="init-status-content" class="hidden">
-                <p class="text-gray-400">Backend components (Firebase, AI models, scalers) are initialized during server startup. Check server logs for detailed status.</p>
+                <p class="text-gray-400 p-2 bg-gray-800 rounded-lg border border-gray-700">
+                    Backend components (Firebase, AI models, scalers) are initialized during server startup. Check server logs for detailed status.
+                </p>
             </div>
         </div>
     </div>
+
+    <footer class="bg-gray-800 text-gray-400 text-center p-4 mt-auto rounded-t-xl">
+        <p>&copy; 2025 Smart AgriTech. All rights reserved.</p>
+        <p class="text-sm mt-1">Powered by Advanced AI & Sensor Technology</p>
+    </footer>
 
     <script>
         // Use a relative path for API calls. This assumes your Flask app serves both frontend and backend.
@@ -214,16 +461,16 @@
                 type: "indicator",
                 mode: "gauge+number",
                 value: value,
-                title: { text: title, font: { color: font_color } },
-                number: { font: { color: font_color } },
+                title: { text: title, font: { color: font_color, size: 16 } }, // Smaller title font
+                number: { font: { color: font_color, size: 24 }, suffix: suffix }, // Larger number font
                 gauge: {
                     axis: { range: [null, max_value], tickwidth: 1, tickcolor: font_color },
                     bar: { color: color },
                     bgcolor: "rgba(0,0,0,0)", // Transparent background for the gauge itself
                     borderwidth: 2,
-                    bordercolor: "gray",
+                    bordercolor: "#4a5568", // Border color for gauge
                     steps: [
-                        { range: [0, max_value * 0.3], color: "#4a5568" }, // Darker gray for steps
+                        { range: [0, max_value * 0.3], color: "#4a5568" }, /* Darker gray for steps */
                         { range: [max_value * 0.3, max_value * 0.7], color: "#2d3748" },
                         { range: [max_value * 0.7, max_value], color: "#1a202c" }
                     ],
@@ -261,13 +508,17 @@
             const traces = [];
             const uniqueMetrics = [...new Set(plotData.map(d => d['Sensor Metric']))];
 
-            uniqueMetrics.forEach(metric => {
+            // Define a color palette for the lines
+            const colors = ['#68D391', '#81E6D9', '#63B3ED', '#A78BFA', '#F6AD55', '#FC8181']; // Green, Teal, Blue, Purple, Orange, Red
+
+            uniqueMetrics.forEach((metric, index) => {
                 const filteredData = plotData.filter(d => d['Sensor Metric'] === metric);
                 traces.push({
                     x: filteredData.map(d => d.timestamp),
                     y: filteredData.map(d => d.Reading),
                     mode: 'lines',
                     name: metric,
+                    line: { color: colors[index % colors.length] }, // Assign color from palette
                     hovertemplate: `<b>%{fullData.name}</b><br>Time: %{x}<br>Reading: %{y:.2f}<extra></extra>`
                 });
             });
@@ -275,29 +526,35 @@
             const layout = {
                 title: {
                     text: "Historical Sensor Readings",
-                    font: { color: "#e2e8f0" }
+                    font: { color: "#e2e8f0", size: 18 }
                 },
                 xaxis: {
                     title: "Time",
-                    color: "#e2e8f0",
+                    color: "#cbd5e0",
                     gridcolor: '#4a5568',
-                    linecolor: '#4a5568'
+                    linecolor: '#4a5568',
+                    tickfont: { color: "#cbd5e0" }
                 },
                 yaxis: {
                     title: "Sensor Reading",
-                    color: "#e2e8f0",
+                    color: "#cbd5e0",
                     gridcolor: '#4a5568',
-                    linecolor: '#4a5568'
+                    linecolor: '#4a5568',
+                    tickfont: { color: "#cbd5e0" }
                 },
                 legend: {
                     title: { text: "Metric", font: { color: "#e2e8f0" } },
-                    font: { color: "#e2e8f0" }
+                    font: { color: "#e2e8f0" },
+                    bgcolor: 'rgba(45, 55, 72, 0.7)', // Semi-transparent legend background
+                    bordercolor: '#4a5568',
+                    borderwidth: 1,
+                    x: 1, y: 1, xanchor: 'right', yanchor: 'top' // Position legend
                 },
                 hovermode: "x unified",
                 font: { family: "Inter", size: 12, color: "#e2e8f0" },
                 paper_bgcolor: "rgba(0,0,0,0)", // Transparent background for the plot area
                 plot_bgcolor: "rgba(0,0,0,0)", // Transparent background for the plot area
-                margin: { l: 40, r: 40, t: 60, b: 40 }
+                margin: { l: 50, r: 30, t: 70, b: 50 } // Adjust margins
             };
 
             Plotly.newPlot(chartDiv, traces, layout);
@@ -330,7 +587,7 @@
             tableContainer.innerHTML = ''; // Clear previous content
 
             if (!rawData || rawData.length === 0) {
-                tableContainer.innerHTML = '<p class="text-gray-400 p-4">No sensor data to display.</p>';
+                tableContainer.innerHTML = '<p class="text-gray-400 p-4 text-center">No sensor data to display.</p>';
                 return;
             }
 
@@ -344,7 +601,7 @@
             headers.forEach(headerText => {
                 const th = document.createElement('th');
                 th.textContent = headerText.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase()); // Format header text
-                th.classList.add('px-4', 'py-2', 'text-left', 'text-gray-200', 'bg-gray-700');
+                th.classList.add('px-4', 'py-3', 'text-left', 'text-gray-200', 'bg-gray-700', 'font-semibold');
                 headerRow.appendChild(th);
             });
             thead.appendChild(headerRow);
@@ -362,7 +619,7 @@
                         value = value.toFixed(2); // Format numbers
                     }
                     td.textContent = value !== null ? value : 'N/A';
-                    td.classList.add('px-4', 'py-2', 'border-b', 'border-gray-600', 'text-gray-300');
+                    td.classList.add('px-4', 'py-2.5', 'border-b', 'border-gray-600', 'text-gray-300');
                     tr.appendChild(td);
                 });
                 tbody.appendChild(tr);
@@ -374,42 +631,44 @@
         // Function to toggle expander content
         function toggleExpander(contentId) {
             const content = document.getElementById(contentId);
-            const icon = document.getElementById('expander-icon');
+            const icon = document.getElementById('expander-icon').querySelector('i');
             if (content.classList.contains('hidden')) {
                 content.classList.remove('hidden');
-                icon.classList.add('rotate-180');
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
             } else {
                 content.classList.add('hidden');
-                icon.classList.remove('rotate-180');
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
             }
         }
 
         // Function to display messages with icons
         function displayMessage(elementId, message, type = 'info') {
             const element = document.getElementById(elementId);
-            let icon = '';
+            let iconClass = '';
             let colorClass = 'text-gray-400';
 
             switch (type) {
                 case 'success':
-                    icon = '✅';
+                    iconClass = 'fas fa-check-circle';
                     colorClass = 'text-green-400';
                     break;
                 case 'warning':
-                    icon = '⚠️';
+                    iconClass = 'fas fa-exclamation-triangle';
                     colorClass = 'text-yellow-400';
                     break;
                 case 'error':
-                    icon = '❌';
+                    iconClass = 'fas fa-times-circle';
                     colorClass = 'text-red-400';
                     break;
                 case 'info':
                 default:
-                    icon = 'ℹ️';
+                    iconClass = 'fas fa-info-circle';
                     colorClass = 'text-blue-400';
                     break;
             }
-            element.innerHTML = `<p class="${colorClass}">${icon} ${message}</p>`;
+            element.innerHTML = `<p class="${colorClass}"><i class="${iconClass} mr-2"></i> ${message}</p>`;
         }
 
         // Function to render Markdown-like text to HTML
@@ -455,10 +714,10 @@
                 const cropLabels = data.crop_labels;
 
                 // Render Gauge Charts
-                createGauge('gauge-soil-moisture', "Soil Moisture (%)", latestData.soil_moisture || 0, 100, "%", 'rgba(0,128,0,0.8)');
-                createGauge('gauge-temperature', "Temperature (°C)", latestData.temperature || 0, 40, "°C", 'rgba(255,165,0,0.8)');
-                createGauge('gauge-ph', "pH", latestData.ph || 0, 14, "", 'rgba(0,0,255,0.8)');
-                createGauge('gauge-humidity', "Humidity (%)", latestData.humidity || 0, 100, "%", 'rgba(128,0,128,0.8)');
+                createGauge('gauge-soil-moisture', "Soil Moisture", latestData.soil_moisture || 0, 100, "%", '#68D391'); /* Green */
+                createGauge('gauge-temperature', "Temperature", latestData.temperature || 0, 40, "°C", '#F6AD55'); /* Orange */
+                createGauge('gauge-ph', "pH", latestData.ph || 0, 14, "", '#63B3ED'); /* Blue */
+                createGauge('gauge-humidity', "Humidity", latestData.humidity || 0, 100, "%", '#A78BFA'); /* Purple */
 
                 // Render Sensor Trends Chart
                 renderSensorTrendsChart(plotData);
@@ -480,9 +739,9 @@
                 const cameraFeedDiv = document.getElementById('camera-feed');
                 if (cameraData) {
                     cameraFeedDiv.innerHTML = `
-                        <p class="text-gray-300">🕒 Timestamp: ${cameraData.timestamp || 'N/A'}</p>
-                        <p class="text-green-400">📈 Growth Stage: ${cameraData.stage || 'N/A'}</p>
-                        <p class="text-yellow-400">⚠️ Advisory: ${cameraData.alert || 'N/A'}</p>
+                        <p class="text-gray-300"><i class="far fa-clock mr-2"></i> Timestamp: ${cameraData.timestamp || 'N/A'}</p>
+                        <p class="text-green-400"><i class="fas fa-chart-line mr-2"></i> Growth Stage: ${cameraData.stage || 'N/A'}</p>
+                        <p class="text-yellow-400"><i class="fas fa-exclamation-triangle mr-2"></i> Advisory: ${cameraData.alert || 'N/A'}</p>
                     `;
                 } else {
                     displayMessage('camera-feed', "No real-time plant monitoring data available from Firebase. Please ensure the dummy camera simulator is running and pushing data.", 'info');
@@ -495,6 +754,9 @@
                 console.error("Error fetching dashboard data:", error);
                 // Display error messages on relevant sections
                 displayMessage('gauge-soil-moisture', "Error loading data", 'error');
+                displayMessage('gauge-temperature', "Error loading data", 'error');
+                displayMessage('gauge-ph', "Error loading data", 'error');
+                displayMessage('gauge-humidity', "Error loading data", 'error');
                 displayMessage('sensor-trends-status', "Error loading sensor trends.", 'error');
                 displayMessage('camera-feed', "Error loading camera data.", 'error');
                 displayMessage('raw-data-table', "Error loading raw data.", 'error');
@@ -504,7 +766,7 @@
                 displayMessage('crop-suggestion', "Error loading suggestions.", 'error');
             } finally {
                 document.getElementById('refresh-button').disabled = false;
-                document.getElementById('refresh-button').innerHTML = '🔄 Refresh Data';
+                document.getElementById('refresh-button').innerHTML = '<i class="fas fa-sync-alt mr-2"></i> Refresh Data';
             }
         }
 
@@ -538,7 +800,7 @@
                 const data = await response.json();
                 const careTipsDiv = document.getElementById('care-tips');
                 if (data.advice && data.advice.length > 0) {
-                    careTipsDiv.innerHTML = data.advice.map(tip => `<p>${renderMarkdown(tip)}</p>`).join('');
+                    careTipsDiv.innerHTML = data.advice.map(tip => `<p class="mb-2 last:mb-0">${renderMarkdown(tip)}</p>`).join('');
                 } else {
                     displayMessage('care-tips', "No specific care recommendations available.", 'info');
                 }
@@ -563,14 +825,14 @@
                 } else {
                     predictedSoilMoisture = data.soil_moisture_pred;
                     let soilMoistureMsg = `📊 Predicted Soil Moisture: <b>${data.soil_moisture_pred.toFixed(2)}%</b>`;
-                    if (!(0 <= data.soil_moisture_pred <= 100)) {
+                    if (!(0 <= data.soil_moisture_pred && data.soil_moisture_pred <= 100)) { // Corrected logical AND
                         soilMoistureMsg += `. This value seems unusual (Expected between 0-100%).`;
-                        growthPredictionDiv.innerHTML = `<p class="text-yellow-400">⚠️ ${soilMoistureMsg}</p>`;
+                        growthPredictionDiv.innerHTML = `<p class="text-yellow-400"><i class="fas fa-exclamation-triangle mr-2"></i> ${soilMoistureMsg}</p>`;
                     } else {
-                        growthPredictionDiv.innerHTML = `<p class="text-green-400">✅ ${soilMoistureMsg}</p>`;
+                        growthPredictionDiv.innerHTML = `<p class="text-green-400"><i class="fas fa-check-circle mr-2"></i> ${soilMoistureMsg}</p>`;
                     }
-                    growthPredictionDiv.innerHTML += `<p class="text-blue-400">💡 Predicted Light Intensity: <b>${data.light_intensity_pred.toFixed(2)} lux</b></p>`;
-                    growthPredictionDiv.innerHTML += `<p class="text-green-400">🌿 Predicted NPK Nutrient Sum: <b>${data.nutrient_sum_pred.toFixed(2)}</b></p>`;
+                    growthPredictionDiv.innerHTML += `<p class="text-blue-400 mt-2"><i class="fas fa-sun mr-2"></i> Predicted Light Intensity: <b>${data.light_intensity_pred.toFixed(2)} lux</b></p>`;
+                    growthPredictionDiv.innerHTML += `<p class="text-green-400 mt-2"><i class="fas fa-flask mr-2"></i> Predicted NPK Nutrient Sum: <b>${data.nutrient_sum_pred.toFixed(2)}</b></p>`;
                 }
             } catch (error) {
                 console.error("Error fetching growth prediction:", error);
@@ -589,7 +851,7 @@
                 if (data.error) {
                     displayMessage('market-price-forecast', `Error: ${data.error}`, 'error');
                 } else {
-                    marketPriceDiv.innerHTML = `<p class="text-green-400">💰 Estimated Market Price for ${selectedCropType}: <b>₹ ${data.predicted_price.toFixed(2)} / unit</b></p>`;
+                    marketPriceDiv.innerHTML = `<p class="text-green-400"><i class="fas fa-money-bill-wave mr-2"></i> Estimated Market Price for ${selectedCropType}: <b>₹ ${data.predicted_price.toFixed(2)} / unit</b></p>`;
                 }
             } catch (error) {
                 console.error("Error fetching market price forecast:", error);
@@ -667,12 +929,57 @@
             audioStatusDiv.textContent = "🔊 Alerts finished.";
         });
 
+        // Function to set the simulation mode via API
+        async function setSimulationMode(isSimulation) {
+            const mode = isSimulation ? 'simulation' : 'real-time';
+            try {
+                const response = await fetch(`${API_BASE_URL}/set_mode`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: mode })
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    console.log(`Backend mode set to: ${data.mode}`);
+                    // Optionally, re-fetch data to reflect the mode change immediately
+                    fetchDataAndRender();
+                } else {
+                    console.error("Failed to set backend mode:", data.message);
+                }
+            } catch (error) {
+                console.error("Error setting simulation mode:", error);
+            }
+        }
+
+        // Function to get the current simulation mode from API and update toggle
+        async function getAndSetInitialMode() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/get_mode`);
+                const data = await response.json();
+                const toggle = document.getElementById('simulation-mode-toggle');
+                if (data.mode === 'simulation') {
+                    toggle.checked = true; // Set to simulation (right side)
+                } else {
+                    toggle.checked = false; // Set to real-time (left side)
+                }
+                console.log(`Initial backend mode: ${data.mode}`);
+            } catch (error) {
+                console.error("Error fetching initial simulation mode:", error);
+            }
+        }
+
 
         // Initial data load when the page is ready
         document.addEventListener('DOMContentLoaded', () => {
+            getAndSetInitialMode(); // Get initial mode and set toggle state
             fetchDataAndRender();
             // Set up auto-refresh (e.g., every 30 seconds)
             setInterval(fetchDataAndRender, 30000); // Refresh every 30 seconds
+
+            // Add event listener for the toggle switch
+            document.getElementById('simulation-mode-toggle').addEventListener('change', (event) => {
+                setSimulationMode(event.target.checked);
+            });
         });
     </script>
 
