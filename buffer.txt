@@ -13,13 +13,16 @@
     <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Google Fonts: Poppins for headings -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
 
     <style>
         /* Base styles for body and font */
         body {
             font-family: 'Inter', sans-serif;
-            /* More attractive radial gradient background */
-            background: radial-gradient(circle at top left, #2a3447, #1a202c 70%);
+            /* Background image with a black overlay */
+            background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), url('pexels-madebymath-21393.jpg') no-repeat center center fixed;
+            background-size: cover;
             color: #e2e8f0; /* Light text */
             min-height: 100vh; /* Ensure full viewport height */
             display: flex;
@@ -538,24 +541,32 @@
             align-items: center;
         }
 
-        /* Camera Details */
-        .camera-feed-placeholder .camera-details {
-            position: absolute;
-            bottom: 1rem;
-            left: 1rem;
-            right: 1rem;
+        /* Camera Details (now external) */
+        .camera-details-external {
+            /* Changed to flex column for single line display */
             display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            gap: 0.5rem;
-            font-size: clamp(0.7rem, 1.8vw, 0.85rem);
-            color: #a0aec0;
+            flex-direction: column;
+            gap: 0.5rem; /* Space between items */
+            background-color: rgba(0, 0, 0, 0.4); /* Dark semi-transparent background */
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            margin-top: 1rem; /* Space from the camera feed box */
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            border: 1px solid #4a5568;
         }
-        .camera-feed-placeholder .camera-details span {
-            padding: 0.25rem 0.5rem;
-            background-color: rgba(0, 0, 0, 0.3);
+        .camera-details-external span {
+            background-color: rgba(0, 0, 0, 0.2); /* Slightly darker background for individual items */
+            padding: 0.5rem 0.75rem;
             border-radius: 0.5rem;
+            display: block; /* Make them block to take full width */
+            text-align: left; /* Align text to left */
+            font-size: clamp(0.75rem, 1.5vw, 0.9rem);
+            color: #cbd5e0;
+            white-space: normal; /* Allow text wrapping if needed */
+            overflow: visible; /* Do not hide overflow text */
+            text-overflow: clip; /* Do not add ellipsis */
         }
+
 
         /* Camera Icon */
         .camera-feed-placeholder .camera-icon {
@@ -594,8 +605,9 @@
             margin-right: 1rem;
         }
         .main-header .title-section h1 {
+            font-family: 'Poppins', sans-serif; /* Changed font to Poppins */
             font-size: 2.5rem; /* Larger main title */
-            font-weight: bold;
+            font-weight: 800; /* Bolder weight for Poppins */
             color: #68D391;
             line-height: 1;
         }
@@ -865,19 +877,22 @@
                 <h2 class="text-2xl font-semibold text-green-300 mb-5 border-b border-gray-700 pb-3">
                     <i class="fas fa-camera mr-2"></i> Real-Time Plant Monitoring
                 </h2>
-                <div id="camera-feed-container" class="camera-feed-placeholder mb-8">
+                <div id="camera-feed-container" class="camera-feed-placeholder mb-4">
                     <span class="live-indicator"><i class="fas fa-circle text-red-500 text-xs mr-1"></i> LIVE</span>
                     <span class="connection-status"><i class="fas fa-wifi mr-1"></i> Connected</span>
                     <i class="fas fa-video camera-icon"></i>
                     <p class="text-gray-400 text-lg">Live Camera Feed</p>
                     <p class="text-gray-500 text-sm">Sector A - Field View</p>
-                    <div class="camera-details flex flex-wrap justify-between gap-2"> <!-- Added flex-wrap and gap -->
-                        <span id="camera-resolution">1920x1080 Resolution</span>
-                        <span id="camera-fps">30 FPS</span>
-                        <span id="camera-signal">85% Signal</span>
-                    </div>
-                    <span class="camera-overlay-text" id="last-frame-time">Last Frame: N/A</span>
+                    <span class="camera-overlay-text">Last Frame: N/A</span>
                 </div>
+                <!-- OUTSIDE the feed box -->
+                <div id="camera-details-external" class="camera-details-external text-sm text-gray-300">
+                    <span id="camera-resolution">Growth Stage: N/A</span>
+                    <span id="camera-fps">Advisory: N/A</span>
+                    <span id="camera-signal">Timestamp: N/A</span>
+                    <span id="last-frame-time">Last Frame: N/A</span>
+                </div>
+
                 <div class="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4 mt-4"> <!-- Adjusted for better responsiveness -->
                     <button id="capture-image-button" class="button-primary flex-1">
                         <i class="fas fa-camera-retro mr-2"></i> Capture Image
@@ -1506,7 +1521,6 @@
                     displayMessage('sensor-trends-status', "⚠️ Not enough complete data available for plotting sensor trends. Check if sensors are reporting data for these features.", 'warning');
                     Plotly.purge('sensor-trends-chart');
                     // Keep camera feed placeholder as is, it has its own dummy logic
-                    // displayMessage('camera-feed-container', "No real-time plant monitoring data available from Firebase. Please ensure the dummy camera simulator is running and pushing data.", 'info');
                     renderRawDataTable([]);
                     displayMessage('care-tips', "No sensor data available for crop care recommendations.", 'info');
                     displayMessage('growth-prediction', "Select a crop, ensure sensor data is available, and all AI components are loaded for prediction.", 'info');
@@ -1556,27 +1570,31 @@
 
                 // Display Camera Feed Data (using the placeholder structure)
                 const cameraFeedContainer = document.getElementById('camera-feed-container');
+                // Target the new external camera details container
+                const cameraDetailsExternal = document.getElementById('camera-details-external');
+
                 if (cameraData) {
                     // Update connection status based on actual data presence
                     const connectionStatusSpan = cameraFeedContainer.querySelector('.connection-status');
                     connectionStatusSpan.innerHTML = '<i class="fas fa-wifi mr-1"></i> Connected';
                     connectionStatusSpan.style.backgroundColor = '#48bb78'; // Green
 
-                    // Update details (simulated for now as backend only provides stage/alert)
-                    document.getElementById('camera-resolution').textContent = `Growth Stage: ${cameraData.stage || 'N/A'}`;
-                    document.getElementById('camera-fps').textContent = `Advisory: ${cameraData.alert || 'N/A'}`;
-                    document.getElementById('camera-signal').textContent = `Timestamp: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
-                    document.getElementById('last-frame-time').textContent = `Last Frame: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
-
+                    // Update details in the EXTERNAL container
+                    cameraDetailsExternal.querySelector('#camera-resolution').textContent = `Growth Stage: ${cameraData.stage || 'N/A'}`;
+                    cameraDetailsExternal.querySelector('#camera-fps').textContent = `Advisory: ${cameraData.alert || 'N/A'}`;
+                    cameraDetailsExternal.querySelector('#camera-signal').textContent = `Timestamp: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
+                    cameraDetailsExternal.querySelector('#last-frame-time').textContent = `Last Frame: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
 
                 } else {
                     const connectionStatusSpan = cameraFeedContainer.querySelector('.connection-status');
                     connectionStatusSpan.innerHTML = '<i class="fas fa-wifi-slash mr-1"></i> Disconnected';
                     connectionStatusSpan.style.backgroundColor = '#e53e3e'; // Red
-                    document.getElementById('camera-resolution').textContent = `No Camera Data`;
-                    document.getElementById('camera-fps').textContent = `N/A`;
-                    document.getElementById('camera-signal').textContent = `N/A`;
-                    document.getElementById('last-frame-time').textContent = `Last Frame: N/A`;
+
+                    // Reset details in the EXTERNAL container
+                    cameraDetailsExternal.querySelector('#camera-resolution').textContent = `No Camera Data`;
+                    cameraDetailsExternal.querySelector('#camera-fps').textContent = `N/A`;
+                    cameraDetailsExternal.querySelector('#camera-signal').textContent = `N/A`;
+                    cameraDetailsExternal.querySelector('#last-frame-time').textContent = `N/A`;
                 }
 
                 // Render Raw Data Table
@@ -1604,7 +1622,6 @@
                 displayMessage('light-intensity-update', "Error loading data", 'error');
                 displayMessage('rainfall-update', "Error loading data", 'error');
                 displayMessage('sensor-trends-status', "Error loading sensor trends.", 'error');
-                // displayMessage('camera-feed-container', "Error loading camera data.", 'error'); // Handled by its own logic
                 displayMessage('raw-data-table', "Error loading raw data.", 'error');
                 displayMessage('care-tips', "Error loading recommendations.", 'error');
                 displayMessage('growth-prediction', "Error loading predictions.", 'error');
@@ -1748,7 +1765,7 @@
             for (let i = 0; i < topAlerts.length; i++) {
                 let tip = topAlerts[i];
                 // Remove markdown and emojis for better speech
-                const cleanTip = tip.replace(/\*\*/g, '').replace(/[🌱�🌡️💨🧪☀️🌧️✅⚠️❌ℹ️]/g, '').trim();
+                const cleanTip = tip.replace(/\*\*/g, '').replace(/[🌱🌡️💨🧪☀️🌧️✅⚠️❌ℹ️]/g, '').trim();
                 if (cleanTip) {
                     try {
                         const response = await fetch(`${API_BASE_URL}/voice_alert`, {
