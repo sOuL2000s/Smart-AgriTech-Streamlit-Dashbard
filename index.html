@@ -478,82 +478,111 @@
 
         /* Real-Time Plant Monitoring Styling */
         .camera-feed-placeholder {
-            background-color: #1a202c; /* Darker background for video area */
+            background-color: #1a202c;
             border: 2px solid #4a5568;
             border-radius: 1rem;
-            min-height: 250px; /* Changed from fixed height to min-height */
-            aspect-ratio: 16 / 9; /* Added aspect ratio for video-like scaling */
+            width: 100%; /* Full width in parent container */
+            max-width: 100%;
+            aspect-ratio: 16 / 9;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             color: #cbd5e0;
-            font-size: 1rem;
+            font-size: clamp(0.9rem, 2vw, 1rem);
             position: relative;
-            overflow: hidden; /* Ensure rounded corners */
-            animation: pulse 2s infinite alternate; /* Added pulse animation */
+            overflow: hidden;
+            animation: pulse 2s infinite alternate;
         }
+
+        /* Pulse Animation */
         @keyframes pulse {
             0% { box-shadow: 0 0 0px rgba(72, 187, 120, 0.4); }
             100% { box-shadow: 0 0 15px rgba(72, 187, 120, 0.8); }
         }
+
+        /* Live Indicator */
         .camera-feed-placeholder .live-indicator {
             position: absolute;
             top: 1rem;
             left: 1rem;
-            background-color: #e53e3e; /* Red */
+            background-color: #e53e3e;
             color: white;
             padding: 0.25rem 0.5rem;
             border-radius: 0.5rem;
-            font-size: 0.75rem;
+            font-size: clamp(0.6rem, 1.5vw, 0.75rem);
             font-weight: bold;
             display: flex;
             align-items: center;
-            animation: blink 1s infinite; /* Blinking live indicator */
+            animation: blink 1s infinite;
         }
+
+        /* Blinking */
         @keyframes blink {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+
+        /* Connection Status */
         .camera-feed-placeholder .connection-status {
             position: absolute;
             top: 1rem;
             right: 1rem;
-            background-color: #48bb78; /* Green */
+            background-color: #48bb78;
             color: white;
             padding: 0.25rem 0.5rem;
             border-radius: 0.5rem;
-            font-size: 0.75rem;
+            font-size: clamp(0.6rem, 1.5vw, 0.75rem);
             font-weight: bold;
             display: flex;
             align-items: center;
         }
-        .camera-feed-placeholder .camera-details {
-            position: absolute;
-            bottom: 1rem;
-            left: 1rem;
-            right: 1rem;
+
+        /* Camera Details (now external) */
+        .camera-details-external {
+            /* Changed from grid to flex column for single line display */
             display: flex;
-            justify-content: space-between;
-            font-size: 0.85rem;
-            color: #a0aec0;
+            flex-direction: column;
+            gap: 0.5rem; /* Space between items */
+            background-color: rgba(0, 0, 0, 0.4); /* Dark semi-transparent background */
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            margin-top: 1rem; /* Space from the camera feed box */
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            border: 1px solid #4a5568;
         }
+        .camera-details-external span {
+            background-color: rgba(0, 0, 0, 0.2); /* Slightly darker background for individual items */
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            display: block; /* Make them block to take full width */
+            text-align: left; /* Align text to left */
+            font-size: clamp(0.75rem, 1.5vw, 0.9rem);
+            color: #cbd5e0;
+            white-space: normal; /* Allow text wrapping if needed */
+            overflow: visible; /* Do not hide overflow text */
+            text-overflow: clip; /* Do not add ellipsis */
+        }
+
+
+        /* Camera Icon */
         .camera-feed-placeholder .camera-icon {
-            font-size: 3rem;
-            color: #63b3ed; /* Blue icon */
+            font-size: clamp(2rem, 5vw, 3rem);
+            color: #63b3ed;
             margin-bottom: 0.5rem;
         }
+
+        /* Overlay Text */
         .camera-feed-placeholder .camera-overlay-text {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 1.5rem;
+            font-size: clamp(1rem, 3vw, 1.5rem);
             font-weight: bold;
-            color: rgba(255, 255, 255, 0.2); /* Semi-transparent text */
-            pointer-events: none; /* Allow clicks to pass through */
+            color: rgba(255, 255, 255, 0.2);
+            pointer-events: none;
         }
-
 
         /* Header Styling */
         .main-header {
@@ -844,20 +873,23 @@
                 <h2 class="text-2xl font-semibold text-green-300 mb-5 border-b border-gray-700 pb-3">
                     <i class="fas fa-camera mr-2"></i> Real-Time Plant Monitoring
                 </h2>
-                <div id="camera-feed-container" class="camera-feed-placeholder mb-8">
+                <div id="camera-feed-container" class="camera-feed-placeholder mb-4">
                     <span class="live-indicator"><i class="fas fa-circle text-red-500 text-xs mr-1"></i> LIVE</span>
                     <span class="connection-status"><i class="fas fa-wifi mr-1"></i> Connected</span>
                     <i class="fas fa-video camera-icon"></i>
                     <p class="text-gray-400 text-lg">Live Camera Feed</p>
                     <p class="text-gray-500 text-sm">Sector A - Field View</p>
-                    <div class="camera-details">
-                        <span id="camera-resolution">1920x1080 Resolution</span>
-                        <span id="camera-fps">30 FPS</span>
-                        <span id="camera-signal">85% Signal</span>
-                    </div>
-                    <span class="camera-overlay-text" id="last-frame-time">Last Frame: N/A</span>
+                    <span class="camera-overlay-text">Last Frame: N/A</span>
                 </div>
-                <div class="flex justify-center space-x-4 mt-4">
+                <!-- OUTSIDE the feed box -->
+                <div id="camera-details-external" class="camera-details-external text-sm text-gray-300">
+                    <span id="camera-resolution">Growth Stage: N/A</span>
+                    <span id="camera-fps">Advisory: N/A</span>
+                    <span id="camera-signal">Timestamp: N/A</span>
+                    <span id="last-frame-time">Last Frame: N/A</span>
+                </div>
+
+                <div class="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4 mt-4"> <!-- Adjusted for better responsiveness -->
                     <button id="capture-image-button" class="button-primary flex-1">
                         <i class="fas fa-camera-retro mr-2"></i> Capture Image
                     </button>
@@ -1485,7 +1517,6 @@
                     displayMessage('sensor-trends-status', "⚠️ Not enough complete data available for plotting sensor trends. Check if sensors are reporting data for these features.", 'warning');
                     Plotly.purge('sensor-trends-chart');
                     // Keep camera feed placeholder as is, it has its own dummy logic
-                    // displayMessage('camera-feed-container', "No real-time plant monitoring data available from Firebase. Please ensure the dummy camera simulator is running and pushing data.", 'info');
                     renderRawDataTable([]);
                     displayMessage('care-tips', "No sensor data available for crop care recommendations.", 'info');
                     displayMessage('growth-prediction', "Select a crop, ensure sensor data is available, and all AI components are loaded for prediction.", 'info');
@@ -1535,27 +1566,31 @@
 
                 // Display Camera Feed Data (using the placeholder structure)
                 const cameraFeedContainer = document.getElementById('camera-feed-container');
+                // Target the new external camera details container
+                const cameraDetailsExternal = document.getElementById('camera-details-external');
+
                 if (cameraData) {
                     // Update connection status based on actual data presence
                     const connectionStatusSpan = cameraFeedContainer.querySelector('.connection-status');
                     connectionStatusSpan.innerHTML = '<i class="fas fa-wifi mr-1"></i> Connected';
                     connectionStatusSpan.style.backgroundColor = '#48bb78'; // Green
 
-                    // Update details (simulated for now as backend only provides stage/alert)
-                    document.getElementById('camera-resolution').textContent = `Growth Stage: ${cameraData.stage || 'N/A'}`;
-                    document.getElementById('camera-fps').textContent = `Advisory: ${cameraData.alert || 'N/A'}`;
-                    document.getElementById('camera-signal').textContent = `Timestamp: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
-                    document.getElementById('last-frame-time').textContent = `Last Frame: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
-
+                    // Update details in the EXTERNAL container
+                    cameraDetailsExternal.querySelector('#camera-resolution').textContent = `Growth Stage: ${cameraData.stage || 'N/A'}`;
+                    cameraDetailsExternal.querySelector('#camera-fps').textContent = `Advisory: ${cameraData.alert || 'N/A'}`;
+                    cameraDetailsExternal.querySelector('#camera-signal').textContent = `Timestamp: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
+                    cameraDetailsExternal.querySelector('#last-frame-time').textContent = `Last Frame: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
 
                 } else {
                     const connectionStatusSpan = cameraFeedContainer.querySelector('.connection-status');
                     connectionStatusSpan.innerHTML = '<i class="fas fa-wifi-slash mr-1"></i> Disconnected';
                     connectionStatusSpan.style.backgroundColor = '#e53e3e'; // Red
-                    document.getElementById('camera-resolution').textContent = `No Camera Data`;
-                    document.getElementById('camera-fps').textContent = `N/A`;
-                    document.getElementById('camera-signal').textContent = `N/A`;
-                    document.getElementById('last-frame-time').textContent = `Last Frame: N/A`;
+
+                    // Reset details in the EXTERNAL container
+                    cameraDetailsExternal.querySelector('#camera-resolution').textContent = `No Camera Data`;
+                    cameraDetailsExternal.querySelector('#camera-fps').textContent = `N/A`;
+                    cameraDetailsExternal.querySelector('#camera-signal').textContent = `N/A`;
+                    cameraDetailsExternal.querySelector('#last-frame-time').textContent = `Last Frame: N/A`;
                 }
 
                 // Render Raw Data Table
@@ -1583,7 +1618,6 @@
                 displayMessage('light-intensity-update', "Error loading data", 'error');
                 displayMessage('rainfall-update', "Error loading data", 'error');
                 displayMessage('sensor-trends-status', "Error loading sensor trends.", 'error');
-                // displayMessage('camera-feed-container', "Error loading camera data.", 'error'); // Handled by its own logic
                 displayMessage('raw-data-table', "Error loading raw data.", 'error');
                 displayMessage('care-tips', "Error loading recommendations.", 'error');
                 displayMessage('growth-prediction', "Error loading predictions.", 'error');
@@ -1727,7 +1761,7 @@
             for (let i = 0; i < topAlerts.length; i++) {
                 let tip = topAlerts[i];
                 // Remove markdown and emojis for better speech
-                const cleanTip = tip.replace(/\*\*/g, '').replace(/[🌱💧🌡️💨🧪☀️🌧️✅⚠️❌ℹ️]/g, '').trim();
+                const cleanTip = tip.replace(/\*\*/g, '').replace(/[🌱🌡️💨🧪☀️🌧️✅⚠️❌ℹ️]/g, '').trim();
                 if (cleanTip) {
                     try {
                         const response = await fetch(`${API_BASE_URL}/voice_alert`, {
