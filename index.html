@@ -29,7 +29,7 @@
 
         /* Main container for content */
         .container {
-            max-width: 1200px;
+            max-width: 1400px; /* Increased max-width for more content */
             margin: 0 auto;
             padding: 1.5rem; /* Slightly reduced padding for smaller screens */
             flex-grow: 1; /* Allow container to grow */
@@ -118,14 +118,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Fixed height for gauges to ensure consistency */
-        .gauge-container {
-            height: 250px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
         /* Custom scrollbar for raw data table */
         .dataframe-container {
             max-height: 300px;
@@ -186,18 +178,52 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Styling for Google Translate dropdown */
+        /* Styling for Google Translate dropdown - Improved UI */
+        #google_translate_element {
+            /* Hide Google Translate's default branding */
+            display: inline-block; /* Keep it block to allow styling */
+            vertical-align: middle;
+        }
+
+        /* Hide the Google Translate banner/toolbar */
+        .goog-te-banner-frame.skiptranslate {
+            display: none !important;
+        }
+        body {
+            top: 0px !important; /* Remove the top margin added by Google Translate */
+        }
+
+        /* Style the Google Translate dropdown itself */
         #google_translate_element .goog-te-gadget-simple {
-            background-color: #2d3748 !important; /* Darker card background */
-            border: 1px solid #4a5568 !important;
+            background-color: #2d3748 !important; /* Card background */
+            border: 1px solid #4a5568 !important; /* Subtle border */
             border-radius: 0.75rem !important; /* rounded-xl */
             padding: 0.5rem 0.75rem !important;
-            color: #e2e8f0 !important;
+            color: #e2e8f0 !important; /* Light text */
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease-in-out;
+            font-size: 1rem;
+            line-height: 1.5; /* Ensure text aligns well */
+            height: auto; /* Allow height to adjust */
+            overflow: hidden; /* Prevent text overflow */
+            display: flex; /* Use flex to align content */
+            align-items: center; /* Vertically center content */
+            justify-content: space-between; /* Space between text and arrow */
+            cursor: pointer;
         }
+
+        #google_translate_element .goog-te-gadget-simple:hover {
+            border-color: #68D391 !important; /* Highlight border on hover */
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
         #google_translate_element .goog-te-gadget-simple .goog-te-menu-value {
             color: #e2e8f0 !important;
             font-weight: 500;
+            flex-grow: 1; /* Allow text to take available space */
+            white-space: nowrap; /* Prevent wrapping */
+            overflow: hidden; /* Hide overflow text */
+            text-overflow: ellipsis; /* Add ellipsis for overflow */
         }
         #google_translate_element .goog-te-gadget-simple .goog-te-menu-value span {
             color: #e2e8f0 !important;
@@ -205,9 +231,20 @@
         #google_translate_element .goog-te-gadget-simple .goog-te-menu-value span:hover {
             color: #cbd5e0 !important; /* Lighter on hover */
         }
-        #google_translate_translate_element_div {
-            display: none; /* Hide the default Google Translate banner */
+
+        /* Custom arrow for the dropdown */
+        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value img {
+            display: none !important; /* Hide default Google arrow image */
         }
+        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value::after {
+            content: '\f078'; /* Font Awesome chevron-down icon */
+            font-family: 'Font Awesome 6 Free'; /* Use Font Awesome */
+            font-weight: 900; /* Solid icon */
+            margin-left: 0.5rem;
+            color: #cbd5e0; /* Icon color */
+            font-size: 0.8rem;
+        }
+
 
         /* Toggle Switch Styles */
         .toggle-switch {
@@ -305,13 +342,242 @@
             background-size: 1.5em;
             padding-right: 2.5rem; /* Space for the custom arrow */
         }
+
+        /* Circular Progress Bar Styling */
+        .circular-progress-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            text-align: center;
+            position: relative;
+            background-color: #242c38; /* Slightly darker background for each sensor item */
+            border-radius: 1rem;
+            border: 1px solid #3a4458;
+            height: 100%; /* Ensure consistent height within the grid */
+        }
+
+        .circular-progress {
+            position: relative;
+            width: 80px; /* Smaller size for the circle */
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 0.5rem;
+            background: conic-gradient(#48bb78 0%, #38a169 0%); /* Default to 0% */
+            transition: background 0.5s ease-in-out;
+            box-shadow: inset 0 0 8px rgba(0,0,0,0.3);
+        }
+
+        .circular-progress::before {
+            content: '';
+            position: absolute;
+            width: 65px; /* Inner circle size */
+            height: 65px;
+            border-radius: 50%;
+            background-color: #2d3748; /* Card background color */
+            z-index: 1;
+        }
+
+        .progress-value {
+            position: relative;
+            font-size: 1.25rem; /* text-xl */
+            font-weight: bold;
+            color: #e2e8f0;
+            z-index: 2;
+        }
+
+        .sensor-icon {
+            position: relative;
+            z-index: 2;
+            color: #68D391; /* Green icon color */
+            font-size: 1.5rem; /* Larger icon */
+            margin-bottom: 0.25rem;
+        }
+
+        .sensor-label {
+            font-size: 0.9rem; /* text-sm */
+            color: #cbd5e0;
+            margin-top: 0.25rem;
+        }
+
+        .sensor-update-time {
+            font-size: 0.75rem; /* text-xs */
+            color: #94a3b8;
+            margin-top: 0.5rem;
+        }
+
+        /* Specific colors for different gauges */
+        .circular-progress.soil-moisture { background: conic-gradient(#68D391 0%, #38a169 0%); }
+        .circular-progress.temperature { background: conic-gradient(#F6AD55 0%, #DD6B20 0%); }
+        .circular-progress.humidity { background: conic-gradient(#63B3ED 0%, #4299E1 0%); }
+        .circular-progress.ph { background: conic-gradient(#A78BFA 0%, #805AD5 0%); }
+        .circular-progress.light-intensity { background: conic-gradient(#ECC94B 0%, #D69E2E 0%); }
+        .circular-progress.rainfall { background: conic-gradient(#4299E1 0%, #3182CE 0%); }
+
+        /* Weather Card Styling */
+        .weather-day {
+            border-bottom: 1px solid #4a5568;
+            padding-bottom: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        .weather-day:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+            margin-bottom: 0;
+        }
+
+        /* Farm Health Index Progress Bar */
+        .health-factor-progress {
+            height: 8px;
+            background-color: #4a5568;
+            border-radius: 9999px; /* full rounded */
+            overflow: hidden;
+        }
+        .health-factor-bar {
+            height: 100%;
+            background-color: #48bb78; /* Green */
+            border-radius: 9999px;
+            transition: width 0.5s ease-in-out;
+        }
+
+        /* Collapsible section styling */
+        .collapsible-header {
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #4a5568;
+            font-weight: 600;
+            color: #e2e8f0;
+            transition: color 0.2s ease-in-out;
+        }
+        .collapsible-header:hover {
+            color: #68D391;
+        }
+        .collapsible-content {
+            padding-top: 0.75rem;
+            padding-bottom: 0.75rem;
+            display: none; /* Hidden by default */
+            overflow: hidden;
+            transition: all 0.3s ease-in-out;
+        }
+        .collapsible-content.active {
+            display: block; /* Show when active */
+        }
+        .collapsible-header .fas {
+            transition: transform 0.3s ease-in-out;
+        }
+        .collapsible-header.active .fas {
+            transform: rotate(90deg);
+        }
+
+        /* Real-Time Plant Monitoring Styling */
+        .camera-feed-placeholder {
+            background-color: #1a202c; /* Darker background for video area */
+            border: 2px solid #4a5568;
+            border-radius: 1rem;
+            min-height: 250px; /* Changed from fixed height to min-height */
+            aspect-ratio: 16 / 9; /* Added aspect ratio for video-like scaling */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #cbd5e0;
+            font-size: 1rem;
+            position: relative;
+            overflow: hidden; /* Ensure rounded corners */
+        }
+        .camera-feed-placeholder .live-indicator {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            background-color: #e53e3e; /* Red */
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+        }
+        .camera-feed-placeholder .connection-status {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background-color: #48bb78; /* Green */
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+        }
+        .camera-feed-placeholder .camera-details {
+            position: absolute;
+            bottom: 1rem;
+            left: 1rem;
+            right: 1rem;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: #a0aec0;
+        }
+        .camera-feed-placeholder .camera-icon {
+            font-size: 3rem;
+            color: #63b3ed; /* Blue icon */
+            margin-bottom: 0.5rem;
+        }
+
+        /* Header Styling */
+        .main-header {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start; /* Align to start, as icons are removed */
+            margin-bottom: 2rem;
+            padding: 1rem 0;
+            border-bottom: 1px solid #4a5568;
+        }
+        .main-header .logo-section {
+            display: flex;
+            align-items: center;
+        }
+        .main-header .logo-section img {
+            height: 60px; /* Larger logo */
+            margin-right: 1rem;
+        }
+        .main-header .title-section h1 {
+            font-size: 2.5rem; /* Larger main title */
+            font-weight: bold;
+            color: #68D391;
+            line-height: 1;
+        }
+        .main-header .title-section p {
+            font-size: 1rem;
+            color: #a0aec0;
+            margin-top: 0.25rem;
+        }
+        /* Removed .main-header .header-icons as per request */
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen">
     <div class="container">
-        <h1 class="text-4xl sm:text-5xl font-extrabold text-green-400 mb-8 text-center tracking-wide">
-            <i class="fas fa-leaf mr-3"></i> Smart AgriTech Dashboard
-        </h1>
+        <!-- Main Header -->
+        <header class="main-header">
+            <div class="logo-section">
+                <img src="android-chrome-192x192.png" alt="AgriTech Logo" class="rounded-full">
+                <div class="title-section">
+                    <h1>SMART AGRITECH DASHBOARD</h1>
+                    <p>Advanced AI & Sensor Technology for Modern Agriculture</p>
+                </div>
+            </div>
+            <!-- Removed header-icons section as per request -->
+        </header>
 
         <div class="flex flex-col sm:flex-row justify-between items-center mb-8 space-y-4 sm:space-y-0">
             <button id="refresh-button" class="button-primary w-full sm:w-auto">
@@ -338,83 +604,276 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <!-- Current Sensor Readings -->
-            <div class="card">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mb-8">
+
+            <!-- Current Sensor Readings (Top-Left, Tall) -->
+            <div class="card xl:row-span-2">
                 <h2 class="text-2xl font-semibold text-green-300 mb-5 border-b border-gray-700 pb-3">
                     <i class="fas fa-tachometer-alt mr-2"></i> Current Sensor Readings
                 </h2>
-                <!-- Adjusted grid for 2x2 layout on medium and large screens -->
-                <div id="gauge-charts" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div id="gauge-soil-moisture" class="gauge-container"></div>
-                    <div id="gauge-temperature" class="gauge-container"></div>
-                    <div id="gauge-ph" class="gauge-container"></div>
-                    <div id="gauge-humidity" class="gauge-container"></div>
+                <!-- Custom Circular Gauges -->
+                <div id="current-sensor-readings-grid" class="grid grid-cols-2 gap-4">
+                    <!-- Soil Moisture -->
+                    <div class="circular-progress-container">
+                        <div class="circular-progress soil-moisture" data-value="0">
+                            <span class="progress-value">0%</span>
+                        </div>
+                        <i class="fas fa-tint sensor-icon"></i>
+                        <span class="sensor-label">Soil Moisture</span>
+                        <span class="sensor-update-time" id="soil-moisture-update">Updated: N/A</span>
+                    </div>
+                    <!-- Temperature -->
+                    <div class="circular-progress-container">
+                        <div class="circular-progress temperature" data-value="0">
+                            <span class="progress-value">0°C</span>
+                        </div>
+                        <i class="fas fa-thermometer-half sensor-icon"></i>
+                        <span class="sensor-label">Temperature</span>
+                        <span class="sensor-update-time" id="temperature-update">Updated: N/A</span>
+                    </div>
+                    <!-- Humidity -->
+                    <div class="circular-progress-container">
+                        <div class="circular-progress humidity" data-value="0">
+                            <span class="progress-value">0%</span>
+                        </div>
+                        <i class="fas fa-water sensor-icon"></i>
+                        <span class="sensor-label">Humidity</span>
+                        <span class="sensor-update-time" id="humidity-update">Updated: N/A</span>
+                    </div>
+                    <!-- pH Level -->
+                    <div class="circular-progress-container">
+                        <div class="circular-progress ph" data-value="0">
+                            <span class="progress-value">0</span>
+                        </div>
+                        <i class="fas fa-flask sensor-icon"></i>
+                        <span class="sensor-label">pH Level</span>
+                        <span class="sensor-update-time" id="ph-update">Updated: N/A</span>
+                    </div>
+                    <!-- Light Intensity -->
+                    <div class="circular-progress-container">
+                        <div class="circular-progress light-intensity" data-value="0">
+                            <span class="progress-value">0 lux</span>
+                        </div>
+                        <i class="fas fa-sun sensor-icon"></i>
+                        <span class="sensor-label">Light Intensity</span>
+                        <span class="sensor-update-time" id="light-intensity-update">Updated: N/A</span>
+                    </div>
+                    <!-- Rainfall -->
+                    <div class="circular-progress-container">
+                        <div class="circular-progress rainfall" data-value="0">
+                            <span class="progress-value">0 mm</span>
+                        </div>
+                        <i class="fas fa-cloud-showers-heavy sensor-icon"></i>
+                        <span class="sensor-label">Rainfall</span>
+                        <span class="sensor-update-time" id="rainfall-update">Updated: N/A</span>
+                    </div>
                 </div>
             </div>
 
-            <!-- Sensor Trends Over Time -->
-            <div class="card">
+            <!-- Sensor Trends Over Time (Top-Middle, Wide) -->
+            <div class="card xl:col-span-2">
                 <h2 class="text-2xl font-semibold text-green-300 mb-5 border-b border-gray-700 pb-3">
                     <i class="fas fa-chart-line mr-2"></i> Sensor Trends Over Time
                 </h2>
-                <!-- Adjusted chart height for better responsiveness -->
-                <div id="sensor-trends-chart" class="w-full h-64 sm:h-80"></div>
+                <div id="sensor-trends-chart" class="w-full h-80"></div>
                 <p id="sensor-trends-status" class="text-sm text-gray-400 mt-3 text-center"></p>
             </div>
-        </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <!-- Crop Care Recommendations & AI-Based Predictions -->
+            <!-- Weather Card (Top-Right, Normal) -->
             <div class="card">
+                <h2 class="text-2xl font-semibold text-green-300 mb-5 border-b border-gray-700 pb-3">
+                    <i class="fas fa-cloud-sun mr-2"></i> Weather
+                </h2>
+                <div id="weather-data">
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="flex items-center">
+                            <i class="fas fa-cloud text-5xl text-blue-300 mr-4"></i>
+                            <div>
+                                <p class="text-5xl font-bold text-white" id="current-temp">24°C</p>
+                                <p class="text-gray-400 text-lg" id="current-humidity">68% Humidity</p>
+                            </div>
+                        </div>
+                        <p class="text-gray-400 text-lg"><i class="fas fa-wind mr-2"></i> <span id="wind-speed">12 km/h</span></p>
+                    </div>
+
+                    <div id="weather-forecast">
+                        <div class="weather-day flex justify-between items-center">
+                            <p class="text-gray-300"><i class="fas fa-calendar-day mr-2"></i> Today</p>
+                            <p class="text-gray-200"><span id="today-high">26°</span> <span class="text-gray-400" id="today-low">18°</span></p>
+                        </div>
+                        <div class="weather-day flex justify-between items-center">
+                            <p class="text-gray-300"><i class="fas fa-calendar-alt mr-2"></i> Tomorrow</p>
+                            <p class="text-gray-200"><span id="tomorrow-high">23°</span> <span class="text-gray-400" id="tomorrow-low">16°</span></p>
+                        </div>
+                        <div class="weather-day flex justify-between items-center">
+                            <p class="text-gray-300"><i class="fas fa-calendar-week mr-2"></i> Wed</p>
+                            <p class="text-gray-200"><span id="wed-high">21°</span> <span class="text-gray-400" id="wed-low">14°</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Crop Care & AI Insights (Middle-Left, Wide) -->
+            <div class="card xl:col-span-2">
                 <h2 class="text-2xl font-semibold text-green-300 mb-5 border-b border-gray-700 pb-3">
                     <i class="fas fa-seedling mr-2"></i> Crop Care & AI Insights
                 </h2>
 
                 <div class="mb-6">
                     <label for="crop-select" class="block text-lg font-medium text-gray-300 mb-2">
-                        <i class="fas fa-leaf mr-2"></i> Select Growing Crop:
+                        <i class="fas fa-leaf mr-2"></i> Active Crop:
                     </label>
                     <select id="crop-select" class="w-full bg-gray-700 text-white py-2.5 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 border border-gray-600">
                         <!-- Options populated by JS -->
                     </select>
                 </div>
 
-                <h3 class="text-xl font-medium text-gray-200 mb-3"><i class="fas fa-lightbulb mr-2"></i> Crop Care Recommendations:</h3>
-                <div id="care-tips" class="bg-gray-800 p-5 rounded-lg mb-6 min-h-[100px] border border-gray-700">
-                    <p class="text-gray-400">Loading recommendations...</p>
-                </div>
-                <button id="play-alerts-button" class="button-secondary w-full sm:w-auto">
-                    <i class="fas fa-volume-up mr-2"></i> Play Top Alerts
-                </button>
-                <div id="audio-status" class="text-sm text-gray-400 mb-6 text-center"></div>
-
-                <h3 class="text-xl font-medium text-gray-200 mb-3"><i class="fas fa-robot mr-2"></i> AI-Based Growth Prediction:</h3>
-                <div id="growth-prediction" class="bg-gray-800 p-5 rounded-lg mb-6 min-h-[100px] border border-gray-700">
-                    <p class="text-gray-400">Loading predictions...</p>
-                </div>
-
-                <h3 class="text-xl font-medium text-gray-200 mb-3"><i class="fas fa-chart-bar mr-2"></i> Market Price Forecast:</h3>
-                <div id="market-price-forecast" class="bg-gray-800 p-5 rounded-lg mb-6 min-h-[60px] border border-gray-700">
-                    <p class="text-gray-400">Loading forecast...</p>
+                <!-- AI Recommendations (Collapsible) -->
+                <div class="mb-4">
+                    <div class="collapsible-header" onclick="toggleCollapsible('ai-recommendations-content')">
+                        <h3 class="text-xl font-medium text-gray-200"><i class="fas fa-lightbulb mr-2"></i> AI Recommendations</h3>
+                        <i class="fas fa-chevron-right"></i>
+                    </div>
+                    <div id="ai-recommendations-content" class="collapsible-content bg-gray-800 p-5 rounded-lg border border-gray-700 mt-2">
+                        <div id="care-tips">
+                            <p class="text-gray-400">Loading recommendations...</p>
+                        </div>
+                        <button id="play-alerts-button" class="button-secondary w-full sm:w-auto mt-4">
+                            <i class="fas fa-volume-up mr-2"></i> Play Top Alerts
+                        </button>
+                        <div id="audio-status" class="text-sm text-gray-400 mt-2 text-center"></div>
+                    </div>
                 </div>
 
-                <h3 class="text-xl font-medium text-gray-200 mb-3"><i class="fas fa-seedling mr-2"></i> Crop Suggestion Based on Predicted Conditions:</h3>
+                <!-- Growth Prediction (Collapsible) -->
+                <div class="mb-4">
+                    <div class="collapsible-header" onclick="toggleCollapsible('growth-prediction-content')">
+                        <h3 class="text-xl font-medium text-gray-200"><i class="fas fa-robot mr-2"></i> Growth Prediction</h3>
+                        <i class="fas fa-chevron-right"></i>
+                    </div>
+                    <div id="growth-prediction-content" class="collapsible-content bg-gray-800 p-5 rounded-lg border border-gray-700 mt-2">
+                        <div id="growth-prediction">
+                            <p class="text-gray-400">Loading predictions...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Market Forecast (Collapsible) -->
+                <div class="mb-4">
+                    <div class="collapsible-header" onclick="toggleCollapsible('market-forecast-content')">
+                        <h3 class="text-xl font-medium text-gray-200"><i class="fas fa-chart-bar mr-2"></i> Market Forecast</h3>
+                        <i class="fas fa-chevron-right"></i>
+                    </div>
+                    <div id="market-forecast-content" class="collapsible-content bg-gray-800 p-5 rounded-lg border border-gray-700 mt-2">
+                        <div id="market-price-forecast">
+                            <p class="text-gray-400">Loading forecast...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Crop Suggestion (Separate, not collapsible in image) -->
+                <h3 class="text-xl font-medium text-gray-200 mb-3 mt-6"><i class="fas fa-seedling mr-2"></i> Crop Suggestion Based on Predicted Conditions:</h3>
                 <div id="crop-suggestion" class="bg-gray-800 p-5 rounded-lg min-h-[100px] border border-gray-700">
                     <p class="text-gray-400">Loading suggestions...</p>
                 </div>
             </div>
 
-            <!-- Real-Time Plant Monitoring & Raw Data -->
+            <!-- Real-Time Plant Monitoring (Middle-Right, Normal) -->
             <div class="card">
                 <h2 class="text-2xl font-semibold text-green-300 mb-5 border-b border-gray-700 pb-3">
-                    <i class="fas fa-camera mr-2"></i> Real-Time Plant Monitoring (Simulated)
+                    <i class="fas fa-camera mr-2"></i> Real-Time Plant Monitoring
                 </h2>
-                <div id="camera-feed" class="bg-gray-800 p-5 rounded-lg mb-8 min-h-[120px] border border-gray-700 flex flex-col justify-center items-center text-center">
-                    <i class="fas fa-video text-green-500 text-4xl mb-3"></i>
-                    <p class="text-gray-400">Loading camera data...</p>
+                <div id="camera-feed-container" class="camera-feed-placeholder mb-8">
+                    <span class="live-indicator"><i class="fas fa-circle text-red-500 text-xs mr-1"></i> LIVE</span>
+                    <span class="connection-status"><i class="fas fa-wifi mr-1"></i> Connected</span>
+                    <i class="fas fa-video camera-icon"></i>
+                    <p class="text-gray-400 text-lg">Live Camera Feed</p>
+                    <p class="text-gray-500 text-sm">Sector A - Field View</p>
+                    <div class="camera-details">
+                        <span>1920x1080 Resolution</span>
+                        <span>30 FPS</span>
+                        <span>85% Signal</span>
+                    </div>
                 </div>
+            </div>
 
+            <!-- Recent Events (Bottom-Right, Normal) -->
+            <div class="card">
+                <h2 class="text-2xl font-semibold text-green-300 mb-5 border-b border-gray-700 pb-3">
+                    <i class="fas fa-history mr-2"></i> Recent Events
+                </h2>
+                <div id="recent-events" class="bg-gray-800 p-5 rounded-lg mb-8 min-h-[150px] border border-gray-700">
+                    <p class="text-gray-400">Loading recent events...</p>
+                    <!-- Events will be populated here by JS -->
+                </div>
+            </div>
+
+            <!-- Farm Health Index (Bottom-Left, Tall) -->
+            <div class="card xl:row-span-2">
+                <h2 class="text-2xl font-semibold text-green-300 mb-5 border-b border-gray-700 pb-3">
+                    <i class="fas fa-heartbeat mr-2"></i> Farm Health Index
+                </h2>
+                <div class="flex flex-col items-center mb-6">
+                    <div class="relative w-32 h-32 flex items-center justify-center mb-4">
+                        <svg class="w-full h-full" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="45" fill="none" stroke="#4a5568" stroke-width="10"></circle>
+                            <circle id="health-score-circle" cx="50" cy="50" r="45" fill="none" stroke="#48bb78" stroke-width="10"
+                                stroke-dasharray="0, 282.7" transform="rotate(-90 50 50)"></circle>
+                        </svg>
+                        <span class="absolute text-4xl font-bold text-white" id="overall-health-score">85</span>
+                    </div>
+                    <p class="text-green-400 text-xl font-semibold mb-4" id="overall-health-status">Good</p>
+                    <div class="w-full">
+                        <h3 class="text-lg font-medium text-gray-200 mb-3">Health Factors:</h3>
+                        <div class="space-y-3" id="health-factors-list">
+                            <!-- Health factors populated by JS -->
+                            <div class="flex justify-between items-center text-gray-300">
+                                <span>Soil Quality</span>
+                                <span class="font-semibold" id="soil-quality-percent">92%</span>
+                            </div>
+                            <div class="health-factor-progress">
+                                <div class="health-factor-bar" id="soil-quality-bar" style="width: 92%;"></div>
+                            </div>
+
+                            <div class="flex justify-between items-center text-gray-300">
+                                <span>Plant Health</span>
+                                <span class="font-semibold" id="plant-health-percent">88%</span>
+                            </div>
+                            <div class="health-factor-progress">
+                                <div class="health-factor-bar" id="plant-health-bar" style="width: 88%;"></div>
+                            </div>
+
+                            <div class="flex justify-between items-center text-gray-300">
+                                <span>Water Management</span>
+                                <span class="font-semibold" id="water-management-percent">78%</span>
+                            </div>
+                            <div class="health-factor-progress">
+                                <div class="health-factor-bar" id="water-management-bar" style="width: 78%;"></div>
+                            </div>
+
+                            <div class="flex justify-between items-center text-gray-300">
+                                <span>Pest Control</span>
+                                <span class="font-semibold" id="pest-control-percent">82%</span>
+                            </div>
+                            <div class="health-factor-progress">
+                                <div class="health-factor-bar" id="pest-control-bar" style="width: 82%;"></div>
+                            </div>
+
+                            <div class="flex justify-between items-center text-gray-300">
+                                <span>Environmental</span>
+                                <span class="font-semibold" id="environmental-percent">90%</span>
+                            </div>
+                            <div class="health-factor-progress">
+                                <div class="health-factor-bar" id="environmental-bar" style="width: 90%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-green-400 text-sm font-semibold mt-4"><i class="fas fa-arrow-up mr-1"></i> <span id="health-change">+5%</span> from last week</p>
+                </div>
+            </div>
+
+            <!-- Latest Sensor Readings (Raw Data) (Bottom-Middle, Wide) -->
+            <div class="card xl:col-span-2">
                 <h2 class="text-2xl font-semibold text-green-300 mb-5 border-b border-gray-700 pb-3">
                     <i class="fas fa-table mr-2"></i> Latest Sensor Readings (Raw Data)
                 </h2>
@@ -422,20 +881,20 @@
                     <p class="text-gray-400 p-4 text-center">Loading raw data...</p>
                 </div>
             </div>
-        </div>
 
-        <!-- Application Initialization Status (Placeholder as this is backend info) -->
-        <div class="card mb-8">
-            <h2 class="text-2xl font-semibold text-green-300 mb-4 cursor-pointer flex justify-between items-center" onclick="toggleExpander('init-status-content')">
-                <span><i class="fas fa-info-circle mr-2"></i> Application Initialization Status</span>
-                <span id="expander-icon" class="float-right transform rotate-0 transition-transform duration-200 text-gray-400">
-                    <i class="fas fa-chevron-down"></i>
-                </span>
-            </h2>
-            <div id="init-status-content" class="hidden">
-                <p class="text-gray-400 p-2 bg-gray-800 rounded-lg border border-gray-700">
-                    Backend components (Firebase, AI models, scalers) are initialized during server startup. Check server logs for detailed status.
-                </p>
+            <!-- Application Initialization Status (Full Width at bottom) -->
+            <div class="card xl:col-span-full">
+                <h2 class="text-2xl font-semibold text-green-300 mb-4 cursor-pointer flex justify-between items-center" onclick="toggleExpander('init-status-content')">
+                    <span><i class="fas fa-info-circle mr-2"></i> Application Initialization Status</span>
+                    <span id="expander-icon" class="float-right transform rotate-0 transition-transform duration-200 text-gray-400">
+                        <i class="fas fa-chevron-down"></i>
+                    </span>
+                </h2>
+                <div id="init-status-content" class="hidden">
+                    <p class="text-gray-400 p-2 bg-gray-800 rounded-lg border border-gray-700">
+                        Backend components (Firebase, AI models, scalers) are initialized during server startup. Check server logs for detailed status.
+                    </p>
+                </div>
             </div>
         </div>
     </div>
@@ -455,42 +914,16 @@
             audio.play().catch(e => console.error("Error playing audio:", e));
         }
 
-        // Helper to create a gauge chart (adapted for Plotly.js in HTML)
-        function createGauge(elementId, title, value, max_value, suffix, color, font_color = '#e2e8f0') {
-            const data = [{
-                type: "indicator",
-                mode: "gauge+number",
-                value: value,
-                title: { text: title, font: { color: font_color, size: 16 } }, // Smaller title font
-                number: { font: { color: font_color, size: 24 }, suffix: suffix }, // Larger number font
-                gauge: {
-                    axis: { range: [null, max_value], tickwidth: 1, tickcolor: font_color },
-                    bar: { color: color },
-                    bgcolor: "rgba(0,0,0,0)", // Transparent background for the gauge itself
-                    borderwidth: 2,
-                    bordercolor: "#4a5568", // Border color for gauge
-                    steps: [
-                        { range: [0, max_value * 0.3], color: "#4a5568" }, /* Darker gray for steps */
-                        { range: [max_value * 0.3, max_value * 0.7], color: "#2d3748" },
-                        { range: [max_value * 0.7, max_value], color: "#1a202c" }
-                    ],
-                    threshold: {
-                        line: { color: "red", width: 4 },
-                        thickness: 0.75,
-                        value: value // Threshold at current value for visual effect
-                    },
-                }
-            }];
+        // Function to update a circular progress bar
+        function updateCircularProgress(elementId, value, max_value, unit = '', colorHex = '#48bb78') { // Changed colorClass to colorHex
+            const container = document.querySelector(`.circular-progress.${elementId}`);
+            const valueSpan = container.querySelector('.progress-value');
+            const percent = (value / max_value) * 100;
+            const conicGradient = `conic-gradient(${colorHex} ${percent}%, #2d3748 ${percent}%)`; // Use colorHex here
 
-            const layout = {
-                height: 250,
-                margin: { l: 10, r: 10, t: 50, b: 10 },
-                font: { color: font_color, family: "Inter" },
-                paper_bgcolor: "rgba(0,0,0,0)", // Transparent background for the plot area
-                plot_bgcolor: "rgba(0,0,0,0)" // Transparent background for the plot area
-            };
-
-            Plotly.newPlot(elementId, data, layout);
+            container.style.background = conicGradient;
+            valueSpan.textContent = `${value}${unit}`;
+            container.dataset.value = value; // Store value in dataset for reference
         }
 
         // Function to render sensor trends chart
@@ -509,16 +942,28 @@
             const uniqueMetrics = [...new Set(plotData.map(d => d['Sensor Metric']))];
 
             // Define a color palette for the lines
-            const colors = ['#68D391', '#81E6D9', '#63B3ED', '#A78BFA', '#F6AD55', '#FC8181']; // Green, Teal, Blue, Purple, Orange, Red
+            const colors = {
+                'Soil Moisture': '#68D391',
+                'Temperature': '#F6AD55',
+                'Humidity': '#63B3ED',
+                'pH': '#A78BFA',
+                'Light Intensity': '#ECC94B',
+                'N': '#FC8181',
+                'P': '#81E6D9',
+                'K': '#B794F4',
+                'Rainfall': '#4299E1',
+                'ds18b20_temperature': '#E53E3E', // A distinct color for the new sensor
+                'Growth Factor': '#38A169'
+            };
 
-            uniqueMetrics.forEach((metric, index) => {
+            uniqueMetrics.forEach((metric) => {
                 const filteredData = plotData.filter(d => d['Sensor Metric'] === metric);
                 traces.push({
                     x: filteredData.map(d => d.timestamp),
                     y: filteredData.map(d => d.Reading),
                     mode: 'lines',
                     name: metric,
-                    line: { color: colors[index % colors.length] }, // Assign color from palette
+                    line: { color: colors[metric] || '#cbd5e0' }, // Assign color from palette, fallback to gray
                     hovertemplate: `<b>%{fullData.name}</b><br>Time: %{x}<br>Reading: %{y:.2f}<extra></extra>`
                 });
             });
@@ -643,9 +1088,27 @@
             }
         }
 
+        // Function to toggle collapsible sections
+        function toggleCollapsible(contentId) {
+            const content = document.getElementById(contentId);
+            const header = content.previousElementSibling; // The header is the previous sibling
+            const icon = header.querySelector('.fas.fa-chevron-right');
+
+            if (content.classList.contains('active')) {
+                content.classList.remove('active');
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                content.classList.add('active');
+                icon.style.transform = 'rotate(90deg)';
+            }
+        }
+
+
         // Function to display messages with icons
         function displayMessage(elementId, message, type = 'info') {
-            const element = document.getElementById(elementId);
+            const element = typeof elementId === 'string' ? document.getElementById(elementId) : elementId;
+            if (!element) return; // Guard against null element
+
             let iconClass = '';
             let colorClass = 'text-gray-400';
 
@@ -680,6 +1143,135 @@
             return html;
         }
 
+        // Simulated Weather Data
+        function getSimulatedWeatherData() {
+            const now = new Date();
+            const currentTemp = Math.floor(Math.random() * (30 - 20 + 1)) + 20; // 20-30°C
+            const currentHumidity = Math.floor(Math.random() * (80 - 50 + 1)) + 50; // 50-80%
+            const windSpeed = Math.floor(Math.random() * (20 - 5 + 1)) + 5; // 5-20 km/h
+
+            const forecast = [
+                { day: "Today", high: Math.floor(Math.random() * (35 - 25 + 1)) + 25, low: Math.floor(Math.random() * (20 - 15 + 1)) + 15 },
+                { day: "Tomorrow", high: Math.floor(Math.random() * (30 - 20 + 1)) + 20, low: Math.floor(Math.random() * (18 - 12 + 1)) + 12 },
+                { day: "Wed", high: Math.floor(Math.random() * (28 - 18 + 1)) + 18, low: Math.floor(Math.random() * (15 - 10 + 1)) + 10 }
+            ];
+
+            return {
+                current: {
+                    temp: currentTemp,
+                    humidity: currentHumidity,
+                    wind: windSpeed,
+                    timestamp: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                },
+                forecast: forecast
+            };
+        }
+
+        // Render Weather Data
+        function renderWeatherData() {
+            const weather = getSimulatedWeatherData();
+            document.getElementById('current-temp').textContent = `${weather.current.temp}°C`;
+            document.getElementById('current-humidity').textContent = `${weather.current.humidity}% Humidity`;
+            document.getElementById('wind-speed').textContent = `${weather.current.wind} km/h`;
+
+            document.getElementById('today-high').textContent = `${weather.forecast[0].high}°`;
+            document.getElementById('today-low').textContent = `${weather.forecast[0].low}°`;
+            document.getElementById('tomorrow-high').textContent = `${weather.forecast[1].high}°`;
+            document.getElementById('tomorrow-low').textContent = `${weather.forecast[1].low}°`;
+            document.getElementById('wed-high').textContent = `${weather.forecast[2].high}°`;
+            document.getElementById('wed-low').textContent = `${weather.forecast[2].low}°`;
+        }
+
+        // Simulated Recent Events Data
+        function getSimulatedRecentEvents() {
+            const events = [
+                { text: "Water detected in sector B", time: "10:27 AM" },
+                { text: "Irrigation cycle completed", time: "09:45 AM" },
+                { text: "Optimal light conditions detected", time: "09:10 AM" },
+                { text: "Nutrient levels adjusted in field 1", time: "Yesterday" },
+                { text: "Pest activity observed in north plot", time: "2 days ago" }
+            ];
+            return events;
+        }
+
+        // Render Recent Events
+        function renderRecentEvents() {
+            const events = getSimulatedRecentEvents();
+            const eventsDiv = document.getElementById('recent-events');
+            eventsDiv.innerHTML = '';
+            if (events.length === 0) {
+                eventsDiv.innerHTML = '<p class="text-gray-400">No recent events to display.</p>';
+                return;
+            }
+            events.forEach(event => {
+                eventsDiv.innerHTML += `
+                    <div class="flex justify-between items-center py-2 border-b border-gray-700 last:border-b-0">
+                        <p class="text-gray-300">${event.text}</p>
+                        <span class="text-gray-500 text-sm">${event.time}</span>
+                    </div>
+                `;
+            });
+        }
+
+        // Simulated Farm Health Index Data
+        function getSimulatedFarmHealthData() {
+            const overallScore = Math.floor(Math.random() * (95 - 70 + 1)) + 70; // 70-95
+            let status = "Good";
+            if (overallScore < 75) status = "Fair";
+            if (overallScore < 60) status = "Poor";
+
+            const healthFactors = {
+                'soil-quality': Math.floor(Math.random() * (98 - 80 + 1)) + 80,
+                'plant-health': Math.floor(Math.random() * (95 - 75 + 1)) + 75,
+                'water-management': Math.floor(Math.random() * (90 - 70 + 1)) + 70,
+                'pest-control': Math.floor(Math.random() * (90 - 70 + 1)) + 70,
+                'environmental': Math.floor(Math.random() * (98 - 85 + 1)) + 85
+            };
+
+            const healthChange = (Math.random() * 10 - 5).toFixed(0); // -5% to +5%
+            const changeIcon = healthChange >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+            const changeColor = healthChange >= 0 ? 'text-green-400' : 'text-red-400';
+
+            return {
+                overallScore,
+                status,
+                healthFactors,
+                healthChange,
+                changeIcon,
+                changeColor
+            };
+        }
+
+        // Render Farm Health Index
+        function renderFarmHealthIndex() {
+            const healthData = getSimulatedFarmHealthData();
+
+            // Overall Score
+            document.getElementById('overall-health-score').textContent = healthData.overallScore;
+            document.getElementById('overall-health-status').textContent = healthData.status;
+            const healthCircle = document.getElementById('health-score-circle');
+            const circumference = 2 * Math.PI * 45; // 2 * pi * r, r=45
+            const progress = (healthData.overallScore / 100) * circumference;
+            healthCircle.style.strokeDasharray = `${progress}, ${circumference}`;
+            healthCircle.style.stroke = healthData.overallScore >= 75 ? '#48bb78' : (healthData.overallScore >= 60 ? '#F6AD55' : '#E53E3E');
+
+
+            // Health Factors
+            for (const factor in healthData.healthFactors) {
+                const percent = healthData.healthFactors[factor];
+                const percentElement = document.getElementById(`${factor}-percent`);
+                const barElement = document.getElementById(`${factor}-bar`);
+                if (percentElement) percentElement.textContent = `${percent}%`;
+                if (barElement) barElement.style.width = `${percent}%`;
+            }
+
+            // Health Change
+            const healthChangeElement = document.getElementById('health-change');
+            healthChangeElement.textContent = `${healthData.healthChange >= 0 ? '+' : ''}${healthData.healthChange}%`;
+            healthChangeElement.className = `${healthData.changeColor} text-sm font-semibold mt-4`; // Reapply classes
+            healthChangeElement.previousElementSibling.className = `fas ${healthData.changeIcon} mr-1`; // Update icon
+        }
+
 
         // Main data fetching and rendering function
         async function fetchDataAndRender() {
@@ -691,13 +1283,25 @@
                 const data = await response.json();
 
                 if (data.status === 'no_data') {
-                    displayMessage('gauge-soil-moisture', "Soil Moisture N/A", 'info');
-                    displayMessage('gauge-temperature', "Temperature N/A", 'info');
-                    displayMessage('gauge-ph', "pH N/A", 'info');
-                    displayMessage('gauge-humidity', "Humidity N/A", 'info');
-                    displayMessage('sensor-trends-status', "No data available for plotting sensor trends.", 'warning');
+                    // Update circular progress bars with 0 and N/A
+                    updateCircularProgress('soil-moisture', 0, 100, '%', '#68D391');
+                    updateCircularProgress('temperature', 0, 40, '°C', '#F6AD55');
+                    updateCircularProgress('humidity', 0, 100, '%', '#63B3ED');
+                    updateCircularProgress('ph', 0, 14, '', '#A78BFA');
+                    updateCircularProgress('light-intensity', 0, 1000, ' lux', '#ECC94B');
+                    updateCircularProgress('rainfall', 0, 250, ' mm', '#4299E1');
+
+                    document.getElementById('soil-moisture-update').textContent = "Updated: N/A";
+                    document.getElementById('temperature-update').textContent = "Updated: N/A";
+                    document.getElementById('humidity-update').textContent = "Updated: N/A";
+                    document.getElementById('ph-update').textContent = "Updated: N/A";
+                    document.getElementById('light-intensity-update').textContent = "Updated: N/A";
+                    document.getElementById('rainfall-update').textContent = "Updated: N/A";
+
+                    displayMessage('sensor-trends-status', "⚠️ Not enough complete data available for plotting sensor trends. Check if sensors are reporting data for these features.", 'warning');
                     Plotly.purge('sensor-trends-chart');
-                    displayMessage('camera-feed', "No real-time plant monitoring data available from Firebase. Please ensure the dummy camera simulator is running and pushing data.", 'info');
+                    // Keep camera feed placeholder as is, it has its own dummy logic
+                    // displayMessage('camera-feed-container', "No real-time plant monitoring data available from Firebase. Please ensure the dummy camera simulator is running and pushing data.", 'info');
                     renderRawDataTable([]);
                     displayMessage('care-tips', "No sensor data available for crop care recommendations.", 'info');
                     displayMessage('growth-prediction', "Select a crop, ensure sensor data is available, and all AI components are loaded for prediction.", 'info');
@@ -713,11 +1317,21 @@
                 const rawData = data.raw_data;
                 const cropLabels = data.crop_labels;
 
-                // Render Gauge Charts
-                createGauge('gauge-soil-moisture', "Soil Moisture", latestData.soil_moisture || 0, 100, "%", '#68D391'); /* Green */
-                createGauge('gauge-temperature', "Temperature", latestData.temperature || 0, 40, "°C", '#F6AD55'); /* Orange */
-                createGauge('gauge-ph', "pH", latestData.ph || 0, 14, "", '#63B3ED'); /* Blue */
-                createGauge('gauge-humidity', "Humidity", latestData.humidity || 0, 100, "%", '#A78BFA'); /* Purple */
+                // Render Custom Circular Gauges
+                const formattedTimestamp = new Date(latestData.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                updateCircularProgress('soil-moisture', latestData.soil_moisture || 0, 100, '%', '#68D391');
+                document.getElementById('soil-moisture-update').textContent = `Updated: ${formattedTimestamp}`;
+                updateCircularProgress('temperature', latestData.temperature || 0, 40, '°C', '#F6AD55');
+                document.getElementById('temperature-update').textContent = `Updated: ${formattedTimestamp}`;
+                updateCircularProgress('humidity', latestData.humidity || 0, 100, '%', '#63B3ED');
+                document.getElementById('humidity-update').textContent = `Updated: ${formattedTimestamp}`;
+                updateCircularProgress('ph', latestData.ph || 0, 14, '', '#A78BFA');
+                document.getElementById('ph-update').textContent = `Updated: ${formattedTimestamp}`;
+                updateCircularProgress('light-intensity', latestData.light_intensity || 0, 1000, ' lux', '#ECC94B'); // Assuming max light intensity 1000 lux
+                document.getElementById('light-intensity-update').textContent = `Updated: ${formattedTimestamp}`;
+                updateCircularProgress('rainfall', latestData.rainfall || 0, 250, ' mm', '#4299E1'); // Assuming max rainfall 250 mm
+                document.getElementById('rainfall-update').textContent = `Updated: ${formattedTimestamp}`;
+
 
                 // Render Sensor Trends Chart
                 renderSensorTrendsChart(plotData);
@@ -735,30 +1349,54 @@
                     displayMessage('crop-suggestion', "Predicted soil moisture is out of typical range or not available, hindering specific crop suggestions.", 'info');
                 }
 
-                // Display Camera Feed Data
-                const cameraFeedDiv = document.getElementById('camera-feed');
+                // Display Camera Feed Data (using the placeholder structure)
+                const cameraFeedContainer = document.getElementById('camera-feed-container');
                 if (cameraData) {
-                    cameraFeedDiv.innerHTML = `
-                        <p class="text-gray-300"><i class="far fa-clock mr-2"></i> Timestamp: ${cameraData.timestamp || 'N/A'}</p>
-                        <p class="text-green-400"><i class="fas fa-chart-line mr-2"></i> Growth Stage: ${cameraData.stage || 'N/A'}</p>
-                        <p class="text-yellow-400"><i class="fas fa-exclamation-triangle mr-2"></i> Advisory: ${cameraData.alert || 'N/A'}</p>
-                    `;
+                    // Update connection status based on actual data presence
+                    const connectionStatusSpan = cameraFeedContainer.querySelector('.connection-status');
+                    connectionStatusSpan.innerHTML = '<i class="fas fa-wifi mr-1"></i> Connected';
+                    connectionStatusSpan.style.backgroundColor = '#48bb78'; // Green
+
+                    // Update details (simulated for now as backend only provides stage/alert)
+                    const cameraDetailsDiv = cameraFeedContainer.querySelector('.camera-details');
+                    cameraDetailsDiv.children[0].textContent = `Growth Stage: ${cameraData.stage || 'N/A'}`;
+                    cameraDetailsDiv.children[1].textContent = `Advisory: ${cameraData.alert || 'N/A'}`;
+                    cameraDetailsDiv.children[2].textContent = `Timestamp: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
+
                 } else {
-                    displayMessage('camera-feed', "No real-time plant monitoring data available from Firebase. Please ensure the dummy camera simulator is running and pushing data.", 'info');
+                    const connectionStatusSpan = cameraFeedContainer.querySelector('.connection-status');
+                    connectionStatusSpan.innerHTML = '<i class="fas fa-wifi-slash mr-1"></i> Disconnected';
+                    connectionStatusSpan.style.backgroundColor = '#e53e3e'; // Red
+                    cameraFeedContainer.querySelector('.camera-details').innerHTML = `
+                        <span>No Camera Data</span>
+                        <span>N/A</span>
+                        <span>N/A</span>
+                    `;
                 }
 
                 // Render Raw Data Table
                 renderRawDataTable(rawData);
 
+                // Render Weather Data
+                renderWeatherData();
+
+                // Render Recent Events
+                renderRecentEvents();
+
+                // Render Farm Health Index
+                renderFarmHealthIndex();
+
             } catch (error) {
                 console.error("Error fetching dashboard data:", error);
                 // Display error messages on relevant sections
-                displayMessage('gauge-soil-moisture', "Error loading data", 'error');
-                displayMessage('gauge-temperature', "Error loading data", 'error');
-                displayMessage('gauge-ph', "Error loading data", 'error');
-                displayMessage('gauge-humidity', "Error loading data", 'error');
+                displayMessage('soil-moisture-update', "Error loading data", 'error');
+                displayMessage('temperature-update', "Error loading data", 'error');
+                displayMessage('humidity-update', "Error loading data", 'error');
+                displayMessage('ph-update', "Error loading data", 'error');
+                displayMessage('light-intensity-update', "Error loading data", 'error');
+                displayMessage('rainfall-update', "Error loading data", 'error');
                 displayMessage('sensor-trends-status', "Error loading sensor trends.", 'error');
-                displayMessage('camera-feed', "Error loading camera data.", 'error');
+                // displayMessage('camera-feed-container', "Error loading camera data.", 'error'); // Handled by its own logic
                 displayMessage('raw-data-table', "Error loading raw data.", 'error');
                 displayMessage('care-tips', "Error loading recommendations.", 'error');
                 displayMessage('growth-prediction', "Error loading predictions.", 'error');
@@ -988,7 +1626,7 @@
         function googleTranslateElementInit() {
             new google.translate.TranslateElement({
                 pageLanguage: 'en',
-                includedLanguages: 'hi,bn,ta,te,ml,gu,mr,kn,pa,ur,es,fr,de,ar,ja', // Added more languages
+                includedLanguages: 'en,hi,bn,ta,te,ml,gu,mr,kn,pa,ur,es,fr,de,ar,ja', // Added English explicitly and more languages
                 layout: google.translate.TranslateElement.InlineLayout.SIMPLE
             }, 'google_translate_element');
         }
