@@ -491,6 +491,11 @@
             font-size: 1rem;
             position: relative;
             overflow: hidden; /* Ensure rounded corners */
+            animation: pulse 2s infinite alternate; /* Added pulse animation */
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0px rgba(72, 187, 120, 0.4); }
+            100% { box-shadow: 0 0 15px rgba(72, 187, 120, 0.8); }
         }
         .camera-feed-placeholder .live-indicator {
             position: absolute;
@@ -504,6 +509,11 @@
             font-weight: bold;
             display: flex;
             align-items: center;
+            animation: blink 1s infinite; /* Blinking live indicator */
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
         .camera-feed-placeholder .connection-status {
             position: absolute;
@@ -533,6 +543,17 @@
             color: #63b3ed; /* Blue icon */
             margin-bottom: 0.5rem;
         }
+        .camera-feed-placeholder .camera-overlay-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.2); /* Semi-transparent text */
+            pointer-events: none; /* Allow clicks to pass through */
+        }
+
 
         /* Header Styling */
         .main-header {
@@ -612,7 +633,7 @@
                     <i class="fas fa-tachometer-alt mr-2"></i> Current Sensor Readings
                 </h2>
                 <!-- Custom Circular Gauges -->
-                <div id="current-sensor-readings-grid" class="grid grid-cols-2 gap-4">
+                <div id="current-sensor-readings-grid" class="grid grid-cols-2 gap-4 mb-6">
                     <!-- Soil Moisture -->
                     <div class="circular-progress-container">
                         <div class="circular-progress soil-moisture" data-value="0">
@@ -668,6 +689,27 @@
                         <span class="sensor-update-time" id="rainfall-update">Updated: N/A</span>
                     </div>
                 </div>
+
+                <!-- New: Device Connectivity -->
+                <h3 class="text-xl font-medium text-gray-200 mb-3 border-t border-gray-700 pt-4"><i class="fas fa-network-wired mr-2"></i> Device Connectivity</h3>
+                <div id="device-connectivity" class="space-y-3">
+                    <div class="flex justify-between items-center text-gray-300">
+                        <span>Main Gateway</span>
+                        <span id="gateway-status" class="font-semibold text-green-400"><i class="fas fa-circle text-xs mr-1"></i> Online</span>
+                    </div>
+                    <div class="flex justify-between items-center text-gray-300">
+                        <span>Irrigation System</span>
+                        <span id="irrigation-status" class="font-semibold text-green-400"><i class="fas fa-circle text-xs mr-1"></i> Active</span>
+                    </div>
+                    <div class="flex justify-between items-center text-gray-300">
+                        <span>Camera Units</span>
+                        <span id="camera-status" class="font-semibold text-green-400"><i class="fas fa-circle text-xs mr-1"></i> 3/3 Connected</span>
+                    </div>
+                    <div class="flex justify-between items-center text-gray-300">
+                        <span>Soil Sensors</span>
+                        <span id="soil-sensor-status" class="font-semibold text-green-400"><i class="fas fa-circle text-xs mr-1"></i> All Online</span>
+                    </div>
+                </div>
             </div>
 
             <!-- Sensor Trends Over Time (Top-Middle, Wide) -->
@@ -684,7 +726,7 @@
                 <h2 class="text-2xl font-semibold text-green-300 mb-5 border-b border-gray-700 pb-3">
                     <i class="fas fa-cloud-sun mr-2"></i> Weather
                 </h2>
-                <div id="weather-data">
+                <div id="weather-data" class="mb-6">
                     <div class="flex justify-between items-center mb-4">
                         <div class="flex items-center">
                             <i class="fas fa-cloud text-5xl text-blue-300 mr-4"></i>
@@ -710,6 +752,13 @@
                             <p class="text-gray-200"><span id="wed-high">21°</span> <span class="text-gray-400" id="wed-low">14°</span></p>
                         </div>
                     </div>
+                </div>
+
+                <!-- New: Weather Advisories -->
+                <h3 class="text-xl font-medium text-gray-200 mb-3 border-t border-gray-700 pt-4"><i class="fas fa-exclamation-triangle mr-2"></i> Weather Advisories</h3>
+                <div id="weather-advisories" class="space-y-2 text-gray-300">
+                    <p><i class="fas fa-circle-info text-blue-400 text-sm mr-2"></i> No active advisories.</p>
+                    <!-- Example: <p class="text-yellow-400"><i class="fas fa-cloud-showers-heavy text-sm mr-2"></i> Heavy Rainfall expected tonight.</p> -->
                 </div>
             </div>
 
@@ -776,6 +825,18 @@
                 <div id="crop-suggestion" class="bg-gray-800 p-5 rounded-lg min-h-[100px] border border-gray-700">
                     <p class="text-gray-400">Loading suggestions...</p>
                 </div>
+
+                <!-- New: Pest & Disease Scan -->
+                <h3 class="text-xl font-medium text-gray-200 mb-3 mt-6 border-t border-gray-700 pt-4"><i class="fas fa-bug mr-2"></i> Pest & Disease Scan</h3>
+                <div id="pest-disease-scan" class="bg-gray-800 p-5 rounded-lg border border-gray-700">
+                    <p id="pest-scan-status" class="text-gray-400 mb-4">Last scan: N/A</p>
+                    <button id="run-pest-scan-button" class="button-primary w-full">
+                        <i class="fas fa-search mr-2"></i> Run New Scan
+                    </button>
+                    <div id="pest-scan-results" class="mt-4 text-gray-300">
+                        <!-- Results will be displayed here -->
+                    </div>
+                </div>
             </div>
 
             <!-- Real-Time Plant Monitoring (Middle-Right, Normal) -->
@@ -790,10 +851,19 @@
                     <p class="text-gray-400 text-lg">Live Camera Feed</p>
                     <p class="text-gray-500 text-sm">Sector A - Field View</p>
                     <div class="camera-details">
-                        <span>1920x1080 Resolution</span>
-                        <span>30 FPS</span>
-                        <span>85% Signal</span>
+                        <span id="camera-resolution">1920x1080 Resolution</span>
+                        <span id="camera-fps">30 FPS</span>
+                        <span id="camera-signal">85% Signal</span>
                     </div>
+                    <span class="camera-overlay-text" id="last-frame-time">Last Frame: N/A</span>
+                </div>
+                <div class="flex justify-center space-x-4 mt-4">
+                    <button id="capture-image-button" class="button-primary flex-1">
+                        <i class="fas fa-camera-retro mr-2"></i> Capture Image
+                    </button>
+                    <button id="view-history-button" class="button-secondary flex-1">
+                        <i class="fas fa-images mr-2"></i> View History
+                    </button>
                 </div>
             </div>
 
@@ -802,9 +872,16 @@
                 <h2 class="text-2xl font-semibold text-green-300 mb-5 border-b border-gray-700 pb-3">
                     <i class="fas fa-history mr-2"></i> Recent Events
                 </h2>
-                <div id="recent-events" class="bg-gray-800 p-5 rounded-lg mb-8 min-h-[150px] border border-gray-700">
+                <div id="recent-events" class="bg-gray-800 p-5 rounded-lg mb-6 min-h-[150px] border border-gray-700">
                     <p class="text-gray-400">Loading recent events...</p>
                     <!-- Events will be populated here by JS -->
+                </div>
+                <!-- New: Quick Actions -->
+                <h3 class="text-xl font-medium text-gray-200 mb-3 border-t border-gray-700 pt-4"><i class="fas fa-bolt mr-2"></i> Quick Actions</h3>
+                <div class="grid grid-cols-1 gap-3">
+                    <button class="button-primary w-full"><i class="fas fa-water mr-2"></i> Initiate Irrigation</button>
+                    <button class="button-secondary w-full"><i class="fas fa-seedling mr-2"></i> Apply Nutrients</button>
+                    <button class="button-primary w-full"><i class="fas fa-bell mr-2"></i> Send Alert</button>
                 </div>
             </div>
 
@@ -870,6 +947,24 @@
                     </div>
                     <p class="text-green-400 text-sm font-semibold mt-4"><i class="fas fa-arrow-up mr-1"></i> <span id="health-change">+5%</span> from last week</p>
                 </div>
+
+                <!-- New: Resource Consumption -->
+                <h3 class="text-xl font-medium text-gray-200 mb-3 border-t border-gray-700 pt-4"><i class="fas fa-chart-pie mr-2"></i> Resource Consumption (Daily)</h3>
+                <div id="resource-consumption" class="space-y-3">
+                    <div class="flex justify-between items-center text-gray-300">
+                        <span>Water Used:</span>
+                        <span class="font-semibold text-blue-300">2500 Liters</span>
+                    </div>
+                    <div class="flex justify-between items-center text-gray-300">
+                        <span>Energy Used:</span>
+                        <span class="font-semibold text-yellow-300">50 kWh</span>
+                    </div>
+                    <div class="flex justify-between items-center text-gray-300">
+                        <span>Nutrients Applied:</span>
+                        <span class="font-semibold text-green-300">5 kg</span>
+                    </div>
+                    <button class="button-secondary w-full mt-4"><i class="fas fa-history mr-2"></i> View Usage History</button>
+                </div>
             </div>
 
             <!-- Latest Sensor Readings (Raw Data) (Bottom-Middle, Wide) -->
@@ -877,8 +972,14 @@
                 <h2 class="text-2xl font-semibold text-green-300 mb-5 border-b border-gray-700 pb-3">
                     <i class="fas fa-table mr-2"></i> Latest Sensor Readings (Raw Data)
                 </h2>
-                <div id="raw-data-table" class="dataframe-container">
+                <div id="raw-data-table" class="dataframe-container mb-6">
                     <p class="text-gray-400 p-4 text-center">Loading raw data...</p>
+                </div>
+                <!-- New: Data Export -->
+                <h3 class="text-xl font-medium text-gray-200 mb-3 border-t border-gray-700 pt-4"><i class="fas fa-download mr-2"></i> Data Export</h3>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button class="button-primary flex-1"><i class="fas fa-file-csv mr-2"></i> Export CSV</button>
+                    <button class="button-secondary flex-1"><i class="fas fa-file-excel mr-2"></i> Export Excel</button>
                 </div>
             </div>
 
@@ -1156,6 +1257,15 @@
                 { day: "Wed", high: Math.floor(Math.random() * (28 - 18 + 1)) + 18, low: Math.floor(Math.random() * (15 - 10 + 1)) + 10 }
             ];
 
+            const advisories = [];
+            if (Math.random() < 0.3) { // 30% chance of a warning
+                const warnings = ["Heavy Rainfall expected tonight.", "High Wind Advisory issued.", "Frost warning for early morning."];
+                advisories.push(`<p class="text-yellow-400"><i class="fas fa-exclamation-triangle text-sm mr-2"></i> ${warnings[Math.floor(Math.random() * warnings.length)]}</p>`);
+            }
+            if (advisories.length === 0) {
+                advisories.push('<p><i class="fas fa-circle-info text-blue-400 text-sm mr-2"></i> No active advisories.</p>');
+            }
+
             return {
                 current: {
                     temp: currentTemp,
@@ -1163,7 +1273,8 @@
                     wind: windSpeed,
                     timestamp: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
                 },
-                forecast: forecast
+                forecast: forecast,
+                advisories: advisories
             };
         }
 
@@ -1180,6 +1291,8 @@
             document.getElementById('tomorrow-low').textContent = `${weather.forecast[1].low}°`;
             document.getElementById('wed-high').textContent = `${weather.forecast[2].high}°`;
             document.getElementById('wed-low').textContent = `${weather.forecast[2].low}°`;
+
+            document.getElementById('weather-advisories').innerHTML = weather.advisories.join('');
         }
 
         // Simulated Recent Events Data
@@ -1272,6 +1385,78 @@
             healthChangeElement.previousElementSibling.className = `fas ${healthData.changeIcon} mr-1`; // Update icon
         }
 
+        // Simulated Device Connectivity Data
+        function getSimulatedDeviceConnectivity() {
+            const statuses = ['Online', 'Offline', 'Active', 'Inactive', 'Connected', 'Disconnected'];
+            const getRandomStatus = () => statuses[Math.floor(Math.random() * statuses.length)];
+
+            return {
+                gateway: Math.random() < 0.9 ? 'Online' : 'Offline',
+                irrigation: Math.random() < 0.8 ? 'Active' : 'Inactive',
+                camera: `${Math.floor(Math.random() * 4)}/3 Connected`, // Simulate some cameras being offline
+                soil: Math.random() < 0.95 ? 'All Online' : 'Some Offline'
+            };
+        }
+
+        // Render Device Connectivity
+        function renderDeviceConnectivity() {
+            const connectivity = getSimulatedDeviceConnectivity();
+
+            const updateStatus = (id, statusText) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.textContent = statusText;
+                    element.className = 'font-semibold ' + (statusText.includes('Online') || statusText.includes('Active') || statusText.includes('Connected') ? 'text-green-400' : 'text-red-400');
+                    element.innerHTML = `<i class="fas fa-circle text-xs mr-1"></i> ${statusText}`;
+                }
+            };
+
+            updateStatus('gateway-status', connectivity.gateway);
+            updateStatus('irrigation-status', connectivity.irrigation);
+            updateStatus('camera-status', connectivity.camera);
+            updateStatus('soil-sensor-status', connectivity.soil);
+        }
+
+        // Simulated Pest Scan Data
+        function getSimulatedPestScanResults() {
+            const results = [
+                { status: 'No threats detected. Your crops are healthy!', type: 'success' },
+                { status: 'Minor pest activity detected in Sector C. Recommend localized treatment.', type: 'warning', details: ['Aphids (low concentration)'] },
+                { status: 'Disease detected in Field 2. Immediate action required.', type: 'error', details: ['Fungal blight (moderate)'] }
+            ];
+            return results[Math.floor(Math.random() * results.length)];
+        }
+
+        // Simulate a pest scan
+        async function runPestScan() {
+            const scanButton = document.getElementById('run-pest-scan-button');
+            const scanStatus = document.getElementById('pest-scan-status');
+            const scanResultsDiv = document.getElementById('pest-scan-results');
+
+            scanButton.disabled = true;
+            scanButton.innerHTML = '<span class="loading-spinner"></span> Scanning...';
+            scanStatus.textContent = 'Scanning in progress...';
+            scanResultsDiv.innerHTML = '';
+
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call delay
+
+            const result = getSimulatedPestScanResults();
+            scanStatus.textContent = `Last scan: ${new Date().toLocaleTimeString()}`;
+
+            let resultHtml = `<p class="mb-2"><i class="fas ${result.type === 'success' ? 'fa-check-circle text-green-400' : result.type === 'warning' ? 'fa-exclamation-triangle text-yellow-400' : 'fa-times-circle text-red-400'} mr-2"></i> ${result.status}</p>`;
+
+            if (result.details && result.details.length > 0) {
+                resultHtml += '<p class="font-semibold mt-3">Details:</p><ul class="list-disc list-inside ml-4">';
+                result.details.forEach(detail => {
+                    resultHtml += `<li>${detail}</li>`;
+                });
+                resultHtml += '</ul>';
+            }
+            scanResultsDiv.innerHTML = resultHtml;
+
+            scanButton.disabled = false;
+            scanButton.innerHTML = '<i class="fas fa-search mr-2"></i> Run New Scan';
+        }
 
         // Main data fetching and rendering function
         async function fetchDataAndRender() {
@@ -1285,17 +1470,16 @@
                 if (data.status === 'no_data') {
                     // Update circular progress bars with 0 and N/A
                     updateCircularProgress('soil-moisture', 0, 100, '%', '#68D391');
-                    updateCircularProgress('temperature', 0, 40, '°C', '#F6AD55');
-                    updateCircularProgress('humidity', 0, 100, '%', '#63B3ED');
-                    updateCircularProgress('ph', 0, 14, '', '#A78BFA');
-                    updateCircularProgress('light-intensity', 0, 1000, ' lux', '#ECC94B');
-                    updateCircularProgress('rainfall', 0, 250, ' mm', '#4299E1');
-
                     document.getElementById('soil-moisture-update').textContent = "Updated: N/A";
+                    updateCircularProgress('temperature', 0, 40, '°C', '#F6AD55');
                     document.getElementById('temperature-update').textContent = "Updated: N/A";
+                    updateCircularProgress('humidity', 0, 100, '%', '#63B3ED');
                     document.getElementById('humidity-update').textContent = "Updated: N/A";
+                    updateCircularProgress('ph', 0, 14, '', '#A78BFA');
                     document.getElementById('ph-update').textContent = "Updated: N/A";
+                    updateCircularProgress('light-intensity', 0, 1000, ' lux', '#ECC94B'); // Assuming max light intensity 1000 lux
                     document.getElementById('light-intensity-update').textContent = "Updated: N/A";
+                    updateCircularProgress('rainfall', 0, 250, ' mm', '#4299E1'); // Assuming max rainfall 250 mm
                     document.getElementById('rainfall-update').textContent = "Updated: N/A";
 
                     displayMessage('sensor-trends-status', "⚠️ Not enough complete data available for plotting sensor trends. Check if sensors are reporting data for these features.", 'warning');
@@ -1358,20 +1542,20 @@
                     connectionStatusSpan.style.backgroundColor = '#48bb78'; // Green
 
                     // Update details (simulated for now as backend only provides stage/alert)
-                    const cameraDetailsDiv = cameraFeedContainer.querySelector('.camera-details');
-                    cameraDetailsDiv.children[0].textContent = `Growth Stage: ${cameraData.stage || 'N/A'}`;
-                    cameraDetailsDiv.children[1].textContent = `Advisory: ${cameraData.alert || 'N/A'}`;
-                    cameraDetailsDiv.children[2].textContent = `Timestamp: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
+                    document.getElementById('camera-resolution').textContent = `Growth Stage: ${cameraData.stage || 'N/A'}`;
+                    document.getElementById('camera-fps').textContent = `Advisory: ${cameraData.alert || 'N/A'}`;
+                    document.getElementById('camera-signal').textContent = `Timestamp: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
+                    document.getElementById('last-frame-time').textContent = `Last Frame: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
+
 
                 } else {
                     const connectionStatusSpan = cameraFeedContainer.querySelector('.connection-status');
                     connectionStatusSpan.innerHTML = '<i class="fas fa-wifi-slash mr-1"></i> Disconnected';
                     connectionStatusSpan.style.backgroundColor = '#e53e3e'; // Red
-                    cameraFeedContainer.querySelector('.camera-details').innerHTML = `
-                        <span>No Camera Data</span>
-                        <span>N/A</span>
-                        <span>N/A</span>
-                    `;
+                    document.getElementById('camera-resolution').textContent = `No Camera Data`;
+                    document.getElementById('camera-fps').textContent = `N/A`;
+                    document.getElementById('camera-signal').textContent = `N/A`;
+                    document.getElementById('last-frame-time').textContent = `Last Frame: N/A`;
                 }
 
                 // Render Raw Data Table
@@ -1385,6 +1569,9 @@
 
                 // Render Farm Health Index
                 renderFarmHealthIndex();
+
+                // Render Device Connectivity
+                renderDeviceConnectivity();
 
             } catch (error) {
                 console.error("Error fetching dashboard data:", error);
@@ -1519,6 +1706,8 @@
         // Event Listeners
         document.getElementById('refresh-button').addEventListener('click', fetchDataAndRender);
         document.getElementById('crop-select').addEventListener('change', updateCropSpecificData);
+        document.getElementById('run-pest-scan-button').addEventListener('click', runPestScan);
+
 
         document.getElementById('play-alerts-button').addEventListener('click', async () => {
             const careTipsDiv = document.getElementById('care-tips');
@@ -1606,6 +1795,14 @@
             }
         }
 
+        // Google Translate Widget Initialization - Moved to global scope
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                pageLanguage: 'en',
+                includedLanguages: 'en,hi,bn,ta,te,ml,gu,mr,kn,pa,ur,es,fr,de,ar,ja', // Added English explicitly and more languages
+                layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+            }, 'google_translate_element');
+        }
 
         // Initial data load when the page is ready
         document.addEventListener('DOMContentLoaded', () => {
@@ -1618,36 +1815,26 @@
             document.getElementById('simulation-mode-toggle').addEventListener('change', (event) => {
                 setSimulationMode(event.target.checked);
             });
-        });
-    </script>
 
-    <!-- Google Translate Widget -->
-    <script type="text/javascript">
-        function googleTranslateElementInit() {
-            new google.translate.TranslateElement({
-                pageLanguage: 'en',
-                includedLanguages: 'en,hi,bn,ta,te,ml,gu,mr,kn,pa,ur,es,fr,de,ar,ja', // Added English explicitly and more languages
-                layout: google.translate.TranslateElement.InlineLayout.SIMPLE
-            }, 'google_translate_element');
-        }
-    </script>
-    <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+            // Load Google Translate script
+            const googleTranslateScript = document.createElement('script');
+            googleTranslateScript.type = 'text/javascript';
+            googleTranslateScript.src = '//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+            document.body.appendChild(googleTranslateScript);
 
-    <!-- Optional: Auto-Detect and Switch Language -->
-    <script>
-        window.onload = function () {
-            const userLang = navigator.language || navigator.userLanguage;
-            const combo = document.querySelector('.goog-te-combo');
-            const langMatch = {
-                'en': 'en', 'hi': 'hi', 'bn': 'bn', 'ta': 'ta', 'te': 'te', 'ml': 'ml',
-                'gu': 'gu', 'mr': 'mr', 'kn': 'kn', 'pa': 'pa', 'ur': 'ur',
-                'es': 'es', 'fr': 'fr', 'de': 'de', 'ar': 'ar', 'ja': 'ja'
-            };
+            // Auto-Detect and Switch Language
+            // This needs to run AFTER the Google Translate widget is fully loaded and initialized.
+            setTimeout(() => {
+                const userLang = navigator.language || navigator.userLanguage;
+                const combo = document.querySelector('.goog-te-combo');
+                const langMatch = {
+                    'en': 'en', 'hi': 'hi', 'bn': 'bn', 'ta': 'ta', 'te': 'te', 'ml': 'ml',
+                    'gu': 'gu', 'mr': 'mr', 'kn': 'kn', 'pa': 'pa', 'ur': 'ur',
+                    'es': 'es', 'fr': 'fr', 'de': 'de', 'ar': 'ar', 'ja': 'ja'
+                };
 
-            const shortLang = userLang.split('-')[0];
-            if (langMatch[shortLang]) {
-                // Give Google Translate widget a moment to load and populate the combo box
-                setTimeout(() => {
+                const shortLang = userLang.split('-')[0];
+                if (langMatch[shortLang]) {
                     if (combo && combo.querySelector(`option[value="${langMatch[shortLang]}"]`)) {
                         combo.value = langMatch[shortLang];
                         // Trigger change event to apply translation immediately
@@ -1655,9 +1842,9 @@
                         // Also trigger our dashboard's update function after translation
                         updateCropSpecificData();
                     }
-                }, 1000); // Adjust timeout if needed
-            }
-        };
+                }
+            }, 1500); // Increased timeout slightly to ensure Google Translate loads
+        });
     </script>
 </body>
 </html>
