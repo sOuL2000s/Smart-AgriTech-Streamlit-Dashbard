@@ -1138,6 +1138,114 @@ def generate_dummy_camera_data():
         "image_url": "https://placehold.co/150x150/E0E0E0/333333?text=Camera+Feed" # Placeholder image
     }
 
+def generate_dummy_weather_data():
+    """Generates simulated weather data."""
+    now = datetime.now()
+    current_temp = round(random.uniform(20, 30), 1)
+    current_humidity = random.randint(50, 80)
+    wind_speed = random.randint(5, 20)
+
+    forecast = []
+    for i in range(3): # Today, Tomorrow, Day after tomorrow
+        day_offset = i
+        day_name = (now + timedelta(days=day_offset)).strftime("%a")
+        high_temp = round(random.uniform(current_temp + 2, current_temp + 8), 1)
+        low_temp = round(random.uniform(current_temp - 8, current_temp - 2), 1)
+        forecast.append({
+            "day": "Today" if i == 0 else ("Tomorrow" if i == 1 else day_name),
+            "high": high_temp,
+            "low": low_temp
+        })
+
+    advisories = []
+    if random.random() < 0.3:
+        warnings = ["Heavy Rainfall expected tonight.", "High Wind Advisory issued.", "Frost warning for early morning.", "Heatwave alert."]
+        advisories.append({"type": "warning", "message": random.choice(warnings)})
+    if not advisories:
+        advisories.append({"type": "info", "message": "No active advisories."})
+
+    return {
+        "current": {
+            "temp": current_temp,
+            "humidity": current_humidity,
+            "wind": wind_speed,
+            "timestamp": now.strftime("%H:%M")
+        },
+        "forecast": forecast,
+        "advisories": advisories
+    }
+
+def generate_dummy_recent_events():
+    """Generates simulated recent events."""
+    events = [
+        {"text": "Water detected in sector B", "time": "10:27 AM"},
+        {"text": "Irrigation cycle completed", "time": "09:45 AM"},
+        {"text": "Optimal light conditions detected", "time": "09:10 AM"},
+        {"text": "Nutrient levels adjusted in field 1", "time": "Yesterday"},
+        {"text": "Pest activity observed in north plot", "time": "2 days ago"},
+        {"text": "Temperature spike recorded in greenhouse", "time": "3 days ago"},
+    ]
+    random.shuffle(events) # Shuffle to make it seem dynamic
+    return events[:random.randint(3, 6)] # Return 3 to 6 random events
+
+def generate_dummy_farm_health_data():
+    """Generates simulated farm health index data."""
+    overall_score = random.randint(60, 95)
+    status = "Good"
+    if overall_score < 75: status = "Fair"
+    if overall_score < 60: status = "Poor"
+
+    health_factors = {
+        'soil-quality': random.randint(70, 98),
+        'plant-health': random.randint(65, 95),
+        'water-management': random.randint(60, 90),
+        'pest-control': random.randint(60, 90),
+        'environmental': random.randint(75, 98)
+    }
+
+    health_change = round(random.uniform(-5, 5), 0)
+    
+    return {
+        "overallScore": overall_score,
+        "status": status,
+        "healthFactors": health_factors,
+        "healthChange": health_change
+    }
+
+def generate_dummy_device_connectivity():
+    """Generates simulated device connectivity data."""
+    statuses = ['Online', 'Offline', 'Active', 'Inactive', 'Connected', 'Disconnected']
+    
+    # Ensure at least some connected status for cameras and soil sensors
+    camera_connected_count = random.randint(0, 3)
+    soil_online_status = 'All Online' if random.random() > 0.1 else 'Some Offline'
+
+    return {
+        "gateway": random.choice(['Online', 'Offline']),
+        "irrigation": random.choice(['Active', 'Inactive']),
+        "camera": f"{camera_connected_count}/3 Connected",
+        "soil": soil_online_status
+    }
+
+def generate_dummy_pest_scan_results():
+    """Generates simulated pest and disease scan results."""
+    results = [
+        {"status": "No threats detected. Your crops are healthy!", "type": "success", "details": []},
+        {"status": "Minor pest activity detected in Sector C. Recommend localized treatment.", "type": "warning", "details": ["Aphids (low concentration)"]},
+        {"status": "Disease detected in Field 2. Immediate action required.", "type": "error", "details": ["Fungal blight (moderate)", "Leaf spot (minor)"]},
+        {"status": "Potential nutrient deficiency in Sector A. Further analysis recommended.", "type": "info", "details": ["Nitrogen deficiency (early stage)"]},
+    ]
+    return random.choice(results)
+
+def generate_dummy_resource_consumption():
+    """Generates simulated daily resource consumption data."""
+    return {
+        "water_used": random.randint(1500, 4000), # Liters
+        "energy_used": random.randint(30, 100), # kWh
+        "nutrients_applied": random.randint(2, 10) # kg
+    }
+
+
 # --- Sensor Data Inserter and Camera Simulator Threads ---
 def run_camera_simulator_thread():
     """Simulates camera feed data and pushes to Firebase."""
@@ -1723,7 +1831,7 @@ def receive_sensor_data():
 
 @app.route('/api/data')
 def get_dashboard_data():
-    """Fetches all data required for the dashboard."""
+    """Fetches core sensor data for the dashboard."""
     latest_data = get_latest_sensor_data() # This now handles dummy data if no real data
     historical_data_list = get_historical_sensor_data(days=7) # Returns list of dicts
 
@@ -1769,6 +1877,62 @@ def get_dashboard_data():
         'crop_labels': all_crop_labels,
         'status': 'success' if latest_data else 'no_data' # Status based on if any data (real or dummy) is available
     })
+
+@app.route('/api/weather_data')
+def get_weather_data():
+    """Endpoint to fetch weather data."""
+    return jsonify(generate_dummy_weather_data())
+
+@app.route('/api/recent_events_data')
+def get_recent_events_data():
+    """Endpoint to fetch recent events data."""
+    return jsonify(generate_dummy_recent_events())
+
+@app.route('/api/farm_health_data')
+def get_farm_health_data():
+    """Endpoint to fetch farm health index data."""
+    return jsonify(generate_dummy_farm_health_data())
+
+@app.route('/api/device_connectivity_data')
+def get_device_connectivity_data():
+    """Endpoint to fetch device connectivity data."""
+    return jsonify(generate_dummy_device_connectivity())
+
+@app.route('/api/resource_consumption_data')
+def get_resource_consumption_data():
+    """Endpoint to fetch resource consumption data."""
+    return jsonify(generate_dummy_resource_consumption())
+
+@app.route('/api/pest_scan_trigger', methods=['POST'])
+def api_pest_scan_trigger():
+    """Endpoint to simulate triggering a pest scan and return results."""
+    # In a real scenario, this would trigger a scan process
+    # For now, it just returns simulated results after a delay
+    time.sleep(2) # Simulate scan time
+    results = generate_dummy_pest_scan_results()
+    return jsonify(results)
+
+@app.route('/api/action', methods=['POST'])
+def api_quick_action():
+    """Endpoint for quick actions like irrigation, nutrient application, alerts."""
+    data = request.get_json()
+    action_type = data.get('action_type')
+    
+    if action_type == 'irrigation':
+        print(f"Action: Initiating Irrigation at {datetime.now()}")
+        message = "Irrigation initiated successfully."
+    elif action_type == 'nutrients':
+        print(f"Action: Applying Nutrients at {datetime.now()}")
+        message = "Nutrients applied successfully."
+    elif action_type == 'alert':
+        alert_message = data.get('message', 'General alert from dashboard.')
+        print(f"Action: Sending Alert: '{alert_message}' at {datetime.now()}")
+        message = f"Alert '{alert_message}' sent successfully."
+    else:
+        return jsonify({"status": "error", "message": "Invalid action type."}), 400
+    
+    return jsonify({"status": "success", "message": message})
+
 
 @app.route('/api/predict_growth', methods=['POST'])
 def api_predict_growth():
