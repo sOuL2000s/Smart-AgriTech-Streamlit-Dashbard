@@ -8,8 +8,8 @@ import tempfile
 import threading
 import io
 
-from flask import Flask, jsonify, request, send_file
-from flask_cors import CORS
+from flask import Flask, jsonify, request, send_file, Response
+from flask_cors import CORS # Import CORS
 
 import firebase_admin
 from firebase_admin import credentials, db
@@ -21,11 +21,12 @@ from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from sklearn.linear_model import LinearRegression
 import joblib
 from gtts import gTTS
+# Removed: import requests # No longer needed as LibreTranslate is not proxied externally
 
 app = Flask(__name__)
-# Explicitly enable CORS for /api routes from any origin.
+# Simplified CORS: Allow all origins for all routes.
 # For production, consider restricting this to your frontend's domain for better security.
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+CORS(app)
 
 # --- Global Variables for Firebase, Models, Scalers, etc. ---
 firebase_app = None
@@ -43,9 +44,10 @@ firebase_camera_ref = None  # Global reference for Firebase camera feed
 # --- New Global Variable for Simulation Mode ---
 # False means "Real-Time Testing" (expecting some real data, generating dummies for others)
 # True means "Simulation" (generating all dummy data)
-simulation_mode = False 
+simulation_mode = False
 
-# Multilingual Advice Messages
+# --- Multilingual Advice Messages ---
+# These messages are now directly used by the backend for advice generation.
 ADVICE_MESSAGES = {
     'en': {
         'no_data': "No sensor data available to provide advice.",
@@ -589,7 +591,7 @@ ADVICE_MESSAGES = {
         'papaya_temp_low': "パパイヤは21-33°Cの範囲を好みます。",
         'pomegranate_temp_low': "理想的な温度は20°C以上です。",
         'melon_temp_low': "温度が暖かい（>25°C）ことを確認してください。",
-        'coconut_temp_low': "ココナッツの理想的な温度は25°C以上です。",
+        'coconut_temp_low': "ココヤシの理想的な温度は25°C以上です。",
         'mothbeans_temp_low': "温度は22°C以上である必要があります。",
         'mungbean_temp_low': "緑豆は最適な成長のために暖かい条件が必要です。",
         'blackgram_temp_low': "理想的な温度範囲は25-35°Cです。",
@@ -845,7 +847,7 @@ SEED_RECOMMENDATIONS_MESSAGES = {
         'papaya_temp_low': "パパイヤは21-33°Cの範囲を好みます。",
         'pomegranate_temp_low': "理想的な温度は20°C以上です。",
         'melon_temp_low': "温度が暖かい（>25°C）ことを確認してください。",
-        'coconut_temp_low': "ココナッツの理想的な温度は25°C以上です。",
+        'coconut_temp_low': "ココヤシの理想的な温度は25°C以上です。",
         'mothbeans_temp_low': "温度は22°C以上である必要があります。",
         'mungbean_temp_low': "緑豆は最適な成長のために暖かい条件が必要です。",
         'blackgram_temp_low': "理想的な温度範囲は25-35°Cです。",
@@ -948,6 +950,83 @@ SEED_RECOMMENDATIONS_MESSAGES = {
         'general_ph_off': "সাধারণ পরামর্শ: বেশিরভাগ ফসলের জন্য সর্বোত্তম pH পরিসর ৫.৫-৭.৫। প্রয়োজন অনুযায়ী সামঞ্জস্য করুন।"
     }
 }
+
+# Multilingual Camera Feed Strings
+CAMERA_FEED_STRINGS = {
+    'en': {
+        'connected': 'Connected',
+        'disconnected': 'Disconnected',
+        'growth_stage': 'Growth Stage',
+        'advisory': 'Advisory',
+        'timestamp': 'Timestamp',
+        'last_frame': 'Last Frame',
+        'no_camera_data': 'No Camera Data'
+    },
+    'hi': {
+        'connected': 'कनेक्टेड',
+        'disconnected': 'डिस्कनेक्टेड',
+        'growth_stage': 'विकास चरण',
+        'advisory': 'सलाह',
+        'timestamp': 'टाइमस्टैम्प',
+        'last_frame': 'अंतिम फ्रेम',
+        'no_camera_data': 'कोई कैमरा डेटा नहीं'
+    },
+    'es': {
+        'connected': 'Conectado',
+        'disconnected': 'Desconectado',
+        'growth_stage': 'Etapa de Crecimiento',
+        'advisory': 'Asesoramiento',
+        'timestamp': 'Marca de tiempo',
+        'last_frame': 'Último cuadro',
+        'no_camera_data': 'Sin datos de cámara'
+    },
+    'fr': {
+        'connected': 'Connecté',
+        'disconnected': 'Déconnecté',
+        'growth_stage': 'Stade de Croissance',
+        'advisory': 'Avis',
+        'timestamp': 'Horodatage',
+        'last_frame': 'Dernière image',
+        'no_camera_data': 'Aucune donnée de caméra'
+    },
+    'de': {
+        'connected': 'Verbunden',
+        'disconnected': 'Getrennt',
+        'growth_stage': 'Wachstumsstadium',
+        'advisory': 'Beratung',
+        'timestamp': 'Zeitstempel',
+        'last_frame': 'Letzter Frame',
+        'no_camera_data': 'Keine Kameradaten'
+    },
+    'ar': {
+        'connected': 'متصل',
+        'disconnected': 'غير متصل',
+        'growth_stage': 'مرحلة النمو',
+        'advisory': 'استشاري',
+        'timestamp': 'الطابع الزمني',
+        'last_frame': 'الإطار الأخير',
+        'no_camera_data': 'لا توجد بيانات الكاميرا'
+    },
+    'ja': {
+        'connected': '接続済み',
+        'disconnected': '切断済み',
+        'growth_stage': '成長段階',
+        'advisory': 'アドバイザリ',
+        'timestamp': 'タイムスタンプ',
+        'last_frame': '最終フレーム',
+        'no_camera_data': 'カメラデータなし'
+    },
+    'bn': {
+        'connected': 'সংযুক্ত',
+        'disconnected': 'বিচ্ছিন্ন',
+        'growth_stage': 'বৃদ্ধির পর্যায়',
+        'advisory': 'পরামর্শ',
+        'timestamp': 'সময় স্ট্যাম্প',
+        'last_frame': 'শেষ ফ্রেম',
+        'no_camera_data': 'কোনো ক্যামেরা ডেটা নেই'
+    }
+}
+
 
 # Simulated growth stages and crop stages
 growth_stages = ["Germination", "Vegetative", "Flowering", "Maturity", "Wilting", "Yellowing"]
@@ -1100,7 +1179,7 @@ def load_models_and_scalers():
 
         X_numerical = df_prices[market_price_features]
         # Ensure market_crop_encoder is fitted with all possible crop types
-        if market_crop_encoder and not market_crop_encoder.categories_[0].tolist():
+        if market_crop_encoder and (not market_crop_encoder.categories_ or not market_crop_encoder.categories_[0].tolist()):
              market_crop_encoder.fit(np.array(df_prices['crop_type'].unique()).reshape(-1, 1))
 
         X_categorical = market_crop_encoder.transform(df_prices[['crop_type']])
@@ -1128,13 +1207,21 @@ def generate_dummy_sensor_data_values():
         "growth_factor": round(random.uniform(0.5, 1.5), 2)
     }
 
-def generate_dummy_camera_data():
-    """Generates dummy camera data for demonstration."""
-    advisories = ["Healthy Growth", "Low Leaf Color Index", "Possible Disease Detected", "Needs Fertilizer", "Check Irrigation"]
+def generate_dummy_camera_data(lang='en'):
+    """Generates dummy camera data for demonstration, with translated advisories."""
+    messages = CAMERA_FEED_STRINGS.get(lang, CAMERA_FEED_STRINGS['en'])
+    advisories = [
+        messages['growth_stage'] + ": " + random.choice(growth_stages),
+        messages['advisory'] + ": " + "Healthy Growth",
+        messages['advisory'] + ": " + "Low Leaf Color Index",
+        messages['advisory'] + ": " + "Possible Disease Detected",
+        messages['advisory'] + ": " + "Needs Fertilizer",
+        messages['advisory'] + ": " + "Check Irrigation"
+    ]
     return {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "stage": random.choice(growth_stages),
-        "alert": random.choice(advisories),
+        "stage": random.choice(growth_stages), # Original stage name
+        "alert": random.choice(advisories), # Translated advisory
         "image_url": "https://placehold.co/150x150/E0E0E0/333333?text=Camera+Feed" # Placeholder image
     }
 
@@ -1204,7 +1291,7 @@ def generate_dummy_farm_health_data():
     }
 
     health_change = round(random.uniform(-5, 5), 0)
-    
+
     return {
         "overallScore": overall_score,
         "status": status,
@@ -1215,7 +1302,7 @@ def generate_dummy_farm_health_data():
 def generate_dummy_device_connectivity():
     """Generates simulated device connectivity data."""
     statuses = ['Online', 'Offline', 'Active', 'Inactive', 'Connected', 'Disconnected']
-    
+
     # Ensure at least some connected status for cameras and soil sensors
     camera_connected_count = random.randint(0, 3)
     soil_online_status = 'All Online' if random.random() > 0.1 else 'Some Offline'
@@ -1245,6 +1332,19 @@ def generate_dummy_resource_consumption():
         "nutrients_applied": random.randint(2, 10) # kg
     }
 
+def generate_dummy_usage_history_data():
+    """Generates simulated historical resource consumption data for a week."""
+    history = []
+    for i in range(7):
+        date = (datetime.now() - timedelta(days=6-i)).strftime("%Y-%m-%d")
+        history.append({
+            "date": date,
+            "water_used": random.randint(1000, 5000),
+            "energy_used": random.randint(20, 120),
+            "nutrients_applied": random.randint(1, 15)
+        })
+    return history
+
 
 # --- Sensor Data Inserter and Camera Simulator Threads ---
 def run_camera_simulator_thread():
@@ -1253,7 +1353,8 @@ def run_camera_simulator_thread():
     while True:
         if firebase_camera_ref:
             try:
-                dummy_camera = generate_dummy_camera_data()
+                # Pass a default language for dummy data generation. Actual API will use requested lang.
+                dummy_camera = generate_dummy_camera_data(lang='en')
                 firebase_camera_ref.push(dummy_camera)
                 # print(f"Simulated Camera Data pushed to Firebase: {dummy_camera}") # Too verbose
                 # Keep only the latest 10 camera entries for simplicity
@@ -1388,7 +1489,7 @@ def get_latest_sensor_data():
             # Convert any numpy NaN values to None for proper JSON serialization
             if isinstance(latest_data[field], (np.float64, np.int64)) and np.isnan(latest_data[field]):
                 latest_data[field] = None
-        
+
         # Handle 'pH' column name consistency if it comes as 'pH' from Firebase
         if 'pH' in latest_data and 'ph' not in latest_data:
             latest_data['ph'] = latest_data['pH']
@@ -1427,16 +1528,16 @@ def get_historical_sensor_data(days=7):
                 if 'pH' in value and 'ph' not in value:
                     value['ph'] = value['pH']
                     del value['pH']
-                
+
                 dummy_fill_values = generate_dummy_sensor_data_values()
                 for field in ['N', 'P', 'K', 'ph', 'rainfall', 'ds18b20_temperature', 'crop_stage', 'growth_factor']:
                     if field not in value or value[field] is None:
                         value[field] = dummy_fill_values.get(field)
-                
+
                 data_list.append(value)
             else:
                 print(f"Skipping non-dict entry in Firebase historical data: {key}: {value}")
-        
+
         df = pd.DataFrame(data_list)
         if df.empty:
             return []
@@ -1452,7 +1553,7 @@ def get_historical_sensor_data(days=7):
         df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
         df = df.dropna(subset=['timestamp'])
         df = df.sort_values('timestamp').reset_index(drop=True)
-        
+
         # Convert any numpy NaN values to None for proper JSON serialization later
         df = df.replace({np.nan: None})
 
@@ -1461,23 +1562,72 @@ def get_historical_sensor_data(days=7):
         print(f"Error fetching historical sensor data from Firebase: {e}")
         return []
 
-def fetch_camera_feed_data_backend():
-    """Fetches the latest camera feed data (growth events) from Firebase Realtime Database."""
+def fetch_camera_feed_data_backend(lang='en'):
+    """Fetches the latest camera feed data (growth events) from Firebase Realtime Database and translates it."""
+    messages = CAMERA_FEED_STRINGS.get(lang, CAMERA_FEED_STRINGS['en']) # Get messages for the requested language
+
     if firebase_camera_ref is None:
         print("Firebase camera reference not initialized. Cannot fetch camera data.")
-        return generate_dummy_camera_data() # Fallback to dummy
+        # Return dummy data with translated strings
+        return {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "stage": messages['no_camera_data'],
+            "alert": messages['no_camera_data'],
+            "image_url": "https://placehold.co/150x150/E0E0E0/333333?text=No+Camera+Feed"
+        }
 
     try:
         snapshot = firebase_camera_ref.order_by_child('timestamp').limit_to_last(1).get()
         if not snapshot:
             print("No camera data found in Firebase. Returning dummy data.")
-            return generate_dummy_camera_data()
+            return {
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "stage": messages['no_camera_data'],
+                "alert": messages['no_camera_data'],
+                "image_url": "https://placehold.co/150x150/E0E0E0/333333?text=No+Camera+Feed"
+            }
 
         latest_camera_entry = list(snapshot.values())[0]
-        return latest_camera_entry
+
+        # Translate specific fields if they exist
+        translated_stage = latest_camera_entry.get('stage', 'N/A')
+        translated_alert = latest_camera_entry.get('alert', 'N/A')
+
+        # Simple translation mapping for common terms in camera data
+        # This assumes 'stage' and 'alert' values are from a known set (e.g., growth_stages, advisories)
+        # For more complex or dynamic text, a proper translation API would be needed.
+        stage_map = {
+            "Germination": messages.get('growth_stage') + ": Germination",
+            "Vegetative": messages.get('growth_stage') + ": Vegetative",
+            "Flowering": messages.get('growth_stage') + ": Flowering",
+            "Maturity": messages.get('growth_stage') + ": Maturity",
+            "Wilting": messages.get('growth_stage') + ": Wilting",
+            "Yellowing": messages.get('growth_stage') + ": Yellowing",
+            "Healthy Growth": messages.get('advisory') + ": Healthy Growth",
+            "Low Leaf Color Index": messages.get('advisory') + ": Low Leaf Color Index",
+            "Possible Disease Detected": messages.get('advisory') + ": Possible Disease Detected",
+            "Needs Fertilizer": messages.get('advisory') + ": Needs Fertilizer",
+            "Check Irrigation": messages.get('advisory') + ": Check Irrigation",
+            "No Camera Data": messages.get('no_camera_data')
+        }
+        translated_stage = stage_map.get(latest_camera_entry.get('stage'), translated_stage)
+        translated_alert = stage_map.get(latest_camera_entry.get('alert'), translated_alert)
+
+
+        return {
+            "timestamp": latest_camera_entry.get('timestamp'),
+            "stage": translated_stage,
+            "alert": translated_alert,
+            "image_url": latest_camera_entry.get('image_url', "https://placehold.co/150x150/E0E0E0/333333?text=Camera+Feed")
+        }
     except Exception as e:
         print(f"Error fetching camera feed data from Firebase: {e}")
-        return generate_dummy_camera_data() # Fallback to dummy on error
+        return {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "stage": messages['no_camera_data'],
+            "alert": messages['no_camera_data'],
+            "image_url": "https://placehold.co/150x150/E0E0E0/333333?text=Error+Loading+Feed"
+        }
 
 def predict_growth_backend(historical_df, selected_crop_type):
     """
@@ -1495,8 +1645,8 @@ def predict_growth_backend(historical_df, selected_crop_type):
     # Assuming the loaded 'tdann_input_scaler.joblib' expects 30 features,
     # we exclude 'ds18b20_temperature' from the features for growth prediction.
     base_sensor_features = ['N', 'P', 'K', 'temperature', 'humidity', 'ph', 'rainfall']
-    biological_features = ['growth_factor'] # Included in Code 1's TDANN input
-    
+    biological_features = ['growth_factor']
+
     # Combine all features expected by the TDANN model
     all_tdann_input_features = base_sensor_features + biological_features
 
@@ -1509,8 +1659,9 @@ def predict_growth_backend(historical_df, selected_crop_type):
             df_for_prediction[col] = dummy_values.get(col, 0) # Default to 0 if no specific dummy
         df_for_prediction[col] = pd.to_numeric(df_for_prediction[col], errors='coerce').fillna(dummy_values.get(col, 0)) # Ensure numeric and fill any remaining NaNs
 
+
     processed_data_for_prediction = df_for_prediction[all_tdann_input_features].tail(LOOKBACK_WINDOW)
-    
+
     # Fill any remaining NaNs (e.g., if only part of the tail has NaNs)
     processed_data_for_prediction = processed_data_for_prediction.fillna(method='ffill').fillna(method='bfill').fillna(0)
 
@@ -1832,10 +1983,12 @@ def receive_sensor_data():
 @app.route('/api/data')
 def get_dashboard_data():
     """Fetches core sensor data for the dashboard."""
+    lang = request.args.get('lang', 'en') # Get language from frontend request
+
     latest_data = get_latest_sensor_data() # This now handles dummy data if no real data
     historical_data_list = get_historical_sensor_data(days=7) # Returns list of dicts
 
-    camera_data = fetch_camera_feed_data_backend() # This now handles dummy data if no real data
+    camera_data = fetch_camera_feed_data_backend(lang) # Pass language to camera data fetcher
 
     # Prepare data for plotting sensor trends
     plot_data_list = []
@@ -1875,179 +2028,607 @@ def get_dashboard_data():
         'plot_data': plot_data_list,
         'raw_data': raw_data_list,
         'crop_labels': all_crop_labels,
+
         'status': 'success' if latest_data else 'no_data' # Status based on if any data (real or dummy) is available
+
     })
 
+
+
 @app.route('/api/weather_data')
+
 def get_weather_data():
+
     """Endpoint to fetch weather data."""
+
     return jsonify(generate_dummy_weather_data())
 
+
+
 @app.route('/api/recent_events_data')
+
 def get_recent_events_data():
+
     """Endpoint to fetch recent events data."""
+
     return jsonify(generate_dummy_recent_events())
 
+
+
 @app.route('/api/farm_health_data')
+
 def get_farm_health_data():
+
     """Endpoint to fetch farm health index data."""
+
     return jsonify(generate_dummy_farm_health_data())
 
+
+
 @app.route('/api/device_connectivity_data')
+
 def get_device_connectivity_data():
+
     """Endpoint to fetch device connectivity data."""
+
     return jsonify(generate_dummy_device_connectivity())
 
+
+
 @app.route('/api/resource_consumption_data')
+
 def get_resource_consumption_data():
+
     """Endpoint to fetch resource consumption data."""
+
     return jsonify(generate_dummy_resource_consumption())
 
+
+
+# New endpoint for resource usage history
+
+@app.route('/api/usage_history')
+
+def get_usage_history_data():
+
+    """Endpoint to fetch historical resource consumption data."""
+
+    # For now, return dummy data as there's no persistence for this
+
+    return jsonify(generate_dummy_usage_history_data())
+
+
+
+
+
 @app.route('/api/pest_scan_trigger', methods=['POST'])
+
 def api_pest_scan_trigger():
+
     """Endpoint to simulate triggering a pest scan and return results."""
+
     # In a real scenario, this would trigger a scan process
+
     # For now, it just returns simulated results after a delay
+
     time.sleep(2) # Simulate scan time
+
     results = generate_dummy_pest_scan_results()
+
     return jsonify(results)
 
+
+
 @app.route('/api/action', methods=['POST'])
+
 def api_quick_action():
+
     """Endpoint for quick actions like irrigation, nutrient application, alerts."""
+
     data = request.get_json()
+
     action_type = data.get('action_type')
-    
+
+
+
     if action_type == 'irrigation':
+
         print(f"Action: Initiating Irrigation at {datetime.now()}")
+
         message = "Irrigation initiated successfully."
+
     elif action_type == 'nutrients':
+
         print(f"Action: Applying Nutrients at {datetime.now()}")
+
         message = "Nutrients applied successfully."
+
     elif action_type == 'alert':
+
         alert_message = data.get('message', 'General alert from dashboard.')
+
         print(f"Action: Sending Alert: '{alert_message}' at {datetime.now()}")
+
         message = f"Alert '{alert_message}' sent successfully."
+
     else:
+
         return jsonify({"status": "error", "message": "Invalid action type."}), 400
-    
+
+
+
     return jsonify({"status": "success", "message": message})
 
 
+
+
+
 @app.route('/api/predict_growth', methods=['POST'])
+
 def api_predict_growth():
+
     data = request.get_json()
+
     selected_crop_type = data.get('selected_crop_type')
 
+
+
     # Fetch historical data as DataFrame for the TDANN model
+
     historical_data_dicts = get_historical_sensor_data(days=7)
+
     if not historical_data_dicts:
+
         return jsonify({'error': 'No sensor data available for prediction. Please send data to /api/sensor_data.'}), 400
-    
+
+
+
     df_historical = pd.DataFrame(historical_data_dicts)
+
     # Ensure 'ph' column name consistency before passing to backend function
+
     if 'pH' in df_historical.columns and 'ph' not in df_historical.columns:
+
         df_historical['ph'] = df_historical['pH']
+
         df_historical = df_historical.drop(columns=['pH'])
+
+
 
     soil_moisture_pred, light_intensity_pred, nutrient_sum_pred, error_msg = predict_growth_backend(df_historical, selected_crop_type)
 
+
+
     if error_msg:
+
         return jsonify({'error': error_msg}), 500
 
+
+
     return jsonify({
+
         'soil_moisture_pred': soil_moisture_pred,
+
         'light_intensity_pred': light_intensity_pred,
+
         'nutrient_sum_pred': nutrient_sum_pred
+
     })
 
+
+
 @app.route('/api/market_price', methods=['POST'])
+
 def api_market_price():
+
     data = request.get_json()
+
     selected_crop_type = data.get('selected_crop_type')
 
+
+
     latest_sensor_data = get_latest_sensor_data() # This will provide dummy data if real is missing
+
     if not latest_sensor_data:
+
         return jsonify({'error': 'No sensor data available for market price prediction.'}), 400
+
+
 
     predicted_price, error_msg = predict_market_price_backend(latest_sensor_data, selected_crop_type)
 
+
+
     if error_msg:
+
         return jsonify({'error': error_msg}), 500
+
+
 
     return jsonify({'predicted_price': predicted_price})
 
+
+
 @app.route('/api/care_advice', methods=['POST'])
+
 def api_care_advice():
+
     data = request.get_json()
+
     selected_crop_type = data.get('selected_crop_type')
+
     lang = data.get('lang', 'en') # Get language from request
+
+
 
     latest_data = get_latest_sensor_data() # This will provide dummy data if real is missing
+
     if not latest_data:
+
         return jsonify({'advice': [ADVICE_MESSAGES.get(lang, ADVICE_MESSAGES['en'])['no_data']]})
 
+
+
     care_tips = crop_care_advice_backend(latest_data, selected_crop_type, lang)
+
     return jsonify({'advice': care_tips})
 
+
+
 @app.route('/api/seed_recommendations', methods=['POST'])
+
 def api_seed_recommendations():
+
     data = request.get_json()
+
     soil_moisture_pred = data.get('soil_moisture_pred')
+
     lang = data.get('lang', 'en') # Get language from request
 
+
+
     # The recommendation is now solely based on predicted soil moisture, as per code 2's simplified logic
+
     seed_recommendation = recommend_seeds_backend(soil_moisture_pred, lang)
+
     return jsonify({'recommendation': seed_recommendation})
 
+
+
 @app.route('/api/voice_alert', methods=['POST'])
+
 def api_voice_alert():
+
     data = request.get_json()
+
     text = data.get('text')
+
     lang = data.get('lang', 'en')
 
+
+
     if not text:
+
         return jsonify({'error': 'No text provided for speech generation.'}), 400
 
+
+
     audio_bytes, error_msg = speak_tip_backend(text, lang)
+
     if error_msg:
+
         return jsonify({'error': error_msg}), 500
 
+
+
     return send_file(
+
         io.BytesIO(audio_bytes),
+
         mimetype='audio/mpeg',
+
         as_attachment=False,
+
         download_name='alert.mp3'
+
     )
 
+
+
 @app.route('/api/crop_labels')
+
 def get_crop_labels():
+
     return jsonify({'crop_labels': all_crop_labels})
 
+
+
+# --- LibreTranslate Proxy Endpoints ---
+
+@app.route('/languages', methods=['GET'])
+
+def get_libretranslate_languages():
+
+    """Proxies the request to LibreTranslate /languages endpoint."""
+
+    try:
+
+        # Assuming LibreTranslate is running at LIBRE_TRANSLATE_BASE_URL
+
+        response = requests.get(f"{LIBRE_TRANSLATE_BASE_URL}/languages")
+
+        response.raise_for_status() # Raise an exception for HTTP errors
+
+        return jsonify(response.json())
+
+    except requests.exceptions.RequestException as e:
+
+        print(f"Error fetching languages from LibreTranslate: {e}")
+
+        return jsonify({"error": "Failed to fetch languages from translation service.", "details": str(e)}), 500
+
+
+
+@app.route('/translate', methods=['POST'])
+
+def translate_text():
+
+    """Proxies the request to LibreTranslate /translate endpoint."""
+
+    data = request.get_json()
+
+    text = data.get('text')
+
+    source_lang = data.get('source_lang')
+
+    target_lang = data.get('target_lang')
+
+
+
+    if not all([text, source_lang, target_lang]):
+
+        return jsonify({"error": "Missing text, source_lang, or target_lang."}), 400
+
+
+
+    payload = {
+
+        "q": text,
+
+        "source": source_lang,
+
+        "target": target_lang,
+
+        "format": "text"
+
+    }
+
+    try:
+
+        response = requests.post(f"{LIBRE_TRANSLATE_BASE_URL}/translate", json=payload)
+
+        response.raise_for_status()
+
+        translated_text = response.json().get("translatedText")
+
+        return jsonify({"translatedText": translated_text})
+
+    except requests.exceptions.RequestException as e:
+
+        print(f"Error translating text via LibreTranslate: {e}")
+
+        return jsonify({"error": "Translation failed.", "details": str(e)}), 500
+
+
+
+@app.route('/api/translate_static_text', methods=['POST'])
+
+def translate_static_text_api():
+
+    """
+
+    Translates a dictionary of static UI texts.
+
+    Frontend sends { keys: ["key1", "key2"], target_lang: "es", source_lang: "en" }
+
+    Backend returns { "key1": "translated_value1", "key2": "translated_value2" }
+
+    """
+
+    data = request.get_json()
+
+    keys = data.get('keys', [])
+
+    target_lang = data.get('target_lang', 'en')
+
+    source_lang = data.get('source_lang', 'en') # Frontend sends source as 'en'
+
+
+
+    translated_texts = {}
+
+    for key in keys:
+
+        # Check if the key exists in our pre-defined multilingual messages
+
+        # This is for static UI elements, not dynamic advice.
+
+        # The frontend's staticTranslations object should ideally contain these.
+
+        # If not, we fall back to LibreTranslate.
+
+        # For simplicity, we'll proxy all static text translation requests to LibreTranslate.
+
+        try:
+
+            # Call the internal /translate endpoint for each key
+
+            translate_response = requests.post(
+
+                f"{request.url_root.rstrip('/')}/translate", # Use current app's /translate endpoint
+
+                json={"text": key, "source_lang": source_lang, "target_lang": target_lang}
+
+            )
+
+            translate_response.raise_for_status()
+
+            translated_texts[key] = translate_response.json().get('translatedText', key)
+
+        except requests.exceptions.RequestException as e:
+
+            print(f"Error translating static key '{key}': {e}")
+
+            translated_texts[key] = key # Fallback to original key on error
+
+
+
+    return jsonify(translated_texts)
+
+
+
+
+
+# --- Data Export Endpoints ---
+
+@app.route('/api/export_csv', methods=['GET'])
+
+def export_csv():
+
+    """Exports historical sensor data as a CSV file."""
+
+    historical_data = get_historical_sensor_data(days=365) # Export up to a year of data
+
+    if not historical_data:
+
+        return jsonify({"error": "No data available to export."}), 404
+
+
+
+    df = pd.DataFrame(historical_data)
+
+    # Ensure all columns are strings for consistent CSV output, handling None
+
+    df = df.astype(str).replace('None', '')
+
+
+
+    csv_buffer = io.StringIO()
+
+    df.to_csv(csv_buffer, index=False)
+
+    csv_buffer.seek(0)
+
+
+
+    return Response(
+
+        csv_buffer.getvalue(),
+
+        mimetype="text/csv",
+
+        headers={"Content-disposition": "attachment; filename=sensor_data.csv"}
+
+    )
+
+
+
+@app.route('/api/export_excel', methods=['GET'])
+
+def export_excel():
+
+    """Exports historical sensor data as an Excel file."""
+
+    historical_data = get_historical_sensor_data(days=365) # Export up to a year of data
+
+    if not historical_data:
+
+        return jsonify({"error": "No data available to export."}), 404
+
+
+
+    df = pd.DataFrame(historical_data)
+
+    # Ensure all columns are strings for consistent Excel output, handling None
+
+    df = df.astype(str).replace('None', '')
+
+
+
+    excel_buffer = io.BytesIO()
+
+    with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
+
+        df.to_excel(writer, index=False, sheet_name='Sensor Data')
+
+    excel_buffer.seek(0)
+
+
+
+    return Response(
+
+        excel_buffer.getvalue(),
+
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+
+        headers={"Content-disposition": "attachment; filename=sensor_data.xlsx"}
+
+    )
+
+
+
+
+
 # Ensure models and Firebase are loaded when the app starts
+
 @app.before_request
+
 def before_first_request():
+
     if not firebase_app:
+
         initialize_firebase()
+
     if model is None or input_scaler is None or output_scaler is None or crop_encoder is None or market_price_model is None:
+
         load_models_and_scalers()
+
+
 
 if __name__ == '__main__':
+
     # Initialize app components (models, scalers, Firebase, etc.) in the main thread before starting others
+
     with app.app_context():
+
         initialize_firebase()
+
         load_models_and_scalers()
 
+
+
     # Start camera simulator in a separate thread
+
     camera_thread = threading.Thread(target=run_camera_simulator_thread)
+
     camera_thread.daemon = True # Allow main program to exit even if threads are running
+
     camera_thread.start()
 
+
+
     # Start sensor data inserter in a separate thread
+
     sensor_inserter_thread = threading.Thread(target=run_sensor_data_inserter_thread)
+
     sensor_inserter_thread.daemon = True
+
     sensor_inserter_thread.start()
 
+
+
     # Run the Flask app
+
     port = int(os.environ.get("PORT", 5000))
+
     app.run(host="0.0.0.0", port=port, debug=False)
