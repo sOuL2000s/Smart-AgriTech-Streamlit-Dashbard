@@ -32,7 +32,7 @@ from gtts import gTTS
 # This is crucial for running Django as a standalone script.
 if not settings.configured:
     settings.configure(
-        DEBUG=False,  # Set to True for development, False for production
+        DEBUG=True,  # Set to True for development, False for production
         SECRET_KEY='a-very-secret-key-that-should-be-randomly-generated-in-production',
         ROOT_URLCONF=__name__,  # This file itself serves as the root URLconf
         INSTALLED_APPS=[
