@@ -31,9 +31,24 @@ from gtts import gTTS
 # This block configures Django's settings if they haven't been already.
 # This is crucial for running Django as a standalone script.
 if not settings.configured:
+    # Determine DEBUG mode based on environment variable (e.g., for production)
+    IS_PROD = os.environ.get('RENDER', 'False') == 'True' # Render sets RENDER=True
+    DEBUG_MODE = not IS_PROD # Set DEBUG to False in production
+
+    # Get allowed hosts from environment variable, or use defaults
+    # For Render, you'll need to add your Render service's URL here.
+    # For example, in Render, you can set an environment variable ALLOWED_HOSTS
+    # with the value 'smart-agritech-streamlit-dashbard.onrender.com'
+    allowed_hosts_str = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost')
+    ALLOWED_HOSTS_LIST = [host.strip() for host in allowed_hosts_str.split(',')]
+
+    # Add the Render domain explicitly if it's not already there and running on Render
+    if IS_PROD and 'smart-agritech-streamlit-dashbard.onrender.com' not in ALLOWED_HOSTS_LIST:
+        ALLOWED_HOSTS_LIST.append('smart-agritech-streamlit-dashbard.onrender.com')
+
     settings.configure(
-        DEBUG=True,  # Set to True for development, False for production
-        SECRET_KEY='a-very-secret-key-that-should-be-randomly-generated-in-production',
+        DEBUG=DEBUG_MODE,
+        SECRET_KEY=os.environ.get('DJANGO_SECRET_KEY', 'a-very-secret-key-that-should-be-randomly-generated-in-production'),
         ROOT_URLCONF=__name__,  # This file itself serves as the root URLconf
         INSTALLED_APPS=[
             # No specific Django apps are strictly needed for this simple API structure,
@@ -48,6 +63,7 @@ if not settings.configured:
             'django.middleware.csrf.CsrfViewMiddleware',
             'django.middleware.clickjacking.XFrameOptionsMiddleware',
         ],
+        ALLOWED_HOSTS=ALLOWED_HOSTS_LIST, # Add this line
         # Custom setting to allow all origins, mirroring Flask's CORS setup
         CORS_ALLOW_ALL_ORIGINS=True,
     )
@@ -639,7 +655,7 @@ ADVICE_MESSAGES = {
         'general_ph_off': "一般的なアドバイス：ほとんどの作物にとって最適なpH範囲は5.5-7.5です。必要に応じて調整してください。"
     },
     'bn': {  # Bengali
-        'no_data': "পরামর্শ দেওয়ার জন্য কোনো সেন্সর ডেটা উপলব্ধ নেই।",
+        'no_data': "কোনো সেন্সর ডেটা উপলব্ধ নেই।",
         'npk_low': "🌱 **{nutrient} কম আছে ({value:.1f})**: {message}",
         'npk_high': "🌱 **{nutrient} বেশি আছে ({value:.1f})**: {message}",
         'soil_moisture_low': "💧 **মাটির আর্দ্রতা কম ({sm:.1f}%)**: {message}",
@@ -695,7 +711,7 @@ ADVICE_MESSAGES = {
         'coconut_temp_low': "নারকেলের জন্য আদর্শ তাপমাত্রা ২৫°C এর উপরে।",
         'mothbeans_temp_low': "মোথবীন খরা-সহনশীল তবে ফুল ফোটার সময় ন্যূনতম সেচ প্রয়োজন।",
         'mungbean_temp_low': "মুগ ডালের সর্বোত্তম বৃদ্ধির জন্য উষ্ণ অবস্থার প্রয়োজন।",
-        'blackgram_temp_low': "আदर्श তাপমাত্রা পরিসর ২৫-৩৫°C।",
+        'blackgram_temp_low': "আদর্শ তাপমাত্রা পরিসর ২৫-৩৫°C।",
         'lentil_temp_low': "মসুর ১৮-৩০°C এ ভালো জন্মায়।",
         'general_temp_low': "সাধারণ পরামর্শ: ঠান্ডা তাপমাত্রা বৃদ্ধি ব্যাহত করতে পারে। সুরক্ষামূলক ব্যবস্থা বিবেচনা করুন।",
         'general_temp_high': "সাধারণ পরামর্শ: উচ্চ তাপমাত্রা তাপ চাপ সৃষ্টি করতে পারে। পর্যাপ্ত জল এবং ছায়া নিশ্চিত করুন।",
@@ -877,84 +893,6 @@ SEED_RECOMMENDATIONS_MESSAGES = {
         'general_ph_very_low': "نصيحة عامة: التربة شديدة الحموضة. استخدم الجير لزيادة الرقم الهيدروجيني وتحسين توافر المغذيات.",
         'general_ph_very_high': "نصيحة عامة: التربة شديدة القلوية. استخدم الكبريت أو المواد العضوية لتقليل الرقم الهيدروجيني.",
         'general_ph_off': "نصيحة عامة: نطاق الرقم الهيدروجيني الأمثل لمعظم المحاصيل هو 5.5-7.5. اضبط حسب الحاجة."
-    },
-    'ja': {  # Japanese (Example)
-        'no_data': "アドバイスを提供するためのセンサーデータがありません。",
-        'npk_low': "🌱 **{nutrient}が低い ({value:.1f})**: {message}",
-        'npk_high': "🌱 **{nutrient}が高い ({value:.1f})**: {message}",
-        'soil_moisture_low': "💧 **土壌水分が低い ({sm:.1f}%)**: {message}",
-        'soil_moisture_high': "💧 **土壌水分が高い ({sm:.1f}%)**: {message}",
-        'temp_low': "🌡️ **温度が低い ({temp:.1f}°C)**: {message}",
-        'temp_high': "🌡️ **温度が高い ({temp:.1f}°C)**: {message}",
-        'humidity_low': "💨 **湿度が低い ({hum:.1f}%)**: {message}",
-        'humidity_high': "💨 **湿度が高い ({hum:.1f}%)**: {message}",
-        'ph_low': "🧪 **pHが低い ({ph_val:.1f})**: {message}",
-        'ph_high': "🧪 **pHが高い ({ph_val:.1f})**: {message}",
-        'ph_off': "🧪 **pHが適切ではありません ({ph_val:.1f})**: {message}",
-        'light_low': "☀️ **光強度が低い ({light:.1f} ルクス)**: {message}",
-        'light_high': "☀️ **光強度が高い ({light:.1f} ルクス)**: {message}",
-        'rainfall_low_msg': "🌧️ **降水量が少ない ({rain:.1f} mm)**: {message}",
-        'rainfall_high_msg': "🌧️ **降水量が多い ({rain:.1f} mm)**: {message}",
-        'all_good': "✅ すべての主要なパラメーターは良好です！最適な成長のために定期的に監視を続けてください。",
-        'npk_n_low': "窒素が豊富な肥料の施用を検討してください。",
-        'npk_n_high': "過剰な窒素は、果実/花の成長よりも葉の成長を促進する可能性があります。",
-        'npk_p_low': "根の発育のためにリン酸肥料の施用を検討してください。",
-        'npk_p_high': "リン酸が高いと他の栄養素が吸収されにくくなることがあります。",
-        'npk_k_low': "植物全体の健康と果実の品質のためにカリウム肥料の施用を検討してください。",
-        'npk_k_high': "過剰なカリウムは、カルシウムとマグネシウムの吸収を妨げる可能性があります。",
-        'wheat_sm_low': "軽く灌漑してください – 小麦は35-50%の土壌水分が必要です。",
-        'rice_sm_low': "イネは高い水分が必要です。適切な灌漑を確保してください。",
-        'maize_sm_low': "トウモロコシは中程度の土壌水分レベルが必要です。",
-        'banana_sm_low': "バナナには土壌を常に湿らせておいてください。",
-        'mango_sm_high': "水浸しを避けてください。マンゴーは水はけの良い土壌が必要です。",
-        'grapes_sm_high': "ブドウは乾燥した土壌を好みます – 水のやりすぎを避けてください。",
-        'cotton_sm_low': "綿は開花中に中程度の水分が必要です。",
-        'millet_sorghum_sm_low': "これらは干ばつに強い作物ですが、それでも最小限の水分が必要です。",
-        'jute_sm_low': "ジュートは成長中に十分な水分が必要です。",
-        'pomegranate_sm_high': "ザクロの水のやりすぎを避けてください。",
-        'melon_sm_low': "メロンは、特に結実中に継続的な水やりが必要です。",
-        'coconut_sm_low': "ココヤシは高い水分レベルが必要です。",
-        'mothbeans_sm_low': "モース豆は干ばつに強いですが、開花中に最小限の灌漑が必要です。",
-        'mungbean_sm_low': "開花および莢形成中に定期的な灌漑を確保してください。",
-        'blackgram_sm_low': "特に開花中に中程度の水分を維持してください。",
-        'lentil_sm_low': "レンズ豆は低から中程度の水分が必要です。",
-        'general_sm_low': "一般的なアドバイス：干ばつストレスを防ぐために灌漑を検討してください。",
-        'general_sm_high': "一般的なアドバイス：水浸しを防ぐために良好な排水を確保してください。",
-        'wheat_temp_high': "日陰を提供するか、夕方に灌漑してください – 小麦には温度が高すぎます。",
-        'rice_temp_high': "イネには暑すぎます。夕方の灌漑または日陰を検討してください。",
-        'maize_temp_low': "トウモロコシは暖かい気候（20-30°C）を好みます。",
-        'banana_temp_low': "バナナは寒さに敏感です – 暖かい条件を確保してください。",
-        'mango_temp_low': "マンゴーはより暖かい温度（>20°C）が必要です。",
-        'cotton_temp_low': "綿は暖かい温度で生育します。",
-        'millet_sorghum_temp_low': "暖かい気候はキビ/ソルガムに理想的です。",
-        'coffee_temp_low': "コーヒーは18-24°Cの範囲で生育します。",
-        'jute_temp_low': "ジュートは25-30°Cでよく育ちます。",
-        'papaya_temp_low': "パパイヤは21-33°Cの範囲を好みます。",
-        'pomegranate_temp_low': "理想的な温度は20°C以上です。",
-        'melon_temp_low': "温度が暖かい（>25°C）ことを確認してください。",
-        'coconut_temp_low': "ココナッツの理想的な温度は25°C以上です。",
-        'mothbeans_temp_low': "温度は22°C以上である必要があります。",
-        'mungbean_temp_low': "緑豆は最適な成長のために暖かい条件が必要です。",
-        'blackgram_temp_low': "理想的な温度範囲は25-35°Cです。",
-        'lentil_temp_low': "レンズ豆は18-30°Cでよく育ちます。",
-        'general_temp_low': "一般的なアドバイス：低温は成長を妨げる可能性があります。保護対策を検討してください。",
-        'general_temp_high': "一般的なアドバイス：高温は熱ストレスを引き起こす可能性があります。十分な水と日陰を確保してください。",
-        'wheat_hum_high': "真菌感染症に注意してください – 空気循環を確保してください。",
-        'rice_hum_low': "周囲の湿度を上げるか、マルチを使用してください。",
-        'banana_hum_low': "バナナは高い湿度が必要です。ミストまたはマルチングを検討してください。",
-        'grapes_hum_high': "高湿度は真菌感染症につながる可能性があります。",
-        'coffee_hum_low': "コーヒーは高い湿度を好みます。",
-        'orange_hum_high': "空気循環を改善し、真菌の問題を防ぐために木を剪定してください。",
-        'general_hum_low': "一般的なアドバイス：低湿度はしおれを引き起こす可能性があります。ミストまたは土壌水分の増加を検討してください。",
-        'general_hum_high': "一般的なアドバイス：高湿度は真菌性疾患のリスクを高めます。換気を良くしてください。",
-        'wheat_ph_low': "わずかに酸性 – pHを上げるために石灰の施用を検討してください。",
-        'rice_ph_off': "イネにはわずかに酸性の土壌を維持してください（pH 5.5-6.5）。",
-        'maize_ph_off': "土壌pHを5.8-7.0の間に維持してください。",
-        'papaya_ph_low': "パパイヤにはわずかに酸性から中性の土壌が最適です。",
-        'orange_ph_off': "オレンジの理想的な土壌pHは6.0-7.5です。",
-        'general_ph_very_low': "一般的なアドバイス：土壌が酸性すぎます。pHを上げ、栄養素の利用可能性を改善するために石灰を施用してください。",
-        'general_ph_very_high': "一般的なアドバイス：土壌がアルカリ性すぎます。pHを下げるために硫黄または有機物を施用してください。",
-        'general_ph_off': "一般的なアドバイス：ほとんどの作物にとって最適なpH範囲は5.5-7.5です。必要に応じて調整してください。"
     }
 }
 
@@ -1426,7 +1364,7 @@ def get_latest_sensor_data():
 
 def get_historical_sensor_data(days=7):
     """Fetches historical sensor data from Firebase for the last 'days'."""
-    if firebase_db_ref is None:
+    if firebase_db_ref == None:
         print("Firebase DB reference not initialized. Cannot fetch historical sensor data.")
         return []
     try:
