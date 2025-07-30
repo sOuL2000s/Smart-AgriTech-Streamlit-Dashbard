@@ -913,7 +913,6 @@ def initialize_firebase():
     firebase_cred_path = None
     try:
         if firebase_key_b64:
-            print("Attempting to decode Firebase credentials from environment variable...")
             decoded_json = base64.b64decode(firebase_key_b64).decode('utf-8')
             with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as f:
                 f.write(decoded_json)
@@ -925,11 +924,9 @@ def initialize_firebase():
             # IMPORTANT: For production, always use FIREBASE_KEY_B64
             # Make sure 'agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json' is in your project root
             # You might need to adjust this path if your service account key is elsewhere
-            print("FIREBASE_KEY_B64 environment variable not found. Attempting to load from local file...")
             cred = credentials.Certificate("agriastrax-website-firebase-adminsdk-fbsvc-36cdff39c2.json")
             print("Firebase credentials loaded from local file (development fallback).")
 
-        print("Initializing Firebase app...")
         firebase_app = firebase_admin.initialize_app(cred, {
             'databaseURL': 'https://agriastrax-website-default-rtdb.firebaseio.com/'  # Replace with your actual Firebase DB URL
         })
@@ -1248,7 +1245,6 @@ def run_sensor_data_inserter_thread():
         if not local_print_only:
             try:
                 firebase_db_ref.push(sample_data)
-                print(f"Initial sample data pushed to Firebase: {sample_data['timestamp']}")
             except Exception as e:
                 print(f"❌ Error pushing initial sample data to Firebase: {e}. Falling back to local printing.")
                 local_print_only = True
@@ -1300,29 +1296,12 @@ def run_sensor_data_inserter_thread():
         if not local_print_only:
             try:
                 firebase_db_ref.push(live_data)
-                print(f"Live sensor data pushed to Firebase: {live_data['timestamp']}")
             except Exception as e:
                 print(f"❌ Error pushing real-time data to Firebase: {e}. Falling back to local printing.")
                 local_print_only = True
                 print("Live Sensor Data (local print):", live_data)
         else:
             print("Live Sensor Data (local print):", live_data)
-
-        # Keep only the latest 100 entries for simplicity in Firebase
-        if firebase_db_ref: # Ensure ref is not None before attempting to get snapshots
-            try:
-                snapshots = firebase_db_ref.order_by_child('timestamp').get()
-                if snapshots and len(snapshots) > 100:
-                    # Fetch only the oldest keys to delete, more efficient than getting all
-                    # This approach still fetches all, but it's simpler to debug for now.
-                    # For very large datasets, a more advanced query to fetch only oldest N keys would be needed.
-                    oldest_keys = sorted(snapshots.keys(), key=lambda k: snapshots[k]['timestamp'])
-                    for i in range(len(oldest_keys) - 100):
-                        firebase_db_ref.child(oldest_keys[i]).delete()
-                        # print(f"Deleted old entry: {oldest_keys[i]}") # Too verbose for continuous operation
-            except Exception as e:
-                print(f"❌ Error during Firebase cleanup (deleting old entries): {e}")
-
         time.sleep(10)
 
 # --- Helper Functions for Data Fetching and Processing ---
@@ -1482,7 +1461,6 @@ def predict_growth_backend(historical_df, selected_crop_type):
             # If column is entirely missing or all NaN, fill with a sensible dummy
             df_for_prediction[col] = dummy_values.get(col, 0)  # Default to 0 if no specific dummy
         df_for_prediction[col] = pd.to_numeric(df_for_prediction[col], errors='coerce').fillna(dummy_values.get(col, 0))  # Ensure numeric and fill any remaining NaNs
-
 
     processed_data_for_prediction = df_for_prediction[all_tdann_input_features].tail(LOOKBACK_WINDOW)
 
@@ -1870,7 +1848,7 @@ def receive_sensor_data(request):
         sensor_entry['growth_factor'] = data.get('growth_factor', dummy_values['growth_factor'])
 
         firebase_db_ref.push(sensor_entry)
-        print(f"Received and stored sensor data via API: {sensor_entry['timestamp']}")
+        print(f"Received and stored sensor data: {sensor_entry}")
 
         # Keep only the latest 100 entries for simplicity in Firebase
         snapshots = firebase_db_ref.order_by_child('timestamp').get()
