@@ -115,7 +115,7 @@
 
         .button-primary:active {
             transform: translateY(0);
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
 
         /* Secondary button for play alerts */
@@ -142,7 +142,7 @@
 
         .button-secondary:active {
             transform: translateY(0);
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
 
         /* Fade-in animation */
@@ -217,10 +217,7 @@
         #google_translate_element {
             /* Adjust this to fit your design */
             margin-left: 10px;
-        }
-        /* Hide the default Google Translate dropdown */
-        #google_translate_element .goog-te-gadget-simple {
-            display: none !important;
+            display: none; /* Keep this hidden as we use a custom select */
         }
         /* Adjust body top padding which Google Translate adds */
         body {
@@ -346,13 +343,13 @@
             pointer-events: none;
         }
 
-        /* Circular Progress Bar Styling */
+        /* Circular Progress Bar Styling (updated to be more like Farm Health Index) */
         .circular-progress-container {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 0.6rem; /* Further reduced padding */
+            padding: 0.6rem;
             text-align: center;
             position: relative;
             background-color: rgba(36, 44, 56, 0.5);
@@ -363,63 +360,79 @@
 
         .circular-progress {
             position: relative;
-            width: 60px; /* Further smaller size for the circle */
-            height: 60px;
+            width: 70px; /* Slightly larger size for the circle */
+            height: 70px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 0.3rem; /* Further reduced margin */
-            background: conic-gradient(#48bb78 0%, #38a169 0%);
-            transition: background 0.5s ease-in-out;
-            box-shadow: inset 0 0 8px rgba(0,0,0,0.3);
+            margin-bottom: 0.3rem;
+            /* Using SVG for better control over inner circle and text positioning */
         }
 
-        .circular-progress::before {
-            content: '';
+        .circular-progress svg {
             position: absolute;
-            width: 48px; /* Inner circle size */
-            height: 48px;
-            border-radius: 50%;
-            background-color: rgba(45, 55, 72, 0.5);
-            z-index: 1;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .circular-progress circle {
+            fill: none;
+            stroke-width: 7; /* Thickness of the ring */
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+
+        .circular-progress .bg-circle {
+            stroke: #4a5568; /* Background color of the ring */
+        }
+
+        .circular-progress .progress-circle {
+            stroke-linecap: round; /* Rounded ends for the progress bar */
+            transition: stroke-dasharray 0.5s ease-in-out;
         }
 
         .progress-value {
-            position: relative;
-            font-size: 1rem; /* Further smaller font */
+            position: absolute; /* Position value absolutely within the container */
+            font-size: clamp(0.8rem, 2vw, 1.1rem); /* Adjusted font size for better fit and responsiveness */
             font-weight: bold;
             color: #e2e8f0;
-            z-index: 2;
+            z-index: 2; /* Ensure text is above circles */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%); /* Center the text precisely */
+            white-space: nowrap; /* Prevent wrapping */
         }
 
         .sensor-icon {
             position: relative;
             z-index: 2;
             color: #68D391;
-            font-size: 1.1rem; /* Further smaller icon */
-            margin-bottom: 0.1rem; /* Further reduced margin */
+            font-size: 1.1rem;
+            margin-bottom: 0.1rem;
         }
 
         .sensor-label {
-            font-size: 0.75rem; /* Further smaller text-sm */
+            font-size: 0.75rem;
             color: #cbd5e0;
             margin-top: 0.1rem;
         }
 
         .sensor-update-time {
-            font-size: 0.65rem; /* Further smaller text-xs */
+            font-size: 0.65rem;
             color: #94a3b8;
             margin-top: 0.25rem;
         }
 
         /* Specific colors for different gauges */
-        .circular-progress.soil-moisture { background: conic-gradient(#68D391 0%, #38a169 0%); }
-        .circular-progress.temperature { background: conic-gradient(#F6AD55 0%, #DD6B20 0%); }
-        .circular-progress.humidity { background: conic-gradient(#63B3ED 0%, #4299E1 0%); }
-        .circular-progress.ph { background: conic-gradient(#A78BFA 0%, #805AD5 0%); }
-        .circular-progress.light-intensity { background: conic-gradient(#ECC94B 0%, #D69E2E 0%); }
-        .circular-progress.rainfall { background: conic-gradient(#4299E1 0%, #3182CE 0%); }
+        .circular-progress.soil-moisture .progress-circle { stroke: #68D391; }
+        .circular-progress.temperature .progress-circle { stroke: #F6AD55; }
+        .circular-progress.humidity .progress-circle { stroke: #63B3ED; }
+        .circular-progress.ph .progress-circle { stroke: #A78BFA; }
+        .circular-progress.light-intensity .progress-circle { stroke: #ECC94B; }
+        .circular-progress.rainfall .progress-circle { stroke: #4299E1; }
 
         /* Weather Card Styling */
         .weather-day {
@@ -486,7 +499,7 @@
         }
 
         /* Real-Time Plant Monitoring Styling */
-        .camera-feed-placeholder {
+        .camera-feed-container { /* Changed from placeholder to container for video */
             background-color: #1a202c;
             border: 2px solid #4a5568;
             border-radius: 1rem;
@@ -498,10 +511,18 @@
             justify-content: center;
             align-items: center;
             color: #cbd5e0;
-            font-size: clamp(0.8rem, 1.8vw, 0.9rem); /* Further smaller font */
+            font-size: clamp(0.8rem, 1.8vw, 0.9rem);
             position: relative;
             overflow: hidden;
             animation: pulse 2s infinite alternate;
+        }
+
+        .camera-feed-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Ensure video covers the area */
+            border-radius: 1rem; /* Match container border-radius */
+            display: block;
         }
 
         /* Pulse Animation */
@@ -511,19 +532,20 @@
         }
 
         /* Live Indicator */
-        .camera-feed-placeholder .live-indicator {
+        .camera-feed-container .live-indicator {
             position: absolute;
-            top: 0.6rem; /* Further reduced */
-            left: 0.6rem; /* Further reduced */
+            top: 0.6rem;
+            left: 0.6rem;
             background-color: #e53e3e;
             color: white;
-            padding: 0.15rem 0.3rem; /* Further reduced padding */
-            border-radius: 0.3rem; /* Further smaller radius */
-            font-size: clamp(0.5rem, 1.2vw, 0.65rem); /* Further smaller font */
+            padding: 0.15rem 0.3rem;
+            border-radius: 0.3rem;
+            font-size: clamp(0.5rem, 1.2vw, 0.65rem);
             font-weight: bold;
             display: flex;
             align-items: center;
             animation: blink 1s infinite;
+            z-index: 10; /* Ensure it's above video */
         }
 
         /* Blinking */
@@ -533,77 +555,110 @@
         }
 
         /* Connection Status */
-        .camera-feed-placeholder .connection-status {
+        .camera-feed-container .connection-status {
             position: absolute;
-            top: 0.6rem; /* Further reduced */
-            right: 0.6rem; /* Further reduced */
+            top: 0.6rem;
+            right: 0.6rem;
             background-color: #48bb78;
             color: white;
-            padding: 0.15rem 0.3rem; /* Further reduced padding */
-            border-radius: 0.3rem; /* Further smaller radius */
-            font-size: clamp(0.5rem, 1.2vw, 0.65rem); /* Further smaller font */
+            padding: 0.15rem 0.3rem;
+            border-radius: 0.3rem;
+            font-size: clamp(0.5rem, 1.2vw, 0.65rem);
             font-weight: bold;
             display: flex;
             align-items: center;
+            z-index: 10; /* Ensure it's above video */
         }
 
         /* Camera Details (now external) */
         .camera-details-external {
             display: flex;
             flex-direction: column;
-            gap: 0.3rem; /* Further reduced gap */
+            gap: 0.3rem;
             background-color: rgba(0, 0, 0, 0.4);
-            padding: 0.5rem 0.7rem; /* Further reduced padding */
+            padding: 0.5rem 0.7rem;
             border-radius: 0.75rem;
-            margin-top: 0.7rem; /* Further reduced margin */
+            margin-top: 0.7rem;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             border: 1px solid #4a5568;
         }
         .camera-details-external span {
             background-color: rgba(0, 0, 0, 0.2);
-            padding: 0.3rem 0.5rem; /* Further reduced padding */
+            padding: 0.3rem 0.5rem;
             border-radius: 0.5rem;
             display: block;
             text-align: left;
-            font-size: clamp(0.65rem, 1.3vw, 0.8rem); /* Further smaller font */
+            font-size: clamp(0.65rem, 1.3vw, 0.8rem);
             color: #cbd5e0;
             white-space: normal;
             overflow: visible;
             text-overflow: clip;
         }
 
-        /* Camera Icon */
-        .camera-feed-placeholder .camera-icon {
-            font-size: clamp(1.6rem, 4vw, 2.2rem); /* Further smaller icon */
-            color: #63b3ed;
-            margin-bottom: 0.3rem; /* Further reduced margin */
-        }
-
-        /* Overlay Text */
-        .camera-feed-placeholder .camera-overlay-text {
+        /* Camera Icon and Overlay Text (for when video is not active) */
+        .camera-feed-container .camera-icon,
+        .camera-feed-container .camera-overlay-text,
+        .camera-feed-container .camera-feed-message {
             position: absolute;
+            z-index: 5; /* Below indicators, above video */
+            text-align: center;
+        }
+        .camera-feed-container .camera-icon {
+            font-size: clamp(1.6rem, 4vw, 2.2rem);
+            color: #63b3ed;
+            margin-bottom: 0.3rem;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: clamp(0.8rem, 2vw, 1.2rem); /* Further smaller font */
+            display: none; /* Hidden by default, shown if video fails */
+        }
+        .camera-feed-container .camera-feed-message {
+            font-size: clamp(0.8rem, 1.8vw, 0.9rem);
+            color: #cbd5e0;
+            top: calc(50% + 1.5rem); /* Below the icon */
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none; /* Hidden by default, shown if video fails */
+        }
+        .camera-feed-container .camera-overlay-text {
+            font-size: clamp(0.8rem, 2vw, 1.2rem);
             font-weight: bold;
             color: rgba(255, 255, 255, 0.2);
             pointer-events: none;
+            display: none; /* Hidden by default, shown if video fails */
         }
+
 
         /* Header Styling */
         .main-header {
             display: flex;
+            flex-direction: column; /* Stack vertically by default */
             align-items: center;
-            justify-content: space-between; /* Distribute items to ends */
-            margin-bottom: 1.25rem; /* Further reduced margin */
-            padding: 0.6rem 0; /* Further reduced padding */
+            justify-content: space-between;
+            margin-bottom: 1.25rem;
+            padding: 0.6rem 0;
             border-bottom: 1px solid #4a5568;
         }
+
+        /* Responsive adjustments for header */
+        @media (min-width: 768px) { /* md breakpoint */
+            .main-header {
+                flex-direction: row; /* Horizontal on medium screens and up */
+                align-items: center;
+            }
+        }
+
         .main-header .logo-section {
             display: flex;
             align-items: center;
+            margin-bottom: 1rem; /* Add margin below logo on small screens */
         }
+        @media (min-width: 768px) {
+            .main-header .logo-section {
+                margin-bottom: 0; /* Remove margin on larger screens */
+            }
+        }
+
         .main-header .logo-section img {
             height: 45px; /* Further smaller logo */
             margin-right: 0.7rem; /* Further reduced margin */
@@ -615,12 +670,44 @@
             color: #68D391;
             line-height: 1;
             letter-spacing: 0.05em;
+            text-align: center; /* Center title on small screens */
         }
         .main-header .title-section p {
             font-size: 0.85rem; /* Further smaller */
             color: #a0aec0;
             margin-top: 0.15rem; /* Further reduced margin */
+            text-align: center; /* Center subtitle on small screens */
         }
+        /* Desktop-specific alignment for the subtitle */
+        @media (min-width: 1024px) { /* lg breakpoint, or adjust as needed for desktop */
+            .main-header .title-section p {
+                text-align: left;
+            }
+        }
+
+
+        /* Adjust the container for buttons, toggle, and select in header */
+        .header-controls {
+            display: flex;
+            flex-direction: column; /* Stack vertically by default */
+            align-items: center;
+            width: 100%; /* Take full width on small screens */
+            gap: 0.75rem; /* Space between items */
+        }
+        @media (min-width: 640px) { /* sm breakpoint */
+            .header-controls {
+                flex-direction: row; /* Horizontal on small screens and up */
+                flex-wrap: wrap; /* Allow wrapping if needed */
+                justify-content: flex-end; /* Align to end on small screens */
+                width: auto; /* Auto width on small screens and up */
+            }
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            .header-controls {
+                flex-wrap: nowrap; /* Prevent wrapping on medium screens and up */
+            }
+        }
+
 
         /* Plotly Chart Specific Styling */
         .js-plotly-plot .plotly .modebar {
@@ -641,6 +728,11 @@
             background-color: #48bb78 !important;
             color: white !important;
         }
+
+        /* Footer transparency */
+        footer {
+            background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black */
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen">
@@ -651,10 +743,11 @@
                 <img src="android-chrome-192x192.png" alt="AgriTech Logo" class="rounded-full"> <!-- Placeholder image -->
                 <div class="title-section">
                     <h1 class="font-michroma">SMART AGRITECH DASHBOARD</h1>
-                    <p>Advanced AI & Sensor Technology for Modern Agriculture</p>
+                    <!-- Added md:text-left for desktop alignment -->
+                    <p class="md:text-left">Advanced AI & Sensor Technology for Modern Agriculture</p>
                 </div>
             </div>
-            <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
+            <div class="header-controls">
                 <button id="refresh-button" class="button-primary w-full sm:w-auto" data-translate-key="refresh_data">
                     <i class="fas fa-sync-alt mr-2"></i> Refresh Data
                 </button>
@@ -671,110 +764,21 @@
                     </label>
                 </div>
                 <!-- Custom Language Selector -->
-                <select id="customLanguageSelect">
+                <select id="customLanguageSelect" class="w-full sm:w-auto">
                     <option value="">🌐 Select Language</option>
-                    <option value="af">Afrikaans</option>
-                    <option value="am">Amharic</option>
-                    <option value="ar">Arabic</option>
-                    <option value="az">Azerbaijani</option>
-                    <option value="be">Belarusian</option>
-                    <option value="bg">Bulgarian</option>
-                    <option value="bn">Bengali</option>
-                    <option value="bs">Bosnian</option>
-                    <option value="ca">Catalan</option>
-                    <option value="ceb">Cebuano</option>
-                    <option value="cs">Czech</option>
-                    <option value="cy">Welsh</option>
-                    <option value="da">Danish</option>
-                    <option value="de">German</option>
-                    <option value="el">Greek</option>
                     <option value="en">English</option>
-                    <option value="eo">Esperanto</option>
-                    <option value="es">Spanish</option>
-                    <option value="et">Estonian</option>
-                    <option value="eu">Basque</option>
-                    <option value="fa">Persian</option>
-                    <option value="fi">Finnish</option>
-                    <option value="fr">French</option>
-                    <option value="fy">Frisian</option>
-                    <option value="ga">Irish</option>
-                    <option value="gl">Galician</option>
-                    <option value="gu">Gujarati</option>
-                    <option value="ha">Hausa</option>
-                    <option value="haw">Hawaiian</option>
-                    <option value="he">Hebrew</option>
                     <option value="hi">Hindi</option>
-                    <option value="hmn">Hmong</option>
-                    <option value="hr">Croatian</option>
-                    <option value="ht">Haitian Creole</option>
-                    <option value="hu">Hungarian</option>
-                    <option value="hy">Armenian</option>
-                    <option value="id">Indonesian</option>
-                    <option value="ig">Igbo</option>
-                    <option value="is">Icelandic</option>
-                    <option value="it">Italian</option>
-                    <option value="ja">Japanese</option>
-                    <option value="jw">Javanese</option>
-                    <option value="ka">Georgian</option>
-                    <option value="kk">Kazakh</option>
-                    <option value="km">Khmer</option>
-                    <option value="kn">Kannada</option>
-                    <option value="ko">Korean</option>
-                    <option value="ku">Kurdish (Kurmanji)</option>
-                    <option value="ky">Kyrgyz</option>
-                    <option value="la">Latin</option>
-                    <option value="lb">Luxembourgish</option>
-                    <option value="lo">Lao</option>
-                    <option value="lt">Lithuanian</option>
-                    <option value="lv">Latvian</option>
-                    <option value="mg">Malagasy</option>
-                    <option value="mi">Maori</option>
-                    <option value="mk">Macedonian</option>
-                    <option value="ml">Malayalam</option>
-                    <option value="mn">Mongolian</option>
-                    <option value="mr">Marathi</option>
-                    <option value="ms">Malay</option>
-                    <option value="mt">Maltese</option>
-                    <option value="my">Myanmar (Burmese)</option>
-                    <option value="ne">Nepali</option>
-                    <option value="nl">Dutch</option>
-                    <option value="no">Norwegian</option>
-                    <option value="ny">Chichewa</option>
-                    <option value="pa">Punjabi</option>
-                    <option value="pl">Polish</option>
-                    <option value="ps">Pashto</option>
-                    <option value="pt">Portuguese</option>
-                    <option value="ro">Romanian</option>
-                    <option value="ru">Russian</option>
-                    <option value="sd">Sindhi</option>
-                    <option value="si">Sinhala</option>
-                    <option value="sk">Slovak</option>
-                    <option value="sl">Slovenian</option>
-                    <option value="so">Somali</option>
-                    <option value="sq">Albanian</option>
-                    <option value="sr">Serbian</option>
-                    <option value="st">Sesotho</option>
-                    <option value="su">Sundanese</option>
-                    <option value="sv">Swedish</option>
-                    <option value="sw">Swahili</option>
-                    <option value="ta">Tamil</option>
+                    <option value="bn">Bengali</option>
                     <option value="te">Telugu</option>
-                    <option value="tg">Tajik</option>
-                    <option value="th">Thai</option>
-                    <option value="tr">Turkish</option>
-                    <option value="uk">Ukrainian</option>
-                    <option value="ur">Urdu</option>
-                    <option value="uz">Uzbek</option>
-                    <option value="vi">Vietnamese</option>
-                    <option value="xh">Xhosa</option>
-                    <option value="yi">Yiddish</option>
-                    <option value="yo">Yoruba</option>
-                    <option value="zh-CN">Chinese (Simplified)</option>
-                    <option value="zh-TW">Chinese (Traditional)</option>
-                    <option value="zu">Zulu</option>
+                    <option value="mr">Marathi</option>
+                    <option value="ta">Tamil</option>
+                    <option value="gu">Gujarati</option>
+                    <option value="kn">Kannada</option>
+                    <option value="ml">Malayalam</option>
+                    <option value="pa">Punjabi</option>
                 </select>
-                <!-- Hidden Google Translate Element -->
-                <div id="google_translate_element" style="display: none;"></div>
+                <!-- Google Translate Element (now visible) -->
+                <div id="google_translate_element"></div>
             </div>
         </header>
 
@@ -790,6 +794,10 @@
                     <!-- Soil Moisture -->
                     <div class="circular-progress-container">
                         <div class="circular-progress soil-moisture" data-value="0">
+                            <svg viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="45" class="bg-circle"></circle>
+                                <circle cx="50" cy="50" r="45" class="progress-circle" stroke-dasharray="0, 282.7" ></circle>
+                            </svg>
                             <span class="progress-value">0%</span>
                         </div>
                         <i class="fas fa-tint sensor-icon"></i>
@@ -799,6 +807,10 @@
                     <!-- Temperature -->
                     <div class="circular-progress-container">
                         <div class="circular-progress temperature" data-value="0">
+                            <svg viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="45" class="bg-circle"></circle>
+                                <circle cx="50" cy="50" r="45" class="progress-circle" stroke-dasharray="0, 282.7" ></circle>
+                            </svg>
                             <span class="progress-value">0°C</span>
                         </div>
                         <i class="fas fa-thermometer-half sensor-icon"></i>
@@ -808,6 +820,10 @@
                     <!-- Humidity -->
                     <div class="circular-progress-container">
                         <div class="circular-progress humidity" data-value="0">
+                            <svg viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="45" class="bg-circle"></circle>
+                                <circle cx="50" cy="50" r="45" class="progress-circle" stroke-dasharray="0, 282.7" ></circle>
+                            </svg>
                             <span class="progress-value">0%</span>
                         </div>
                         <i class="fas fa-water sensor-icon"></i>
@@ -817,6 +833,10 @@
                     <!-- pH Level -->
                     <div class="circular-progress-container">
                         <div class="circular-progress ph" data-value="0">
+                            <svg viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="45" class="bg-circle"></circle>
+                                <circle cx="50" cy="50" r="45" class="progress-circle" stroke-dasharray="0, 282.7" ></circle>
+                            </svg>
                             <span class="progress-value">0</span>
                         </div>
                         <i class="fas fa-flask sensor-icon"></i>
@@ -826,6 +846,10 @@
                     <!-- Light Intensity -->
                     <div class="circular-progress-container">
                         <div class="circular-progress light-intensity" data-value="0">
+                            <svg viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="45" class="bg-circle"></circle>
+                                <circle cx="50" cy="50" r="45" class="progress-circle" stroke-dasharray="0, 282.7" ></circle>
+                            </svg>
                             <span class="progress-value">0 lux</span>
                         </div>
                         <i class="fas fa-sun sensor-icon"></i>
@@ -835,6 +859,10 @@
                     <!-- Rainfall -->
                     <div class="circular-progress-container">
                         <div class="circular-progress rainfall" data-value="0">
+                            <svg viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="45" class="bg-circle"></circle>
+                                <circle cx="50" cy="50" r="45" class="progress-circle" stroke-dasharray="0, 282.7" ></circle>
+                            </svg>
                             <span class="progress-value">0 mm</span>
                         </div>
                         <i class="fas fa-cloud-showers-heavy sensor-icon"></i>
@@ -890,29 +918,30 @@
                     <i class="fas fa-cloud-sun mr-2"></i> Weather
                 </h2>
                 <div id="weather-data" class="mb-4">
+                    <p class="text-gray-400 text-sm mb-2" id="current-location"><i class="fas fa-map-marker-alt mr-1"></i> Location: N/A</p>
                     <div class="flex justify-between items-center mb-2">
                         <div class="flex items-center">
-                            <i class="fas fa-cloud text-3xl text-blue-300 mr-2"></i>
+                            <i id="weather-icon" class="fas fa-cloud text-3xl text-blue-300 mr-2"></i>
                             <div>
-                                <p class="text-3xl font-bold text-white" id="current-temp">24°C</p>
-                                <p class="text-gray-400 text-sm" id="current-humidity"><span data-translate-key="humidity_text">68% Humidity</span></p>
+                                <p class="text-3xl font-bold text-white" id="current-temp">--°C</p>
+                                <p class="text-gray-400 text-sm" id="current-humidity"><span data-translate-key="humidity_text">Humidity</span>: --%</p>
                             </div>
                         </div>
-                        <p class="text-gray-400 text-sm"><i class="fas fa-wind mr-1"></i> <span id="wind-speed">12 km/h</span></p>
+                        <p class="text-gray-400 text-sm"><i class="fas fa-wind mr-1"></i> <span id="wind-speed">-- km/h</span></p>
                     </div>
 
                     <div id="weather-forecast" class="text-xs">
                         <div class="weather-day flex justify-between items-center">
                             <p class="text-gray-300"><i class="fas fa-calendar-day mr-1"></i> <span data-translate-key="today">Today</span></p>
-                            <p class="text-gray-200"><span id="today-high">26°</span> <span class="text-gray-400" id="today-low">18°</span></p>
+                            <p class="text-gray-200"><span id="today-high">--°</span> <span class="text-gray-400" id="today-low">--°</span></p>
                         </div>
                         <div class="weather-day flex justify-between items-center">
                             <p class="text-gray-300"><i class="fas fa-calendar-alt mr-1"></i> <span data-translate-key="tomorrow">Tomorrow</span></p>
-                            <p class="text-gray-200"><span id="tomorrow-high">23°</span> <span class="text-gray-400" id="tomorrow-low">16°</span></p>
+                            <p class="text-gray-200"><span id="tomorrow-high">--°</span> <span class="text-gray-400" id="tomorrow-low">--°</span></p>
                         </div>
                         <div class="weather-day flex justify-between items-center">
-                            <p class="text-gray-300"><i class="fas fa-calendar-week mr-1"></i> <span data-translate-key="wednesday">Wed</span></p>
-                            <p class="text-gray-200"><span id="wed-high">21°</span> <span class="text-gray-400" id="wed-low">14°</span></p>
+                            <p class="text-gray-300"><i class="fas fa-calendar-week mr-1"></i> <span id="day-after-tomorrow">Wed</span></p>
+                            <p class="text-gray-200"><span id="day-after-tomorrow-high">--°</span> <span class="text-gray-400" id="day-after-tomorrow-low">--°</span></p>
                         </div>
                     </div>
                 </div>
@@ -1006,11 +1035,12 @@
                 <h2 class="text-lg font-semibold text-green-300 mb-3 border-b border-gray-700 pb-2" data-translate-key="realtime_plant_monitoring_title">
                     <i class="fas fa-camera mr-2"></i> Real-Time Plant Monitoring
                 </h2>
-                <div id="camera-feed-container" class="camera-feed-placeholder mb-2">
+                <div id="camera-feed-container" class="camera-feed-container mb-2">
                     <span class="live-indicator" data-translate-key="live_indicator"><i class="fas fa-circle text-red-500 text-xs mr-1"></i> LIVE</span>
                     <span class="connection-status" data-translate-key="connected_status"><i class="fas fa-wifi mr-1"></i> Connected</span>
+                    <video id="live-camera-feed" autoplay playsinline class="hidden"></video>
                     <i class="fas fa-video camera-icon"></i>
-                    <p class="text-gray-400 text-sm" data-translate-key="live_camera_feed">Live Camera Feed</p>
+                    <p class="camera-feed-message text-gray-400 text-sm" data-translate-key="live_camera_feed">Live Camera Feed</p>
                     <p class="text-gray-500 text-xs" data-translate-key="sector_a_field_view">Sector A - Field View</p>
                     <span class="camera-overlay-text" data-translate-key="last_frame_na">Last Frame: N/A</span>
                 </div>
@@ -1141,8 +1171,8 @@
                 <!-- New: Data Export -->
                 <h3 class="text-base font-medium text-gray-200 mb-2 border-t border-gray-700 pt-3" data-translate-key="data_export_title"><i class="fas fa-download mr-2"></i> Data Export</h3>
                 <div class="flex flex-col sm:flex-row gap-1.5">
-                    <button class="button-primary flex-1 text-xs" data-translate-key="export_csv"><i class="fas fa-file-csv mr-2"></i> Export CSV</button>
-                    <button class="button-secondary flex-1 text-xs" data-translate-key="export_excel"><i class="fas fa-file-excel mr-2"></i> Export Excel</button>
+                    <button id="export-csv-button" class="button-primary flex-1 text-xs" data-translate-key="export_csv"><i class="fas fa-file-csv mr-2"></i> Export CSV</button>
+                    <button id="export-excel-button" class="button-secondary flex-1 text-xs" data-translate-key="export_excel"><i class="fas fa-file-excel mr-2"></i> Export Excel</button>
                 </div>
             </div>
 
@@ -1170,44 +1200,124 @@
 
     <script type="text/javascript">
         // Google Translate API initialization
+        let googleTranslateElementInitialized = false; // Flag to ensure init only runs once
+        let googTeComboElement = null; // To store the Google Translate combo box element
+
         function googleTranslateElementInit() {
+            if (googleTranslateElementInitialized) return; // Prevent multiple initializations
+
             new google.translate.TranslateElement({
                 pageLanguage: 'en',
                 layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
-                autoDisplay: false
+                autoDisplay: false // We will trigger translation manually
             }, 'google_translate_element');
+
+            // Set flag after successful initialization call
+            googleTranslateElementInitialized = true;
+            console.log("Google Translate element initialized.");
+
+            // Use MutationObserver to detect when the goog-te-combo element is added
+            const observer = new MutationObserver((mutationsList, observer) => {
+                for (const mutation of mutationsList) {
+                    if (mutation.type === 'childList') {
+                        const combo = document.querySelector('.goog-te-combo');
+                        if (combo) {
+                            googTeComboElement = combo;
+                            console.log("Google Translate combo box found and ready.");
+                            observer.disconnect(); // Stop observing once found
+                            // If a language was already selected before the combo box was ready, apply it now
+                            const customLanguageSelect = document.getElementById('customLanguageSelect');
+                            if (customLanguageSelect && customLanguageSelect.value) {
+                                applyGoogleTranslateLanguage(customLanguageSelect.value);
+                            }
+                            break;
+                        }
+                    }
+                }
+            });
+
+            // Start observing the body for child list changes (where the combo box will be added)
+            observer.observe(document.body, { childList: true, subtree: true });
+        }
+
+        // Function to apply Google Translate language
+        function applyGoogleTranslateLanguage(lang) {
+            if (googTeComboElement) {
+                googTeComboElement.value = lang;
+                googTeComboElement.dispatchEvent(new Event('change'));
+                googTeComboElement.dispatchEvent(new Event('domchange', { bubbles: true })); // Custom event for some internal GT logic
+                console.log(`Language changed to ${lang} via direct select.`);
+            } else {
+                console.warn("Google Translate combo box not yet available. Waiting for it to load.");
+            }
         }
     </script>
     <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
     <script>
         const API_BASE_URL = 'http://localhost:5000/';
-        // currentLanguage is now updated by the custom dropdown for voice alerts
+        // IMPORTANT: Replace 'YOUR_OPENWEATHER_API_KEY' with your actual OpenWeather API key.
+        const OPEN_WEATHER_API_KEY = '6e903b9cec47d3e4c90c1b982c2be09b';
+        // Default location if geolocation fails or is denied
+        const DEFAULT_WEATHER_LOCATION = 'New Delhi'; // Changed default to an Indian city
+
         let currentLanguage = 'en';
         let originalPlotData = [];
+        let userLatitude = null;
+        let userLongitude = null;
+        let currentRawData = []; // To store raw data for export
 
-        // Function to translate static UI elements (now a no-op for Google Translate)
-        // Google Translate handles all page translation automatically.
-        async function translateStaticElements(lang) {
-            // No action needed here for Google Translate
-            console.log(`Google Translate will handle translation to ${lang}.`);
+        // For camera feed
+        let mediaStream = null;
+
+        // Function to get user's current location
+        async function getUserLocation() {
+            return new Promise((resolve, reject) => {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            resolve({
+                                lat: position.coords.latitude,
+                                lon: position.coords.longitude
+                            });
+                        },
+                        (error) => {
+                            console.error("Error getting user location:", error);
+                            reject(new Error("Geolocation failed. Using default location."));
+                        },
+                        {
+                            enableHighAccuracy: true, // Request high accuracy
+                            timeout: 10000, // 10 seconds timeout
+                            maximumAge: 0 // No cached position
+                        }
+                    );
+                } else {
+                    reject(new Error("Geolocation is not supported by this browser. Using default location."));
+                }
+            });
         }
 
-        // Function to create an Audio object and play sound
-        function playAudio(audioBlob) {
-            const audio = new Audio(URL.createObjectURL(audioBlob));
-            audio.play().catch(e => console.error("Error playing audio:", e));
-        }
-
-        // Function to update a circular progress bar
+        // Function to update a circular progress bar using SVG
         function updateCircularProgress(elementId, value, max_value, unit = '', colorHex = '#48bb78') {
             const container = document.querySelector(`.circular-progress.${elementId}`);
+            if (!container) {
+                console.warn(`Circular progress container for ${elementId} not found.`);
+                return;
+            }
             const valueSpan = container.querySelector('.progress-value');
-            const percent = (value / max_value) * 100;
-            const conicGradient = `conic-gradient(${colorHex} ${percent}%, #2d3748 ${percent}%)`;
+            const progressCircle = container.querySelector('.progress-circle');
+            const circumference = 2 * Math.PI * 45; // r=45 from SVG
 
-            container.style.background = conicGradient;
-            valueSpan.textContent = `${value}${unit}`;
+            const percent = (value / max_value) * 100;
+            const progressOffset = circumference - (percent / 100) * circumference;
+
+            if (progressCircle) {
+                progressCircle.style.strokeDasharray = `${circumference - progressOffset}, ${circumference}`;
+                progressCircle.style.stroke = colorHex;
+            }
+            if (valueSpan) {
+                valueSpan.textContent = `${value}${unit}`;
+            }
             container.dataset.value = value;
         }
 
@@ -1216,8 +1326,12 @@
             const chartDiv = document.getElementById('sensor-trends-chart');
             const statusDiv = document.getElementById('sensor-trends-status');
 
+            if (!chartDiv || !statusDiv) {
+                console.error("Chart or status div not found for sensor trends.");
+                return;
+            }
+
             if (!plotData || plotData.length === 0) {
-                // These messages will remain in English as Google Translate translates the page
                 displayMessage(statusDiv, "⚠️ Not enough complete data available for plotting sensor trends. Check if sensors are reporting data for these features.", 'warning');
                 Plotly.purge(chartDiv);
                 return;
@@ -1333,6 +1447,10 @@
         // Function to populate crop selectbox
         function populateCropSelect(cropLabels) {
             const selectElement = document.getElementById('crop-select');
+            if (!selectElement) {
+                console.error("Crop select element not found.");
+                return;
+            }
             selectElement.innerHTML = '';
 
             if (cropLabels && cropLabels.length > 0) {
@@ -1345,7 +1463,7 @@
             } else {
                 const option = document.createElement('option');
                 option.value = "";
-                option.textContent = "No crops found"; // This will be translated by Google Translate
+                option.textContent = "No crops found";
                 selectElement.appendChild(option);
                 selectElement.disabled = true;
             }
@@ -1354,10 +1472,14 @@
         // Function to render raw data table
         function renderRawDataTable(rawData) {
             const tableContainer = document.getElementById('raw-data-table');
+            if (!tableContainer) {
+                console.error("Raw data table container not found.");
+                return;
+            }
             tableContainer.innerHTML = '';
 
             if (!rawData || rawData.length === 0) {
-                tableContainer.innerHTML = `<p class="text-gray-400 p-4 text-center">No sensor data to display.</p>`; // This will be translated by Google Translate
+                tableContainer.innerHTML = `<p class="text-gray-400 p-4 text-center">No sensor data to display.</p>`;
                 return;
             }
 
@@ -1399,7 +1521,12 @@
         // Function to toggle expander content
         function toggleExpander(contentId) {
             const content = document.getElementById(contentId);
-            const icon = document.getElementById('expander-icon').querySelector('i');
+            const icon = document.getElementById('expander-icon')?.querySelector('i');
+            if (!content || !icon) {
+                console.warn(`Expander content or icon not found for ${contentId}.`);
+                return;
+            }
+
             if (content.classList.contains('hidden')) {
                 content.classList.remove('hidden');
                 icon.classList.remove('fa-chevron-down');
@@ -1414,8 +1541,17 @@
         // Function to toggle collapsible sections
         function toggleCollapsible(contentId) {
             const content = document.getElementById(contentId);
+            if (!content) {
+                console.warn(`Collapsible content for ${contentId} not found.`);
+                return;
+            }
             const header = content.previousElementSibling;
-            const icon = header.querySelector('.fas.fa-chevron-right');
+            const icon = header?.querySelector('.fas.fa-chevron-right');
+
+            if (!header || !icon) {
+                console.warn(`Collapsible header or icon not found for ${contentId}.`);
+                return;
+            }
 
             if (content.classList.contains('active')) {
                 content.classList.remove('active');
@@ -1429,7 +1565,10 @@
         // Function to display messages with icons
         async function displayMessage(elementId, messageText, type = 'info') {
             const element = typeof elementId === 'string' ? document.getElementById(elementId) : elementId;
-            if (!element) return;
+            if (!element) {
+                console.warn(`Element with ID or reference ${elementId} not found for displaying message.`);
+                return;
+            }
 
             let iconClass = '';
             let colorClass = 'text-gray-400';
@@ -1453,73 +1592,234 @@
                     colorClass = 'text-blue-400';
                     break;
             }
-            // Message is directly passed and will be translated by Google Translate on the page
             element.innerHTML = `<p class="${colorClass}"><i class="${iconClass} mr-2"></i> ${messageText}</p>`;
         }
 
         // Function to render Markdown-like text to HTML
-        // This function remains as it processes backend-provided markdown,
-        // which Google Translate will then translate on the page.
         function renderMarkdown(text) {
             let html = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
             html = html.replace(/\{[a-zA-Z_]+(?::[^}]+)?\}/g, ''); // Remove variable placeholders
             return html;
         }
 
-        // Simulated Weather Data (no change, as it's simulated on frontend for now)
-        function getSimulatedWeatherData() {
-            const now = new Date();
-            const currentTemp = Math.floor(Math.random() * (30 - 20 + 1)) + 20;
-            const currentHumidity = Math.floor(Math.random() * (80 - 50 + 1)) + 50;
-            const windSpeed = Math.floor(Math.random() * (20 - 5 + 1)) + 5;
-
-            const forecast = [
-                { day: "Today", high: Math.floor(Math.random() * (35 - 25 + 1)) + 25, low: Math.floor(Math.random() * (20 - 15 + 1)) + 15 },
-                { day: "Tomorrow", high: Math.floor(Math.random() * (30 - 20 + 1)) + 20, low: Math.floor(Math.random() * (18 - 12 + 1)) + 12 },
-                { day: "Wed", high: Math.floor(Math.random() * (28 - 18 + 1)) + 18, low: Math.floor(Math.random() * (15 - 10 + 1)) + 10 }
-            ];
-
-            const advisories = [];
-            if (Math.random() < 0.3) {
-                const warnings = ["Heavy Rainfall expected tonight.", "High Wind Advisory issued.", "Frost warning for early morning."];
-                advisories.push(`<p class="text-yellow-400"><i class="fas fa-exclamation-triangle text-xs mr-2"></i> ${warnings[Math.floor(Math.random() * warnings.length)]}</p>`);
+        // Function to get Font Awesome icon based on OpenWeather condition code
+        function getWeatherIcon(iconCode) {
+            // Mapping OpenWeather icons to Font Awesome icons
+            // https://openweathermap.org/weather-conditions
+            switch (iconCode) {
+                case '01d': return 'fas fa-sun'; // clear sky day
+                case '01n': return 'fas fa-moon'; // clear sky night
+                case '02d': return 'fas fa-cloud-sun'; // few clouds day
+                case '02n': return 'fas fa-cloud-moon'; // few clouds night
+                case '03d':
+                case '03n': return 'fas fa-cloud'; // scattered clouds
+                case '04d':
+                case '04n': return 'fas fa-cloud-meatball'; // broken clouds
+                case '09d':
+                case '09n': return 'fas fa-cloud-showers-heavy'; // shower rain
+                case '10d': return 'fas fa-cloud-sun-rain'; // rain day
+                case '10n': return 'fas fa-cloud-moon-rain'; // rain night
+                case '11d':
+                case '11n': return 'fas fa-bolt'; // thunderstorm
+                case '13d':
+                case '13n': return 'fas fa-snowflake'; // snow
+                case '50d':
+                case '50n': return 'fas fa-smog'; // mist
+                default: return 'fas fa-cloud';
             }
-            if (advisories.length === 0) {
-                advisories.push(`<p><i class="fas fa-circle-info text-blue-400 text-xs mr-2"></i> No active advisories.</p>`);
-            }
-
-            return {
-                current: {
-                    temp: currentTemp,
-                    humidity: currentHumidity,
-                    wind: windSpeed,
-                    timestamp: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-                },
-                forecast: forecast,
-                advisories: advisories
-            };
         }
 
-        // Render Weather Data
+        // Render Weather Data using OpenWeather API
         async function renderWeatherData() {
-            const weather = getSimulatedWeatherData();
-            document.getElementById('current-temp').textContent = `${weather.current.temp}°C`;
-            // The text 'Humidity' is now part of the data-translate-key, so it will be translated by Google Translate
-            document.getElementById('current-humidity').innerHTML = `${document.querySelector('[data-translate-key="humidity_text"]').textContent}: ${weather.current.humidity}%`;
-            document.getElementById('wind-speed').textContent = `${weather.current.wind} km/h`;
+            const weatherDataDiv = document.getElementById('weather-data');
+            const advisoriesDiv = document.getElementById('weather-advisories');
+            const currentLocationElement = document.getElementById('current-location');
 
-            // These elements have data-translate-key attributes, so Google Translate handles them
-            document.getElementById('today-high').textContent = `${weather.forecast[0].high}°`;
-            document.getElementById('today-low').textContent = `${weather.forecast[0].low}°`;
+            if (!weatherDataDiv || !advisoriesDiv || !currentLocationElement) {
+                console.error("Weather data, advisories, or location div not found.");
+                return;
+            }
+            advisoriesDiv.innerHTML = `<p><i class="fas fa-circle-info text-blue-400 text-sm mr-2"></i> Fetching weather data...</p>`;
+            currentLocationElement.innerHTML = `<i class="fas fa-map-marker-alt mr-1"></i> Location: Fetching...`;
 
-            document.getElementById('tomorrow-high').textContent = `${weather.forecast[1].high}°`;
-            document.getElementById('tomorrow-low').textContent = `${weather.forecast[1].low}°`;
+            const currentTempElement = document.getElementById('current-temp');
+            const currentHumidityElement = document.getElementById('current-humidity');
+            const windSpeedElement = document.getElementById('wind-speed');
+            const weatherIconElement = document.getElementById('weather-icon');
+            const todayHighElement = document.getElementById('today-high');
+            const todayLowElement = document.getElementById('today-low');
+            const tomorrowHighElement = document.getElementById('tomorrow-high');
+            const tomorrowLowElement = document.getElementById('tomorrow-low');
+            const tomorrowTextElement = document.querySelector('[data-translate-key="tomorrow"]');
+            const dayAfterTomorrowElement = document.getElementById('day-after-tomorrow');
+            const dayAfterTomorrowHighElement = document.getElementById('day-after-tomorrow-high');
+            const dayAfterTomorrowLowElement = document.getElementById('day-after-tomorrow-low');
+            const humidityTextElement = document.querySelector('[data-translate-key="humidity_text"]');
 
-            document.getElementById('wed-high').textContent = `${weather.forecast[2].high}°`;
-            document.getElementById('wed-low').textContent = `${weather.forecast[2].low}°`;
 
-            // Advisories are directly rendered, Google Translate will translate them
-            document.getElementById('weather-advisories').innerHTML = weather.advisories.join('');
+            let weatherApiUrlCurrent;
+            let weatherApiUrlForecast;
+
+            if (userLatitude !== null && userLongitude !== null) {
+                weatherApiUrlCurrent = `https://api.openweathermap.org/data/2.5/weather?lat=${userLatitude}&lon=${userLongitude}&appid=${OPEN_WEATHER_API_KEY}&units=metric`;
+                weatherApiUrlForecast = `https://api.openweathermap.org/data/2.5/forecast?lat=${userLatitude}&lon=${userLongitude}&appid=${OPEN_WEATHER_API_KEY}&units=metric`;
+                console.log("Fetching weather for coordinates:", userLatitude, userLongitude);
+            } else {
+                weatherApiUrlCurrent = `https://api.openweathermap.org/data/2.5/weather?q=${DEFAULT_WEATHER_LOCATION}&appid=${OPEN_WEATHER_API_KEY}&units=metric`;
+                weatherApiUrlForecast = `https://api.openweathermap.org/data/2.5/forecast?q=${DEFAULT_WEATHER_LOCATION}&appid=${OPEN_WEATHER_API_KEY}&units=metric`;
+                console.log("Fetching weather for default location:", DEFAULT_WEATHER_LOCATION);
+            }
+
+            try {
+                // Fetch current weather
+                const currentWeatherResponse = await fetch(weatherApiUrlCurrent);
+                if (!currentWeatherResponse.ok) {
+                    throw new Error(`HTTP error! status: ${currentWeatherResponse.status}`);
+                }
+                const currentWeatherData = await currentWeatherResponse.json();
+
+                // Update current location
+                if (currentWeatherData.name) {
+                    currentLocationElement.innerHTML = `<i class="fas fa-map-marker-alt mr-1"></i> Location: ${currentWeatherData.name}`;
+                } else {
+                    currentLocationElement.innerHTML = `<i class="fas fa-map-marker-alt mr-1"></i> Location: N/A`;
+                }
+
+                // Fetch 5-day forecast
+                const forecastResponse = await fetch(weatherApiUrlForecast);
+                if (!forecastResponse.ok) {
+                    throw new Error(`HTTP error! status: ${forecastResponse.status}`);
+                }
+                const forecastData = await forecastResponse.json();
+
+                // Update current weather
+                if (currentTempElement && currentWeatherData.main) {
+                    currentTempElement.textContent = `${Math.round(currentWeatherData.main.temp)}°C`;
+                }
+                if (currentHumidityElement && currentWeatherData.main && humidityTextElement) {
+                    currentHumidityElement.innerHTML = `${humidityTextElement.textContent}: ${currentWeatherData.main.humidity}%`;
+                }
+                if (windSpeedElement && currentWeatherData.wind) {
+                    windSpeedElement.textContent = `${(currentWeatherData.wind.speed * 3.6).toFixed(1)} km/h`; // Convert m/s to km/h
+                }
+                if (weatherIconElement && currentWeatherData.weather && currentWeatherData.weather[0]) {
+                    weatherIconElement.className = getWeatherIcon(currentWeatherData.weather[0].icon) + ' text-3xl text-blue-300 mr-2';
+                }
+
+                // Process forecast data for the next 3 days
+                const dailyForecasts = {};
+                const today = new Date();
+                today.setHours(0, 0, 0, 0); // Normalize to start of day
+
+                if (forecastData.list) {
+                    forecastData.list.forEach(item => {
+                        const date = new Date(item.dt * 1000); // Convert timestamp to Date object
+                        date.setHours(0, 0, 0, 0); // Normalize to start of day for grouping
+
+                        // Only consider next 3 full days (including today if available in forecast)
+                        if (((date.getTime() - today.getTime()) / (24 * 60 * 60 * 1000)) < 3) {
+                            const dateString = date.toISOString().split('T')[0];
+                            if (!dailyForecasts[dateString]) {
+                                dailyForecasts[dateString] = { min: item.main.temp, max: item.main.temp };
+                            } else {
+                                dailyForecasts[dateString].min = Math.min(dailyForecasts[dateString].min, item.main.temp);
+                                dailyForecasts[dateString].max = Math.max(dailyForecasts[dateString].max, item.main.temp);
+                            }
+                        }
+                    });
+                }
+
+
+                const sortedDates = Object.keys(dailyForecasts).sort();
+
+                // Update forecast for Today, Tomorrow, Day After Tomorrow
+                const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+                // Today
+                if (sortedDates[0] && todayHighElement && todayLowElement) {
+                    const todayForecast = dailyForecasts[sortedDates[0]];
+                    todayHighElement.textContent = `${Math.round(todayForecast.max)}°`;
+                    todayLowElement.textContent = `${Math.round(todayForecast.min)}°`;
+                } else if (todayHighElement && todayLowElement) {
+                    todayHighElement.textContent = `--°`;
+                    todayLowElement.textContent = `--°`;
+                }
+
+                // Tomorrow
+                if (sortedDates[1] && tomorrowHighElement && tomorrowLowElement && tomorrowTextElement) {
+                    const tomorrowForecast = dailyForecasts[sortedDates[1]];
+                    tomorrowHighElement.textContent = `${Math.round(tomorrowForecast.max)}°`;
+                    tomorrowLowElement.textContent = `${Math.round(tomorrowForecast.min)}°`;
+                    tomorrowTextElement.textContent = 'Tomorrow'; // Ensure this uses data-translate-key
+                } else if (tomorrowHighElement && tomorrowLowElement) {
+                    tomorrowHighElement.textContent = `--°`;
+                    tomorrowLowElement.textContent = `--°`;
+                }
+
+                // Day After Tomorrow (e.g., Wednesday)
+                if (sortedDates[2] && dayAfterTomorrowHighElement && dayAfterTomorrowLowElement && dayAfterTomorrowElement) {
+                    const dayAfterTomorrowForecast = dailyForecasts[sortedDates[2]];
+                    dayAfterTomorrowHighElement.textContent = `${Math.round(dayAfterTomorrowForecast.max)}°`;
+                    dayAfterTomorrowLowElement.textContent = `${Math.round(dayAfterTomorrowForecast.min)}°`;
+                    const dayAfterTomorrowDate = new Date(sortedDates[2]);
+                    dayAfterTomorrowElement.textContent = dayNames[dayAfterTomorrowDate.getDay()];
+                } else if (dayAfterTomorrowHighElement && dayAfterTomorrowLowElement && dayAfterTomorrowElement) {
+                    dayAfterTomorrowHighElement.textContent = `--°`;
+                    dayAfterTomorrowLowElement.textContent = `--°`;
+                    dayAfterTomorrowElement.textContent = `N/A`;
+                }
+
+
+                // Weather Advisories (simplified based on OpenWeather data)
+                advisoriesDiv.innerHTML = ''; // Clear previous advisories
+                let hasAdvisory = false;
+
+                if (currentWeatherData.weather && currentWeatherData.weather[0]) {
+                    const weatherDescription = currentWeatherData.weather[0].description.toLowerCase();
+                    const mainWeather = currentWeatherData.weather[0].main.toLowerCase();
+
+                    if (mainWeather.includes('rain') || mainWeather.includes('thunderstorm') || mainWeather.includes('drizzle')) {
+                        advisoriesDiv.innerHTML += `<p class="text-yellow-400"><i class="fas fa-cloud-showers-heavy text-xs mr-2"></i> Expect ${weatherDescription} conditions. Be prepared for wet weather.</p>`;
+                        hasAdvisory = true;
+                    }
+                }
+
+                if (currentWeatherData.wind && currentWeatherData.wind.speed && (currentWeatherData.wind.speed * 3.6 > 30)) { // Wind speed over 30 km/h
+                    advisoriesDiv.innerHTML += `<p class="text-yellow-400"><i class="fas fa-wind text-xs mr-2"></i> High wind speeds detected (${(currentWeatherData.wind.speed * 3.6).toFixed(1)} km/h). Secure loose objects.</p>`;
+                    hasAdvisory = true;
+                    }
+                if (currentWeatherData.main && currentWeatherData.main.temp) {
+                    if (currentWeatherData.main.temp > 35) { // Temperature over 35°C
+                        advisoriesDiv.innerHTML += `<p class="text-red-400"><i class="fas fa-temperature-high text-xs mr-2"></i> High temperature advisory. Ensure adequate irrigation.</p>`;
+                        hasAdvisory = true;
+                    }
+                    if (currentWeatherData.main.temp < 0) { // Temperature below 0°C
+                        advisoriesDiv.innerHTML += `<p class="text-blue-400"><i class="fas fa-snowflake text-xs mr-2"></i> Freezing temperature advisory. Protect sensitive crops from frost.</p>`;
+                        hasAdvisory = true;
+                    }
+                }
+
+
+                if (!hasAdvisory) {
+                    advisoriesDiv.innerHTML = `<p><i class="fas fa-circle-info text-blue-400 text-xs mr-2"></i> No active advisories.</p>`;
+                }
+
+            } catch (error) {
+                console.error("Error fetching weather data:", error);
+                advisoriesDiv.innerHTML = `<p class="text-red-400"><i class="fas fa-times-circle text-xs mr-2"></i> Failed to load weather data. Check API key and network.</p>`;
+                currentLocationElement.innerHTML = `<i class="fas fa-map-marker-alt mr-1"></i> Location: N/A`;
+                if (currentTempElement) currentTempElement.textContent = `--°C`;
+                if (currentHumidityElement && humidityTextElement) currentHumidityElement.innerHTML = `${humidityTextElement.textContent}: --%`;
+                if (windSpeedElement) windSpeedElement.textContent = `-- km/h`;
+                if (weatherIconElement) weatherIconElement.className = 'fas fa-cloud-sun text-3xl text-blue-300 mr-2'; // Default icon on error
+                if (todayHighElement) todayHighElement.textContent = `--°`;
+                if (todayLowElement) todayLowElement.textContent = `--°`;
+                if (tomorrowHighElement) tomorrowHighElement.textContent = `--°`;
+                if (tomorrowLowElement) tomorrowLowElement.textContent = `--°`;
+                if (dayAfterTomorrowHighElement) dayAfterTomorrowHighElement.textContent = `--°`;
+                if (dayAfterTomorrowLowElement) dayAfterTomorrowLowElement.textContent = `--°`;
+                if (dayAfterTomorrowElement) dayAfterTomorrowElement.textContent = `N/A`;
+            }
         }
 
         // Simulated Recent Events Data
@@ -1538,13 +1838,16 @@
         async function renderRecentEvents() {
             const events = getSimulatedRecentEvents();
             const eventsDiv = document.getElementById('recent-events');
+            if (!eventsDiv) {
+                console.error("Recent events div not found.");
+                return;
+            }
             eventsDiv.innerHTML = '';
             if (events.length === 0) {
-                displayMessage(eventsDiv, 'Loading recent events...', 'info'); // This will be translated by Google Translate
+                displayMessage(eventsDiv, 'Loading recent events...', 'info');
                 return;
             }
             for (const event of events) {
-                // Text is directly rendered, Google Translate will translate it
                 eventsDiv.innerHTML += `
                     <div class="flex justify-between items-center py-1 border-b border-gray-700 last:border-b-0">
                         <p class="text-gray-300">${event.text}</p>
@@ -1587,15 +1890,21 @@
         async function renderFarmHealthIndex() {
             const healthData = getSimulatedFarmHealthData();
 
-            document.getElementById('overall-health-score').textContent = healthData.overallScore;
-            // The status text is directly set, Google Translate will translate it
-            document.getElementById('overall-health-status').textContent = healthData.status;
+            const overallHealthScoreElement = document.getElementById('overall-health-score');
+            const overallHealthStatusElement = document.getElementById('overall-health-status');
+            const healthScoreCircleElement = document.getElementById('health-score-circle');
+            const healthChangeElement = document.getElementById('health-change');
 
-            const healthCircle = document.getElementById('health-score-circle');
-            const circumference = 2 * Math.PI * 45;
-            const progress = (healthData.overallScore / 100) * circumference;
-            healthCircle.style.strokeDasharray = `${progress}, ${circumference}`;
-            healthCircle.style.stroke = healthData.overallScore >= 75 ? '#48bb78' : (healthData.overallScore >= 60 ? '#F6AD55' : '#E53E3E');
+            if (overallHealthScoreElement) overallHealthScoreElement.textContent = healthData.overallScore;
+            if (overallHealthStatusElement) overallHealthStatusElement.textContent = healthData.status;
+
+            if (healthScoreCircleElement) {
+                const circumference = 2 * Math.PI * 45;
+                const progress = (healthData.overallScore / 100) * circumference;
+                healthScoreCircleElement.style.strokeDasharray = `${progress}, ${circumference}`;
+                healthScoreCircleElement.style.stroke = healthData.overallScore >= 75 ? '#48bb78' : (healthData.overallScore >= 60 ? '#F6AD55' : '#E53E3E');
+            }
+
 
             for (const factor in healthData.healthFactors) {
                 const percent = healthData.healthFactors[factor];
@@ -1605,11 +1914,10 @@
                 if (barElement) barElement.style.width = `${percent}%`;
             }
 
-            const healthChangeElement = document.getElementById('health-change');
-            // Text is directly set, Google Translate will translate it
-            healthChangeElement.textContent = `${healthData.healthChange >= 0 ? '+' : ''}${healthData.healthChange}% from last week`;
-            healthChangeElement.className = `${healthData.changeColor} text-xs font-semibold mt-2`;
-            healthChangeElement.previousElementSibling.className = `fas ${healthData.changeIcon} mr-1`;
+            if (healthChangeElement) {
+                healthChangeElement.innerHTML = `<i class="fas ${healthData.changeIcon} mr-1"></i> ${healthData.healthChange >= 0 ? '+' : ''}${healthData.healthChange}% <span data-translate-key="from_last_week">from last week</span>`;
+                healthChangeElement.className = `${healthData.changeColor} text-xs font-semibold mt-2`;
+            }
         }
 
         // Simulated Device Connectivity Data
@@ -1632,7 +1940,6 @@
             const updateStatus = async (id, statusText) => {
                 const element = document.getElementById(id);
                 if (element) {
-                    // Status text is directly set, Google Translate will translate it
                     element.textContent = statusText;
                     element.className = 'font-semibold ' + (statusText.includes('Online') || statusText.includes('Active') || statusText.includes('Connected') ? 'text-green-400' : 'text-red-400');
                     element.innerHTML = `<i class="fas fa-circle text-xs mr-1"></i> ${statusText}`;
@@ -1661,38 +1968,207 @@
             const scanStatus = document.getElementById('pest-scan-status');
             const scanResultsDiv = document.getElementById('pest-scan-results');
 
+            if (!scanButton || !scanStatus || !scanResultsDiv) {
+                console.error("Pest scan elements not found.");
+                return;
+            }
+
             scanButton.disabled = true;
-            scanButton.innerHTML = `<span class="loading-spinner"></span> Scanning in progress...`; // This will be translated by Google Translate
-            scanStatus.textContent = `Scanning in progress...`; // This will be translated by Google Translate
+            scanButton.innerHTML = `<span class="loading-spinner"></span> Scanning in progress...`;
+            scanStatus.textContent = `Scanning in progress...`;
             scanResultsDiv.innerHTML = '';
 
             await new Promise(resolve => setTimeout(resolve, 2000));
 
             const result = getSimulatedPestScanResults();
-            scanStatus.textContent = `Last scan: ${new Date().toLocaleTimeString()}`; // This will be translated by Google Translate
+            scanStatus.textContent = `Last scan: ${new Date().toLocaleTimeString()}`;
 
             let resultHtml = `<p class="mb-2"><i class="fas ${result.type === 'success' ? 'fa-check-circle text-green-400' : result.type === 'warning' ? 'fa-exclamation-triangle text-yellow-400' : 'fa-times-circle text-red-400'} mr-2"></i> ${result.status}</p>`;
 
             if (result.details && result.details.length > 0) {
-                resultHtml += `<p class="font-semibold mt-2">Details:</p><ul class="list-disc list-inside ml-3">`; // This will be translated by Google Translate
+                resultHtml += `<p class="font-semibold mt-2">Details:</p><ul class="list-disc list-inside ml-3">`;
                 for (const detail of result.details) {
-                    resultHtml += `<li>${detail}</li>`; // This will be translated by Google Translate
+                    resultHtml += `<li>${detail}</li>`;
                 }
                 resultHtml += '</ul>';
             }
             scanResultsDiv.innerHTML = resultHtml;
 
             scanButton.disabled = false;
-            scanButton.innerHTML = `<i class="fas fa-search mr-2"></i> Run New Scan`; // This will be translated by Google Translate
+            scanButton.innerHTML = `<i class="fas fa-search mr-2"></i> Run New Scan`;
         }
+
+        // Function to start the camera feed
+        async function startCameraFeed() {
+            const videoElement = document.getElementById('live-camera-feed');
+            const cameraIcon = document.querySelector('.camera-feed-container .camera-icon');
+            const cameraMessage = document.querySelector('.camera-feed-container .camera-feed-message');
+            const cameraOverlayText = document.querySelector('.camera-feed-container .camera-overlay-text');
+            const connectionStatusSpan = document.querySelector('.camera-feed-container .connection-status');
+
+            if (!videoElement || !cameraIcon || !cameraMessage || !cameraOverlayText || !connectionStatusSpan) {
+                console.error("Camera feed elements not found.");
+                return;
+            }
+
+            try {
+                // Request camera access
+                mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); // Prefer rear camera
+                videoElement.srcObject = mediaStream;
+                videoElement.classList.remove('hidden'); // Show video element
+                cameraIcon.style.display = 'none'; // Hide placeholder icon
+                cameraMessage.style.display = 'none'; // Hide placeholder message
+                cameraOverlayText.style.display = 'none'; // Hide overlay text
+
+                connectionStatusSpan.innerHTML = `<i class="fas fa-wifi mr-1"></i> Connected`;
+                connectionStatusSpan.style.backgroundColor = '#48bb78';
+
+                videoElement.onloadedmetadata = () => {
+                    videoElement.play();
+                };
+
+            } catch (err) {
+                console.error("Error accessing camera: ", err);
+                videoElement.classList.add('hidden'); // Hide video element
+                cameraIcon.style.display = 'block'; // Show placeholder icon
+                cameraMessage.style.display = 'block'; // Show placeholder message
+                cameraMessage.textContent = 'Camera access denied or not available.';
+                cameraOverlayText.style.display = 'block'; // Show overlay text
+                cameraOverlayText.textContent = 'Camera Offline';
+
+                connectionStatusSpan.innerHTML = `<i class="fas fa-wifi-slash mr-1"></i> Disconnected`;
+                connectionStatusSpan.style.backgroundColor = '#e53e3e';
+            }
+        }
+
+        // Function to stop the camera feed
+        function stopCameraFeed() {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+                const videoElement = document.getElementById('live-camera-feed');
+                if (videoElement) {
+                    videoElement.srcObject = null;
+                    videoElement.classList.add('hidden');
+                }
+                const cameraIcon = document.querySelector('.camera-feed-container .camera-icon');
+                const cameraMessage = document.querySelector('.camera-feed-container .camera-feed-message');
+                const cameraOverlayText = document.querySelector('.camera-feed-container .camera-overlay-text');
+                if (cameraIcon) cameraIcon.style.display = 'block';
+                if (cameraMessage) cameraMessage.style.display = 'block';
+                if (cameraOverlayText) cameraOverlayText.style.display = 'block';
+            }
+        }
+
+        // Function to capture an image from the video feed
+        function captureImage() {
+            const videoElement = document.getElementById('live-camera-feed');
+            if (videoElement && mediaStream) {
+                const canvas = document.createElement('canvas');
+                canvas.width = videoElement.videoWidth;
+                canvas.height = videoElement.videoHeight;
+                const context = canvas.getContext('2d');
+                context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+                canvas.toBlob((blob) => {
+                    const imageUrl = URL.createObjectURL(blob);
+                    // For demonstration, open in a new tab. In a real app, you might upload it or display it.
+                    window.open(imageUrl, '_blank');
+                    // Clean up URL object after use
+                    URL.revokeObjectURL(imageUrl);
+                }, 'image/png');
+            } else {
+                displayMessage(document.getElementById('camera-details-external'), 'Camera is not active to capture image.', 'warning');
+            }
+        }
+
+        // Function to export raw data to CSV
+        function exportToCSV() {
+            if (currentRawData.length === 0) {
+                displayMessage(document.getElementById('raw-data-table').nextElementSibling.nextElementSibling, 'No data to export.', 'warning');
+                return;
+            }
+
+            const headers = Object.keys(currentRawData[0]);
+            const csvRows = [];
+
+            // Add headers
+            csvRows.push(headers.map(header => `"${header.replace(/"/g, '""')}"`).join(','));
+
+            // Add data rows
+            currentRawData.forEach(row => {
+                const values = headers.map(header => {
+                    let value = row[header];
+                    if (value === null || value === undefined) {
+                        value = '';
+                    } else if (typeof value === 'string') {
+                        value = value.replace(/"/g, '""'); // Escape double quotes
+                    }
+                    return `"${value}"`;
+                });
+                csvRows.push(values.join(','));
+            });
+
+            const csvString = csvRows.join('\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'sensor_data.csv';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            displayMessage(document.getElementById('raw-data-table').nextElementSibling.nextElementSibling, 'CSV export successful!', 'success');
+        }
+
+        // Function to export raw data to Excel (as a tab-separated file with .xls extension for basic compatibility)
+        function exportToExcel() {
+            if (currentRawData.length === 0) {
+                displayMessage(document.getElementById('raw-data-table').nextElementSibling.nextElementSibling, 'No data to export.', 'warning');
+                return;
+            }
+
+            const headers = Object.keys(currentRawData[0]);
+            const excelRows = [];
+
+            // Add headers (tab-separated)
+            excelRows.push(headers.map(header => `${header.replace(/"/g, '""')}`).join('\t'));
+
+            // Add data rows (tab-separated)
+            currentRawData.forEach(row => {
+                const values = headers.map(header => {
+                    let value = row[header];
+                    if (value === null || value === undefined) {
+                        value = '';
+                    } else if (typeof value === 'string') {
+                        value = value.replace(/"/g, '""'); // Escape double quotes
+                    }
+                    return `${value}`;
+                });
+                excelRows.push(values.join('\t'));
+            });
+
+            const excelString = excelRows.join('\n');
+            const blob = new Blob([excelString], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'sensor_data.xls'; // Use .xls for basic Excel opening
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            displayMessage(document.getElementById('raw-data-table').nextElementSibling.nextElementSibling, 'Excel export successful!', 'success');
+        }
+
 
         // Main data fetching and rendering function
         async function fetchDataAndRender() {
-            document.getElementById('refresh-button').disabled = true;
-            document.getElementById('refresh-button').innerHTML = `<span class="loading-spinner"></span> Loading...`; // This will be translated by Google Translate
+            const refreshButton = document.getElementById('refresh-button');
+            if (refreshButton) {
+                refreshButton.disabled = true;
+                refreshButton.innerHTML = `<span class="loading-spinner"></span> Loading...`;
+            }
+
 
             try {
-                // Remove lang parameter as Google Translate handles client-side translation
                 const response = await fetch(`${API_BASE_URL}/api/data`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -1701,17 +2177,23 @@
 
                 if (data.status === 'no_data') {
                     updateCircularProgress('soil-moisture', 0, 100, '%', '#68D391');
-                    document.getElementById('soil-moisture-update').textContent = `Updated: N/A`;
+                    const soilMoistureUpdate = document.getElementById('soil-moisture-update');
+                    if(soilMoistureUpdate) soilMoistureUpdate.textContent = `Updated: N/A`;
                     updateCircularProgress('temperature', 0, 40, '°C', '#F6AD55');
-                    document.getElementById('temperature-update').textContent = `Updated: N/A`;
+                    const temperatureUpdate = document.getElementById('temperature-update');
+                    if(temperatureUpdate) temperatureUpdate.textContent = `Updated: N/A`;
                     updateCircularProgress('humidity', 0, 100, '%', '#63B3ED');
-                    document.getElementById('humidity-update').textContent = `Updated: N/A`;
+                    const humidityUpdate = document.getElementById('humidity-update');
+                    if(humidityUpdate) humidityUpdate.textContent = `Updated: N/A`;
                     updateCircularProgress('ph', 0, 14, '', '#A78BFA');
-                    document.getElementById('ph-update').textContent = `Updated: N/A`;
+                    const phUpdate = document.getElementById('ph-update');
+                    if(phUpdate) phUpdate.textContent = `Updated: N/A`;
                     updateCircularProgress('light-intensity', 0, 1000, ' lux', '#ECC94B');
-                    document.getElementById('light-intensity-update').textContent = `Updated: N/A`;
+                    const lightIntensityUpdate = document.getElementById('light-intensity-update');
+                    if(lightIntensityUpdate) lightIntensityUpdate.textContent = `Updated: N/A`;
                     updateCircularProgress('rainfall', 0, 250, ' mm', '#4299E1');
-                    document.getElementById('rainfall-update').textContent = `Updated: N/A`;
+                    const rainfallUpdate = document.getElementById('rainfall-update');
+                    if(rainfallUpdate) rainfallUpdate.textContent = `Updated: N/A`;
 
                     displayMessage('sensor-trends-status', 'Not enough complete data available for plotting sensor trends. Check if sensors are reporting data for these features.', 'warning');
                     Plotly.purge('sensor-trends-chart');
@@ -1721,36 +2203,45 @@
                     displayMessage('market-price-forecast', 'Select a crop to view market price forecast.', 'info');
                     displayMessage('crop-suggestion', 'Predicted soil moisture data is unusual or unavailable for crop suggestion.', 'info');
                     populateCropSelect(data.crop_labels);
+                    currentRawData = []; // Clear raw data on no data status
                     return;
                 }
 
                 const latestData = data.latest_data;
                 originalPlotData = data.plot_data;
                 const cameraData = data.camera_data;
-                const rawData = data.raw_data;
+                currentRawData = data.raw_data; // Store raw data for export
                 const cropLabels = data.crop_labels;
 
                 const formattedTimestamp = new Date(latestData.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+                const soilMoistureUpdate = document.getElementById('soil-moisture-update');
+                const temperatureUpdate = document.getElementById('temperature-update');
+                const humidityUpdate = document.getElementById('humidity-update');
+                const phUpdate = document.getElementById('ph-update');
+                const lightIntensityUpdate = document.getElementById('light-intensity-update');
+                const rainfallUpdate = document.getElementById('rainfall-update');
+
                 updateCircularProgress('soil-moisture', latestData.soil_moisture || 0, 100, '%', '#68D391');
-                document.getElementById('soil-moisture-update').textContent = `Updated: ${formattedTimestamp}`;
+                if(soilMoistureUpdate) soilMoistureUpdate.textContent = `Updated: ${formattedTimestamp}`;
                 updateCircularProgress('temperature', latestData.temperature || 0, 40, '°C', '#F6AD55');
-                document.getElementById('temperature-update').textContent = `Updated: ${formattedTimestamp}`;
+                if(temperatureUpdate) temperatureUpdate.textContent = `Updated: ${formattedTimestamp}`;
                 updateCircularProgress('humidity', latestData.humidity || 0, 100, '%', '#63B3ED');
-                document.getElementById('humidity-update').textContent = `Updated: ${formattedTimestamp}`;
+                if(humidityUpdate) humidityUpdate.textContent = `Updated: ${formattedTimestamp}`;
                 updateCircularProgress('ph', latestData.ph || 0, 14, '', '#A78BFA');
-                document.getElementById('ph-update').textContent = `Updated: ${formattedTimestamp}`;
+                if(phUpdate) phUpdate.textContent = `Updated: ${formattedTimestamp}`;
                 updateCircularProgress('light-intensity', latestData.light_intensity || 0, 1000, ' lux', '#ECC94B');
-                document.getElementById('light-intensity-update').textContent = `Updated: ${formattedTimestamp}`;
+                if(lightIntensityUpdate) lightIntensityUpdate.textContent = `Updated: ${formattedTimestamp}`;
                 updateCircularProgress('rainfall', latestData.rainfall || 0, 250, ' mm', '#4299E1');
-                document.getElementById('rainfall-update').textContent = `Updated: ${formattedTimestamp}`;
+                if(rainfallUpdate) rainfallUpdate.textContent = `Updated: ${formattedTimestamp}`;
 
 
-                const currentFilter = document.getElementById('chart-filter').value;
+                const currentFilter = document.getElementById('chart-filter')?.value;
                 renderSensorTrendsChart(originalPlotData, currentFilter);
 
                 populateCropSelect(cropLabels);
                 const cropSelect = document.getElementById('crop-select');
-                if (cropSelect.value) {
+                if (cropSelect && cropSelect.value) {
                     cropSelect.dispatchEvent(new Event('change'));
                 } else {
                     displayMessage('care-tips', 'Select a crop to get recommendations.', 'info');
@@ -1762,29 +2253,66 @@
                 const cameraFeedContainer = document.getElementById('camera-feed-container');
                 const cameraDetailsExternal = document.getElementById('camera-details-external');
 
-                if (cameraData) {
+                if (cameraFeedContainer && cameraDetailsExternal && cameraData) {
                     const connectionStatusSpan = cameraFeedContainer.querySelector('.connection-status');
-                    connectionStatusSpan.innerHTML = `<i class="fas fa-wifi mr-1"></i> ${cameraData.alert.includes('No Camera Data') ? 'Disconnected' : 'Connected'}`;
-                    connectionStatusSpan.style.backgroundColor = cameraData.alert.includes('No Camera Data') ? '#e53e3e' : '#48bb78';
+                    if (connectionStatusSpan) {
+                        connectionStatusSpan.innerHTML = `<i class="fas fa-wifi mr-1"></i> ${cameraData.alert?.includes('No Camera Data') ? 'Disconnected' : 'Connected'}`;
+                        connectionStatusSpan.style.backgroundColor = cameraData.alert?.includes('No Camera Data') ? '#e53e3e' : '#48bb78';
+                    }
 
-                    cameraDetailsExternal.querySelector('#camera-resolution').textContent = `${cameraData.stage || 'N/A'}`;
-                    cameraDetailsExternal.querySelector('#camera-fps').textContent = `${cameraData.alert || 'N/A'}`;
-                    cameraDetailsExternal.querySelector('#camera-signal').textContent = `Timestamp: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
-                    cameraDetailsExternal.querySelector('#last-frame-time').textContent = `Last Frame: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
+                    // For the actual camera feed, we handle its state via startCameraFeed/stopCameraFeed
+                    // The cameraData from backend might be for simulated info, not actual stream status
+                    // So, we'll primarily rely on `mediaStream` for connection status.
+                    if (mediaStream) { // If camera is active, hide placeholder elements
+                        cameraFeedContainer.querySelector('.camera-icon').style.display = 'none';
+                        cameraFeedContainer.querySelector('.camera-feed-message').style.display = 'none';
+                        cameraFeedContainer.querySelector('.camera-overlay-text').style.display = 'none';
+                    } else { // If camera is not active, show placeholder elements
+                         cameraFeedContainer.querySelector('.camera-icon').style.display = 'block';
+                         cameraFeedContainer.querySelector('.camera-feed-message').style.display = 'block';
+                         cameraFeedContainer.querySelector('.camera-overlay-text').style.display = 'block';
+                         cameraFeedContainer.querySelector('.camera-feed-message').textContent = 'Live Camera Feed';
+                         cameraFeedContainer.querySelector('.camera-overlay-text').textContent = 'Last Frame: N/A';
+                    }
 
-                } else {
+
+                    const cameraResolution = cameraDetailsExternal.querySelector('#camera-resolution');
+                    const cameraFps = cameraDetailsExternal.querySelector('#camera-fps');
+                    const cameraSignal = cameraDetailsExternal.querySelector('#camera-signal');
+                    const lastFrameTime = cameraDetailsExternal.querySelector('#last-frame-time');
+
+                    if (cameraResolution) cameraResolution.textContent = `Growth Stage: ${cameraData.stage || 'N/A'}`;
+                    if (cameraFps) cameraFps.textContent = `Advisory: ${cameraData.alert || 'N/A'}`;
+                    if (cameraSignal) cameraSignal.textContent = `Timestamp: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
+                    if (lastFrameTime) lastFrameTime.textContent = `Last Frame: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
+
+                } else if (cameraFeedContainer && cameraDetailsExternal) {
                     const connectionStatusSpan = cameraFeedContainer.querySelector('.connection-status');
-                    connectionStatusSpan.innerHTML = `<i class="fas fa-wifi-slash mr-1"></i> Disconnected`;
-                    connectionStatusSpan.style.backgroundColor = '#e53e3e';
+                    if (connectionStatusSpan) {
+                        connectionStatusSpan.innerHTML = `<i class="fas fa-wifi-slash mr-1"></i> Disconnected`;
+                        connectionStatusSpan.style.backgroundColor = '#e53e3e';
+                    }
 
-                    cameraDetailsExternal.querySelector('#camera-resolution').textContent = `No Camera Data`;
-                    cameraDetailsExternal.querySelector('#camera-fps').textContent = `N/A`;
-                    cameraDetailsExternal.querySelector('#camera-signal').textContent = `N/A`;
-                    cameraDetailsExternal.querySelector('#last-frame-time').textContent = `N/A`;
+                    const cameraResolution = cameraDetailsExternal.querySelector('#camera-resolution');
+                    const cameraFps = cameraDetailsExternal.querySelector('#camera-fps');
+                    const cameraSignal = cameraDetailsExternal.querySelector('#camera-signal');
+                    const lastFrameTime = cameraDetailsExternal.querySelector('#last-frame-time');
+
+                    if (cameraResolution) cameraResolution.textContent = `Growth Stage: N/A`;
+                    if (cameraFps) cameraFps.textContent = `Advisory: N/A`;
+                    if (cameraSignal) cameraSignal.textContent = `Timestamp: N/A`;
+                    if (lastFrameTime) lastFrameTime.textContent = `Last Frame: N/A`;
+
+                    // Ensure placeholder elements are visible if no camera data or stream
+                    cameraFeedContainer.querySelector('.camera-icon').style.display = 'block';
+                    cameraFeedContainer.querySelector('.camera-feed-message').style.display = 'block';
+                    cameraFeedContainer.querySelector('.camera-overlay-text').style.display = 'block';
+                    cameraFeedContainer.querySelector('.camera-feed-message').textContent = 'Live Camera Feed';
+                    cameraFeedContainer.querySelector('.camera-overlay-text').textContent = 'Last Frame: N/A';
                 }
 
-                renderRawDataTable(rawData);
-                renderWeatherData();
+                renderRawDataTable(currentRawData);
+                renderWeatherData(); // Call the updated OpenWeather function
                 renderRecentEvents();
                 renderFarmHealthIndex();
                 renderDeviceConnectivity();
@@ -1798,20 +2326,24 @@
                 displayMessage('light-intensity-update', 'Error loading data.', 'error');
                 displayMessage('rainfall-update', 'Error loading data.', 'error');
                 displayMessage('sensor-trends-status', 'Error loading trends.', 'error');
+                Plotly.purge('sensor-trends-chart'); // Ensure chart is purged on error
+                renderRawDataTable([]); // Clear table on error
                 displayMessage('raw-data-table', 'Error loading raw data.', 'error');
                 displayMessage('care-tips', 'Error loading recommendations.', 'error');
                 displayMessage('growth-prediction', 'Error loading predictions.', 'error');
                 displayMessage('market-price-forecast', 'Error loading forecast.', 'error');
                 displayMessage('crop-suggestion', 'Error loading suggestions.', 'error');
             } finally {
-                document.getElementById('refresh-button').disabled = false;
-                document.getElementById('refresh-button').innerHTML = `<i class="fas fa-sync-alt mr-2"></i> Refresh Data`;
+                if (refreshButton) {
+                    refreshButton.disabled = false;
+                    refreshButton.innerHTML = `<i class="fas fa-sync-alt mr-2"></i> Refresh Data`;
+                }
             }
         }
 
         // Function to update predictions and advice based on selected crop
         async function updateCropSpecificData() {
-            const selectedCropType = document.getElementById('crop-select').value;
+            const selectedCropType = document.getElementById('crop-select')?.value;
 
             if (!selectedCropType) {
                 displayMessage('care-tips', 'Select a crop to get recommendations.', 'info');
@@ -1822,7 +2354,6 @@
             }
 
             try {
-                // Removed lang parameter from API call
                 const response = await fetch(`${API_BASE_URL}/api/care_advice`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1833,10 +2364,12 @@
                 }
                 const data = await response.json();
                 const careTipsDiv = document.getElementById('care-tips');
-                if (data.advice && data.advice.length > 0) {
-                    careTipsDiv.innerHTML = data.advice.map(tip => `<p class="mb-1.5 last:mb-0">${renderMarkdown(tip)}</p>`).join('');
-                } else {
-                    displayMessage('care-tips', 'No specific care recommendations available.', 'info');
+                if (careTipsDiv) {
+                    if (data.advice && data.advice.length > 0) {
+                        careTipsDiv.innerHTML = data.advice.map(tip => `<p class="mb-1.5 last:mb-0">${renderMarkdown(tip)}</p>`).join('');
+                    } else {
+                        displayMessage('care-tips', 'No specific care recommendations available.', 'info');
+                    }
                 }
             } catch (error) {
                 console.error("Error fetching crop care advice:", error);
@@ -1856,19 +2389,21 @@
                 }
                 const data = await response.json();
                 const growthPredictionDiv = document.getElementById('growth-prediction');
-                if (data.error) {
-                    displayMessage('growth-prediction', `Error: ${data.error}`, 'error');
-                } else {
-                    predictedSoilMoisture = data.soil_moisture_pred;
-                    let soilMoistureMsg = `Predicted Soil Moisture: <b>${data.soil_moisture_pred.toFixed(2)}%</b>`;
-                    if (!(0 <= data.soil_moisture_pred && data.soil_moisture_pred <= 100)) {
-                        soilMoistureMsg += ` (Unusual value, may indicate data anomaly)`;
-                        growthPredictionDiv.innerHTML = `<p class="text-yellow-400"><i class="fas fa-exclamation-triangle mr-2"></i> ${soilMoistureMsg}</p>`;
+                if (growthPredictionDiv) {
+                    if (data.error) {
+                        displayMessage('growth-prediction', `Error: ${data.error}`, 'error');
                     } else {
-                        growthPredictionDiv.innerHTML = `<p class="text-green-400"><i class="fas fa-check-circle mr-2"></i> ${soilMoistureMsg}</p>`;
+                        predictedSoilMoisture = data.soil_moisture_pred;
+                        let soilMoistureMsg = `Predicted Soil Moisture: <b>${data.soil_moisture_pred.toFixed(2)}%</b>`;
+                        if (!(0 <= data.soil_moisture_pred && data.soil_moisture_pred <= 100)) {
+                            soilMoistureMsg += ` (Unusual value, may indicate data anomaly)`;
+                            growthPredictionDiv.innerHTML = `<p class="text-yellow-400"><i class="fas fa-exclamation-triangle mr-2"></i> ${soilMoistureMsg}</p>`;
+                        } else {
+                            growthPredictionDiv.innerHTML = `<p class="text-green-400"><i class="fas fa-check-circle mr-2"></i> ${soilMoistureMsg}</p>`;
+                        }
+                        growthPredictionDiv.innerHTML += `<p class="text-blue-400 mt-1.5"><i class="fas fa-sun mr-2"></i> Predicted Light Intensity: <b>${data.light_intensity_pred.toFixed(2)} lux</b></p>`;
+                        growthPredictionDiv.innerHTML += `<p class="text-green-400 mt-1.5"><i class="fas fa-flask mr-2"></i> Predicted Nutrient Sum: <b>${data.nutrient_sum_pred.toFixed(2)}</b></p>`;
                     }
-                    growthPredictionDiv.innerHTML += `<p class="text-blue-400 mt-1.5"><i class="fas fa-sun mr-2"></i> Predicted Light Intensity: <b>${data.light_intensity_pred.toFixed(2)} lux</b></p>`;
-                    growthPredictionDiv.innerHTML += `<p class="text-green-400 mt-1.5"><i class="fas fa-flask mr-2"></i> Predicted Nutrient Sum: <b>${data.nutrient_sum_pred.toFixed(2)}</b></p>`;
                 }
             } catch (error) {
                 console.error("Error fetching growth prediction:", error);
@@ -1886,10 +2421,12 @@
                 }
                 const data = await response.json();
                 const marketPriceDiv = document.getElementById('market-price-forecast');
-                if (data.error) {
-                    displayMessage('market-price-forecast', `Error: ${data.error}`, 'error');
-                } else {
-                    marketPriceDiv.innerHTML = `<p class="text-green-400"><i class="fas fa-money-bill-wave mr-2"></i> Estimated Market Price for ${selectedCropType}: <b>$${data.predicted_price.toFixed(2)}</b></p>`;
+                if (marketPriceDiv) {
+                    if (data.error) {
+                        displayMessage('market-price-forecast', `Error: ${data.error}`, 'error');
+                    } else {
+                        marketPriceDiv.innerHTML = `<p class="text-green-400"><i class="fas fa-money-bill-wave mr-2"></i> Estimated Market Price for ${selectedCropType}: <b>$${data.predicted_price.toFixed(2)}</b></p>`;
+                    }
                 }
             } catch (error) {
                 console.error("Error fetching market price forecast:", error);
@@ -1897,7 +2434,6 @@
             }
 
             try {
-                // Removed lang parameter from API call
                 const response = await fetch(`${API_BASE_URL}/api/seed_recommendations`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1908,10 +2444,12 @@
                 }
                 const data = await response.json();
                 const cropSuggestionDiv = document.getElementById('crop-suggestion');
-                if (data.error) {
-                    displayMessage('crop-suggestion', `Error: ${data.error}`, 'error');
-                } else {
-                    cropSuggestionDiv.innerHTML = `<p class="text-gray-300">${renderMarkdown(data.recommendation)}</p>`;
+                if (cropSuggestionDiv) {
+                    if (data.error) {
+                        displayMessage('crop-suggestion', `Error: ${data.error}`, 'error');
+                    } else {
+                        cropSuggestionDiv.innerHTML = `<p class="text-gray-300">${renderMarkdown(data.recommendation)}</p>`;
+                    }
                 }
             } catch (error) {
                 console.error("Error fetching crop suggestion:", error);
@@ -1920,33 +2458,38 @@
         }
 
         // Event Listeners
-        document.getElementById('refresh-button').addEventListener('click', fetchDataAndRender);
-        document.getElementById('crop-select').addEventListener('change', updateCropSpecificData);
-        document.getElementById('run-pest-scan-button').addEventListener('click', runPestScan);
-        document.getElementById('chart-filter').addEventListener('change', (event) => {
+        document.getElementById('refresh-button')?.addEventListener('click', fetchDataAndRender);
+        document.getElementById('crop-select')?.addEventListener('change', updateCropSpecificData);
+        document.getElementById('run-pest-scan-button')?.addEventListener('click', runPestScan);
+        document.getElementById('chart-filter')?.addEventListener('change', (event) => {
             renderSensorTrendsChart(originalPlotData, event.target.value);
         });
+        document.getElementById('export-csv-button')?.addEventListener('click', exportToCSV);
+        document.getElementById('export-excel-button')?.addEventListener('click', exportToExcel);
+        document.getElementById('capture-image-button')?.addEventListener('click', captureImage);
+
 
         // Custom Language Select Listener to connect to Google Translate
-        document.getElementById("customLanguageSelect").addEventListener("change", function () {
+        document.getElementById("customLanguageSelect")?.addEventListener("change", function () {
             var lang = this.value;
             if (lang) {
                 currentLanguage = lang; // Update currentLanguage for voice alerts
-                var gtCombo = document.querySelector("#google_translate_element select");
-                if (gtCombo) {
-                    gtCombo.value = lang;
-                    gtCombo.dispatchEvent(new Event("change"));
-                }
+                applyGoogleTranslateLanguage(lang); // Call the new function
             }
         });
 
-        document.getElementById('play-alerts-button').addEventListener('click', async () => {
+
+        document.getElementById('play-alerts-button')?.addEventListener('click', async () => {
             const careTipsDiv = document.getElementById('care-tips');
             const audioStatusDiv = document.getElementById('audio-status');
 
+            if (!careTipsDiv || !audioStatusDiv) {
+                console.error("Care tips or audio status div not found.");
+                return;
+            }
+
             const tips = Array.from(careTipsDiv.querySelectorAll('p')).map(p => p.textContent);
 
-            // These messages will be translated by Google Translate on the page
             const noAlertsText = 'No alerts to play.';
             const loadingRecText = 'Loading recommendations...';
             const noSpecificRecText = 'No specific care recommendations available.';
@@ -1956,7 +2499,7 @@
                 return;
             }
 
-            audioStatusDiv.textContent = 'Playing alerts...'; // This will be translated by Google Translate
+            audioStatusDiv.textContent = 'Playing alerts...';
             const topAlerts = tips.slice(0, 2);
 
             for (let i = 0; i < topAlerts.length; i++) {
@@ -1964,7 +2507,6 @@
                 const cleanTip = tip.replace(/\*\*/g, '').replace(/[🌱🌡️💨🧪☀️🌧️✅⚠️❌ℹ️]/g, '').trim();
                 if (cleanTip) {
                     try {
-                        // Pass currentLanguage for voice generation if backend supports it
                         const response = await fetch(`${API_BASE_URL}/api/voice_alert`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -1977,17 +2519,19 @@
                         }
 
                         const audioBlob = await response.blob();
-                        playAudio(audioBlob);
-                        audioStatusDiv.textContent = `🔊 Playing alert ${i + 1}: "${cleanTip}"`; // This will be translated by Google Translate
+                        const audio = new Audio(URL.createObjectURL(audioBlob));
+                        audio.play().catch(e => console.error("Error playing audio:", e));
+
+                        audioStatusDiv.textContent = `🔊 Playing alert ${i + 1}: "${cleanTip}"`;
                         await new Promise(resolve => setTimeout(resolve, cleanTip.length * 50 + 1000));
                     } catch (error) {
                         console.error("Error playing voice alert:", error);
-                        audioStatusDiv.textContent = `Error playing alert ${i + 1}: ${error.message}`; // This will be translated by Google Translate
+                        audioStatusDiv.textContent = `Error playing alert ${i + 1}: ${error.message}`;
                         break;
                     }
                 }
             }
-            audioStatusDiv.textContent = 'Alerts finished.'; // This will be translated by Google Translate
+            audioStatusDiv.textContent = 'Alerts finished.';
         });
 
         // Function to set the simulation mode via API
@@ -2023,10 +2567,12 @@
                 }
                 const data = await response.json();
                 const toggle = document.getElementById('simulation-mode-toggle');
-                if (data.mode === 'simulation') {
-                    toggle.checked = true;
-                } else {
-                    toggle.checked = false;
+                if (toggle) {
+                    if (data.mode === 'simulation') {
+                        toggle.checked = true;
+                    } else {
+                        toggle.checked = false;
+                    }
                 }
                 console.log(`Initial backend mode: ${data.mode}`);
             } catch (error) {
@@ -2035,15 +2581,32 @@
         }
 
         // Initial data load when the page is ready
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Attempt to get user location first
+            try {
+                const coords = await getUserLocation();
+                userLatitude = coords.lat;
+                userLongitude = coords.lon;
+                console.log("User location obtained:", userLatitude, userLongitude);
+            } catch (error) {
+                console.warn(error.message);
+                // userLatitude and userLongitude remain null, so renderWeatherData will use default city
+            }
+
             getAndSetInitialMode();
             fetchDataAndRender(); // Fetch initial data
             setInterval(fetchDataAndRender, 30000); // Refresh data every 30 seconds
 
-            document.getElementById('simulation-mode-toggle').addEventListener('change', (event) => {
+            document.getElementById('simulation-mode-toggle')?.addEventListener('change', (event) => {
                 setSimulationMode(event.target.checked);
             });
+
+            // Start camera feed when the page loads
+            startCameraFeed();
         });
+
+        // Ensure camera feed is stopped when navigating away
+        window.addEventListener('beforeunload', stopCameraFeed);
     </script>
 </body>
 </html>
