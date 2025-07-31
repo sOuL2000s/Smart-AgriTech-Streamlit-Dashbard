@@ -26,6 +26,7 @@
             display: flex;
             flex-direction: column;
             overflow-x: hidden; /* Prevent horizontal scroll */
+            top: 0px !important; /* Fix for Google Translate banner pushing content down */
         }
 
         /* Apply Michroma font to the main title */
@@ -213,6 +214,22 @@
             100% { transform: rotate(360deg); }
         }
 
+        
+        /* Hide the top banner */
+        .goog-te-banner-frame.skiptranslate {
+            display: none !important;
+        }
+        body {
+            top: 0px !important;
+        }
+
+        /* Remove Google branding */
+        .goog-logo-link, 
+        .goog-te-gadget .goog-te-combo + span, 
+        .goog-te-gadget .goog-te-gadget-icon {
+            display: none !important;
+        }
+
         /* Custom select box styling for Google Translate */
         #google_translate_element {
             /* Adjust this to fit your design */
@@ -256,6 +273,73 @@
         #customLanguageSelect option:hover {
             background-color: #4a5568;
         }
+
+        /* Dropdown styling */
+        .goog-te-combo {
+            width: auto !important;
+            background: transparent !important;
+            color: #e2e8f0 !important;
+            border: 1px solid #38a169 !important; /* green border */
+            padding: 0.4rem 0.6rem !important;
+            border-radius: 0.75rem !important;
+            font-size: 0.9rem !important;
+            font-family: 'Inter', sans-serif !important;
+            appearance: none !important;
+            -webkit-appearance: none !important;
+            -moz-appearance: none !important;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='292.4' height='292.4'%3E%3Cpath fill='%23e2e8f0' d='M287 69.4a17.6 17.6 0 0 0-13.2-6.4H18.2c-4.8 0-9.3 1.8-13.2 6.4-4.2 4.4-6.4 10.2-6.4 16.3 0 6.1 2.2 11.9 6.4 16.3l127.4 127.3c4.2 4.4 10.2 6.4 16.3 6.4s11.9-2.2 16.3-6.4L287 102c4.2-4.4 6.4-10.2 6.4-16.3S291.2 73.8 287 69.4z'/%3E%3C/svg%3E") !important;
+            background-repeat: no-repeat !important;
+            background-position: right 0.8rem center !important;
+            background-size: 0.8em !important;
+            padding-right: 2.5rem !important;
+        }
+
+        /* Transparent dropdown list and green scrollbar */
+        iframe.goog-te-menu-frame {
+            box-shadow: none !important;
+            border-radius: 0.75rem !important;
+        }
+
+        .goog-te-menu2 {
+            background-color: transparent !important;
+            border: none !important;
+            font-family: 'Inter', sans-serif !important;
+        }
+
+        .goog-te-menu2-item {
+            color: #e2e8f0 !important;
+            background: rgba(0, 0, 0, 0.5) !important;
+            padding: 0.5rem 1rem !important;
+        }
+
+        .goog-te-menu2-item div,
+        .goog-te-menu2-item span {
+            color: #e2e8f0 !important;
+            background: transparent !important;
+        }
+
+        .goog-te-menu2-item:hover {
+            background-color: rgba(56, 161, 105, 0.8) !important;
+        }
+
+        /* Green scrollbar inside iframe */
+        .goog-te-menu2::-webkit-scrollbar {
+            width: 8px;
+        }
+        .goog-te-menu2::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .goog-te-menu2::-webkit-scrollbar-thumb {
+            background-color: #38a169;
+            border-radius: 10px;
+        }
+
+        /* Force iframe to have pointer events */
+        .goog-te-menu-frame {
+            pointer-events: auto !important;
+        }
+
+        /* --- END GOOGLE TRANSLATE CUSTOM STYLING --- */
 
 
         /* Toggle Switch Styles */
@@ -740,7 +824,7 @@
         <!-- Main Header -->
         <header class="main-header">
             <div class="logo-section">
-                <img src="android-chrome-192x192.png" alt="AgriTech Logo" class="rounded-full"> <!-- Placeholder image -->
+                <img src="android-chrome-192x192.png" alt="AgriTech Logo" class="rounded-full" onerror="this.onerror=null;this.src='https://placehold.co/192x192/2d3748/68d391?text=SA';">
                 <div class="title-section">
                     <h1 class="font-michroma">SMART AGRITECH DASHBOARD</h1>
                     <!-- Added md:text-left for desktop alignment -->
@@ -777,12 +861,12 @@
                     <option value="ml">Malayalam</option>
                     <option value="pa">Punjabi</option>
                 </select>
-                <!-- Google Translate Element (now visible) -->
+                <!-- Google Translate Element (Styled) -->
                 <div id="google_translate_element"></div>
             </div>
         </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 mb-5 flex-grow">
+        <main class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 mb-5 flex-grow">
 
             <!-- Current Sensor Readings (Top-Left, Tall) -->
             <div class="card xl:row-span-2">
@@ -1190,7 +1274,7 @@
                     </p>
                 </div>
             </div>
-        </div>
+        </main>
     </div>
 
     <footer class="bg-gray-800 text-gray-400 text-center p-2.5 mt-auto rounded-t-xl text-xs">
@@ -1198,70 +1282,96 @@
         <p class="mt-1" data-translate-key="footer_powered_by">Powered by Advanced AI & Sensor Technology</p>
     </footer>
 
-    <script type="text/javascript">
-        // Google Translate API initialization
-        let googleTranslateElementInitialized = false; // Flag to ensure init only runs once
-        let googTeComboElement = null; // To store the Google Translate combo box element
-
-        function googleTranslateElementInit() {
-            if (googleTranslateElementInitialized) return; // Prevent multiple initializations
-
-            new google.translate.TranslateElement({
-                pageLanguage: 'en',
-                layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
-                autoDisplay: false // We will trigger translation manually
-            }, 'google_translate_element');
-
-            // Set flag after successful initialization call
-            googleTranslateElementInitialized = true;
-            console.log("Google Translate element initialized.");
-
-            // Use MutationObserver to detect when the goog-te-combo element is added
-            const observer = new MutationObserver((mutationsList, observer) => {
-                for (const mutation of mutationsList) {
-                    if (mutation.type === 'childList') {
-                        const combo = document.querySelector('.goog-te-combo');
-                        if (combo) {
-                            googTeComboElement = combo;
-                            console.log("Google Translate combo box found and ready.");
-                            observer.disconnect(); // Stop observing once found
-                            // If a language was already selected before the combo box was ready, apply it now
-                            const customLanguageSelect = document.getElementById('customLanguageSelect');
-                            if (customLanguageSelect && customLanguageSelect.value) {
-                                applyGoogleTranslateLanguage(customLanguageSelect.value);
-                            }
-                            break;
-                        }
-                    }
-                }
-            });
-
-            // Start observing the body for child list changes (where the combo box will be added)
-            observer.observe(document.body, { childList: true, subtree: true });
-        }
-
-        // Function to apply Google Translate language
-        function applyGoogleTranslateLanguage(lang) {
-            if (googTeComboElement) {
-                googTeComboElement.value = lang;
-                googTeComboElement.dispatchEvent(new Event('change'));
-                googTeComboElement.dispatchEvent(new Event('domchange', { bubbles: true })); // Custom event for some internal GT logic
-                console.log(`Language changed to ${lang} via direct select.`);
-            } else {
-                console.warn("Google Translate combo box not yet available. Waiting for it to load.");
-            }
-        }
-    </script>
+    <!-- Google Translate Script -->
     <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
+    <script type="text/javascript">
+        // This function is called by the Google Translate script when it loads
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                pageLanguage: 'en',
+                includedLanguages: 'en,hi,bn,te,mr,ta,gu,kn,ml,pa,ur', // Added Urdu (ur)
+                layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+                autoDisplay: false // We handle display and persistence
+            }, 'google_translate_element');
+            
+            // After initialization, start looking for the combo box to attach our logic
+            //setupLanguageChangeListener();
+        }
+
+        function doGTranslate(lang) {
+            // Check if the Google Translate widget is loaded
+            if (typeof google === 'undefined' || !google.translate) {
+                console.error('Google Translate API not loaded.');
+                showMessageBox('Translation service not available. Please try again later.');
+                return;
+            }
+            if (lang === 'en') {
+                // Remove the translate cookie to revert to the original language
+                document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:01 GMT; path=/';
+                window.location.reload();
+            } else {
+                // Set the translate cookie for the new language
+                const googtrans = `/en/${lang}`;
+                document.cookie = `googtrans=${googtrans}; path=/`;
+                window.location.reload();
+            }
+        }
+
+        // This function finds the Google Translate dropdown and adds our custom logic to it
+        function setupLanguageChangeListener() {
+            const maxAttempts = 20;
+            let attempts = 0;
+            const intervalId = setInterval(() => {
+                const googTeCombo = document.querySelector('.goog-te-combo');
+                if (googTeCombo) {
+                    clearInterval(intervalId);
+                    console.log("✅ Google Translate dropdown found. Attaching listener and checking for saved language.");
+
+                    // Listen for changes to the dropdown
+                    googTeCombo.addEventListener('change', function() {
+                        currentLanguage = this.value || 'en';
+                        console.log('Language changed to:', currentLanguage);
+                        // Save the user's choice in localStorage for persistence
+                        if (this.value) {
+                            localStorage.setItem('preferredLang', this.value);
+                        } else {
+                            // If they select the default "Select Language", remove the preference
+                            localStorage.removeItem('preferredLang');
+                        }
+                    });
+
+                    // On page load, check if a language was previously saved
+                    const preferredLang = localStorage.getItem('preferredLang');
+                    if (preferredLang && googTeCombo.value !== preferredLang) {
+                        googTeCombo.value = preferredLang;
+                        // Dispatch a 'change' event to make Google Translate apply the language
+                        googTeCombo.dispatchEvent(new Event('change'));
+                    }
+                    
+                    // Set the initial language for our voice alerts
+                    currentLanguage = googTeCombo.value || 'en';
+
+                } else {
+                    attempts++;
+                    if (attempts >= maxAttempts) {
+                        clearInterval(intervalId);
+                        console.error("❌ Could not find Google Translate dropdown after multiple attempts.");
+                    }
+                }
+            }, 500); // Check every 500ms
+        }
+    </script>
+    
     <script>
-        const API_BASE_URL = 'https://smart-agritech-streamlit-dashbard.onrender.com/';
+        // --- Main Application Logic ---
+        const API_BASE_URL = 'http://localhost:5000/';
         // IMPORTANT: Replace 'YOUR_OPENWEATHER_API_KEY' with your actual OpenWeather API key.
-        const OPEN_WEATHER_API_KEY = '6e903b9cec47d3e4c90c1b982c2be09b';
+        const OPEN_WEATHER_API_KEY = '6e903b9cec47d3e4c90c1b982c2be09b'; // Placeholder, replace with actual key
         // Default location if geolocation fails or is denied
         const DEFAULT_WEATHER_LOCATION = 'New Delhi'; // Changed default to an Indian city
 
-        let currentLanguage = 'en';
+        let currentLanguage = 'en'; // Default language, will be updated by the translate widget
         let originalPlotData = [];
         let userLatitude = null;
         let userLongitude = null;
@@ -1505,10 +1615,12 @@
                 headers.forEach(headerText => {
                     const td = document.createElement('td');
                     let value = rowData[headerText];
-                    if (typeof value === 'number') {
+                    if (value === null || value === undefined) {
+                        value = '';
+                    } else if (typeof value === 'number') {
                         value = value.toFixed(2);
                     }
-                    td.textContent = value !== null ? value : 'N/A';
+                    td.textContent = value;
                     td.classList.add('px-2', 'py-1.5', 'border-b', 'border-gray-600', 'text-gray-300');
                     tr.appendChild(td);
                 });
@@ -2467,18 +2579,13 @@
         document.getElementById('export-csv-button')?.addEventListener('click', exportToCSV);
         document.getElementById('export-excel-button')?.addEventListener('click', exportToExcel);
         document.getElementById('capture-image-button')?.addEventListener('click', captureImage);
-
-
-        // Custom Language Select Listener to connect to Google Translate
-        document.getElementById("customLanguageSelect")?.addEventListener("change", function () {
-            var lang = this.value;
-            if (lang) {
-                currentLanguage = lang; // Update currentLanguage for voice alerts
-                applyGoogleTranslateLanguage(lang); // Call the new function
+        // Event listener for the custom language selector
+        document.getElementById('customLanguageSelect')?.addEventListener('change', (event) => {
+            const selectedLang = event.target.value;
+            if (selectedLang) {
+                doGTranslate(selectedLang);
             }
         });
-
-
         document.getElementById('play-alerts-button')?.addEventListener('click', async () => {
             const careTipsDiv = document.getElementById('care-tips');
             const audioStatusDiv = document.getElementById('audio-status');
@@ -2504,7 +2611,7 @@
 
             for (let i = 0; i < topAlerts.length; i++) {
                 let tip = topAlerts[i];
-                const cleanTip = tip.replace(/\*\*/g, '').replace(/[🌱🌡️💨🧪☀️🌧️✅⚠️❌ℹ️]/g, '').trim();
+                const cleanTip = tip.replace(/\*\*/g, '').replace(/[🌱🌡️💨�☀️🌧️✅⚠️❌ℹ️]/g, '').trim();
                 if (cleanTip) {
                     try {
                         const response = await fetch(`${API_BASE_URL}/api/voice_alert`, {
