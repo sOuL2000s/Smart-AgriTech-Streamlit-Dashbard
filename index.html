@@ -26,7 +26,8 @@
             display: flex;
             flex-direction: column;
             overflow-x: hidden; /* Prevent horizontal scroll */
-            top: 0px !important; /* Fix for Google Translate banner pushing content down */
+            /* Fix for Google Translate banner pushing content down - MUST be here */
+            top: 0px !important; 
         }
 
         /* Apply Michroma font to the main title */
@@ -118,6 +119,13 @@
             transform: translateY(0);
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
+        .button-primary:disabled {
+            background: #2d3748; /* Darker background for disabled */
+            color: #a0aec0; /* Lighter text for disabled */
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
 
         /* Secondary button for play alerts */
         .button-secondary {
@@ -145,6 +153,14 @@
             transform: translateY(0);
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
+        .button-secondary:disabled {
+            background: #2d3748; /* Darker background for disabled */
+            color: #a0aec0; /* Lighter text for disabled */
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
 
         /* Fade-in animation */
         @keyframes fadeIn {
@@ -201,8 +217,8 @@
             border: 4px solid rgba(255, 255, 255, 0.3);
             border-top: 4px solid #3498db;
             border-radius: 50%;
-            width: 24px;
-            height: 24px;
+            width: 20px; /* Smaller spinner */
+            height: 20px; /* Smaller spinner */
             animation: spin 1s linear infinite;
             display: inline-block;
             vertical-align: middle;
@@ -214,8 +230,7 @@
             100% { transform: rotate(360deg); }
         }
 
-        
-        /* Hide the top banner */
+        /* Hide the top banner and adjust body top padding which Google Translate adds */
         .goog-te-banner-frame.skiptranslate {
             display: none !important;
         }
@@ -236,11 +251,7 @@
             margin-left: 10px;
             display: none; /* Keep this hidden as we use a custom select */
         }
-        /* Adjust body top padding which Google Translate adds */
-        body {
-            top: 0px !important;
-        }
-
+        
         /* Custom Language Select Styling */
         #customLanguageSelect {
             width: auto; /* Adjusted to fit content */
@@ -274,7 +285,7 @@
             background-color: #4a5568;
         }
 
-        /* Dropdown styling */
+        /* Dropdown styling for Google Translate's hidden select */
         .goog-te-combo {
             width: auto !important;
             background: transparent !important;
@@ -716,8 +727,8 @@
         /* Header Styling */
         .main-header {
             display: flex;
-            flex-direction: column; /* Stack vertically by default */
-            align-items: center;
+            flex-direction: column; /* Stack vertically by default for mobile */
+            align-items: center; /* Center items for mobile */
             justify-content: space-between;
             margin-bottom: 1.25rem;
             padding: 0.6rem 0;
@@ -734,19 +745,32 @@
 
         .main-header .logo-section {
             display: flex;
-            align-items: center;
+            flex-direction: column; /* Stack logo and title vertically on mobile */
+            align-items: center; /* Center them */
             margin-bottom: 1rem; /* Add margin below logo on small screens */
+            text-align: center; /* Center text within logo section */
         }
         @media (min-width: 768px) {
             .main-header .logo-section {
+                flex-direction: row; /* Horizontal on larger screens */
+                align-items: center; /* Align items horizontally */
                 margin-bottom: 0; /* Remove margin on larger screens */
+                text-align: left; /* Align text left on larger screens */
             }
         }
 
         .main-header .logo-section img {
             height: 45px; /* Further smaller logo */
-            margin-right: 0.7rem; /* Further reduced margin */
+            margin-right: 0; /* Remove margin-right for mobile vertical stacking */
+            margin-bottom: 0.5rem; /* Add margin below logo image on mobile */
         }
+        @media (min-width: 768px) {
+            .main-header .logo-section img {
+                margin-right: 0.7rem; /* Restore margin-right for larger screens */
+                margin-bottom: 0; /* Remove margin-bottom on larger screens */
+            }
+        }
+
         .main-header .title-section h1 {
             font-family: 'Michroma', sans-serif; /* Applied Michroma font */
             font-size: 2rem; /* Further smaller main title */
@@ -812,6 +836,11 @@
             background-color: #48bb78 !important;
             color: white !important;
         }
+        /* Ensure Plotly text is readable */
+        .js-plotly-plot .plotly .main-svg, .js-plotly-plot .plotly .svg-container {
+            font-family: 'Inter', sans-serif !important;
+            color: #e2e8f0 !important;
+        }
 
         /* Footer transparency */
         footer {
@@ -860,6 +889,11 @@
                     <option value="kn">Kannada</option>
                     <option value="ml">Malayalam</option>
                     <option value="pa">Punjabi</option>
+                    <option value="es">Spanish</option> <!-- Added Spanish -->
+                    <option value="fr">French</option> <!-- Added French -->
+                    <option value="de">German</option> <!-- Added German -->
+                    <option value="ar">Arabic</option> <!-- Added Arabic -->
+                    <option value="ja">Japanese</option> <!-- Added Japanese -->
                 </select>
                 <!-- Google Translate Element (Styled) -->
                 <div id="google_translate_element"></div>
@@ -1254,9 +1288,14 @@
                 </div>
                 <!-- New: Data Export -->
                 <h3 class="text-base font-medium text-gray-200 mb-2 border-t border-gray-700 pt-3" data-translate-key="data_export_title"><i class="fas fa-download mr-2"></i> Data Export</h3>
-                <div class="flex flex-col sm:flex-row gap-1.5">
-                    <button id="export-csv-button" class="button-primary flex-1 text-xs" data-translate-key="export_csv"><i class="fas fa-file-csv mr-2"></i> Export CSV</button>
-                    <button id="export-excel-button" class="button-secondary flex-1 text-xs" data-translate-key="export_excel"><i class="fas fa-file-excel mr-2"></i> Export Excel</button>
+                <div id="export-status-container" class="text-xs text-gray-400 mb-2 text-center"></div>
+                <div id="export-buttons-container" class="flex flex-col sm:flex-row gap-1.5">
+                    <button id="export-csv-button" class="button-primary flex-1 text-xs" data-translate-key="export_csv">
+                        <i class="fas fa-file-csv mr-2"></i> Export CSV
+                    </button>
+                    <button id="export-excel-button" class="button-secondary flex-1 text-xs" data-translate-key="export_excel">
+                        <i class="fas fa-file-excel mr-2"></i> Export Excel
+                    </button>
                 </div>
             </div>
 
@@ -1290,13 +1329,13 @@
         function googleTranslateElementInit() {
             new google.translate.TranslateElement({
                 pageLanguage: 'en',
-                includedLanguages: 'en,hi,bn,te,mr,ta,gu,kn,ml,pa,ur', // Added Urdu (ur)
+                includedLanguages: 'en,hi,bn,te,mr,ta,gu,kn,ml,pa,ur,es,fr,de,ar,ja', // Added ES, FR, DE, AR, JA
                 layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
                 autoDisplay: false // We handle display and persistence
             }, 'google_translate_element');
             
             // After initialization, start looking for the combo box to attach our logic
-            //setupLanguageChangeListener();
+            setupLanguageChangeListener(); // Call this here to ensure it's set up
         }
 
         function doGTranslate(lang) {
@@ -1675,7 +1714,7 @@
         }
 
         // Function to display messages with icons
-        async function displayMessage(elementId, messageText, type = 'info') {
+        async function displayMessage(elementId, messageText, type = 'info', duration = 3000) {
             const element = typeof elementId === 'string' ? document.getElementById(elementId) : elementId;
             if (!element) {
                 console.warn(`Element with ID or reference ${elementId} not found for displaying message.`);
@@ -1704,7 +1743,17 @@
                     colorClass = 'text-blue-400';
                     break;
             }
+            // Store original content only if it's the target for temporary messages
+            const isTemporaryTarget = element.id === 'export-status-container';
+            const originalContent = isTemporaryTarget ? element.innerHTML : null;
+
             element.innerHTML = `<p class="${colorClass}"><i class="${iconClass} mr-2"></i> ${messageText}</p>`;
+
+            if (duration > 0 && isTemporaryTarget) { // Only clear for specific temporary message containers
+                setTimeout(() => {
+                    element.innerHTML = originalContent; // Restore original content
+                }, duration);
+            }
         }
 
         // Function to render Markdown-like text to HTML
@@ -1833,10 +1882,10 @@
                             const dateString = date.toISOString().split('T')[0];
                             if (!dailyForecasts[dateString]) {
                                 dailyForecasts[dateString] = { min: item.main.temp, max: item.main.temp };
-                            } else {
-                                dailyForecasts[dateString].min = Math.min(dailyForecasts[dateString].min, item.main.temp);
-                                dailyForecasts[dateString].max = Math.max(dailyForecasts[dateString].max, item.main.temp);
                             }
+                            // Ensure min/max are correctly updated across multiple entries per day
+                            dailyForecasts[dateString].min = Math.min(dailyForecasts[dateString].min, item.main.temp_min);
+                            dailyForecasts[dateString].max = Math.max(dailyForecasts[dateString].max, item.main.temp_max);
                         }
                     });
                 }
@@ -2195,79 +2244,123 @@
         }
 
         // Function to export raw data to CSV
-        function exportToCSV() {
+        async function exportToCSV() {
+            const exportCsvButton = document.getElementById('export-csv-button');
+            const exportExcelButton = document.getElementById('export-excel-button');
+            const exportStatusContainer = document.getElementById('export-status-container'); // New element
+
             if (currentRawData.length === 0) {
-                displayMessage(document.getElementById('raw-data-table').nextElementSibling.nextElementSibling, 'No data to export.', 'warning');
+                displayMessage(exportStatusContainer, 'No data to export.', 'warning', 2000);
                 return;
             }
 
-            const headers = Object.keys(currentRawData[0]);
-            const csvRows = [];
+            exportCsvButton.disabled = true;
+            exportExcelButton.disabled = true;
+            exportCsvButton.innerHTML = `<span class="loading-spinner"></span> Exporting...`;
+            exportExcelButton.innerHTML = `<i class="fas fa-file-excel mr-2"></i> Export Excel`; // Ensure other button text is correct
 
-            // Add headers
-            csvRows.push(headers.map(header => `"${header.replace(/"/g, '""')}"`).join(','));
+            try {
+                const headers = Object.keys(currentRawData[0]);
+                const csvRows = [];
 
-            // Add data rows
-            currentRawData.forEach(row => {
-                const values = headers.map(header => {
-                    let value = row[header];
-                    if (value === null || value === undefined) {
-                        value = '';
-                    } else if (typeof value === 'string') {
-                        value = value.replace(/"/g, '""'); // Escape double quotes
-                    }
-                    return `"${value}"`;
+                // Add headers
+                csvRows.push(headers.map(header => `"${header.replace(/"/g, '""')}"`).join(','));
+
+                // Add data rows
+                currentRawData.forEach(row => {
+                    const values = headers.map(header => {
+                        let value = row[header];
+                        if (value === null || value === undefined) {
+                            value = '';
+                        } else if (typeof value === 'string') {
+                            value = value.replace(/"/g, '""'); // Escape double quotes
+                        }
+                        return `"${value}"`;
+                    });
+                    csvRows.push(values.join(','));
                 });
-                csvRows.push(values.join(','));
-            });
 
-            const csvString = csvRows.join('\n');
-            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'sensor_data.csv';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            displayMessage(document.getElementById('raw-data-table').nextElementSibling.nextElementSibling, 'CSV export successful!', 'success');
+                const csvString = csvRows.join('\n');
+                const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'sensor_data.csv';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href); // Clean up URL object after use
+
+                displayMessage(exportStatusContainer, 'CSV export successful!', 'success', 2000);
+            } catch (error) {
+                console.error("Error exporting CSV:", error);
+                displayMessage(exportStatusContainer, 'Error during CSV export.', 'error', 2000);
+            } finally {
+                // Re-enable buttons immediately after the file is prompted/downloaded
+                exportCsvButton.disabled = false;
+                exportExcelButton.disabled = false;
+                exportCsvButton.innerHTML = `<i class="fas fa-file-csv mr-2"></i> Export CSV`;
+                exportExcelButton.innerHTML = `<i class="fas fa-file-excel mr-2"></i> Export Excel`;
+            }
         }
 
         // Function to export raw data to Excel (as a tab-separated file with .xls extension for basic compatibility)
-        function exportToExcel() {
+        async function exportToExcel() {
+            const exportCsvButton = document.getElementById('export-csv-button');
+            const exportExcelButton = document.getElementById('export-excel-button');
+            const exportStatusContainer = document.getElementById('export-status-container'); // New element
+
             if (currentRawData.length === 0) {
-                displayMessage(document.getElementById('raw-data-table').nextElementSibling.nextElementSibling, 'No data to export.', 'warning');
+                displayMessage(exportStatusContainer, 'No data to export.', 'warning', 2000);
                 return;
             }
 
-            const headers = Object.keys(currentRawData[0]);
-            const excelRows = [];
+            exportCsvButton.disabled = true;
+            exportExcelButton.disabled = true;
+            exportExcelButton.innerHTML = `<span class="loading-spinner"></span> Exporting...`;
+            exportCsvButton.innerHTML = `<i class="fas fa-file-csv mr-2"></i> Export CSV`; // Ensure other button text is correct
 
-            // Add headers (tab-separated)
-            excelRows.push(headers.map(header => `${header.replace(/"/g, '""')}`).join('\t'));
+            try {
+                const headers = Object.keys(currentRawData[0]);
+                const excelRows = [];
 
-            // Add data rows (tab-separated)
-            currentRawData.forEach(row => {
-                const values = headers.map(header => {
-                    let value = row[header];
-                    if (value === null || value === undefined) {
-                        value = '';
-                    } else if (typeof value === 'string') {
-                        value = value.replace(/"/g, '""'); // Escape double quotes
-                    }
-                    return `${value}`;
+                // Add headers (tab-separated)
+                excelRows.push(headers.map(header => `${header.replace(/"/g, '""')}`).join('\t'));
+
+                // Add data rows (tab-separated)
+                currentRawData.forEach(row => {
+                    const values = headers.map(header => {
+                        let value = row[header];
+                        if (value === null || value === undefined) {
+                            value = '';
+                        } else if (typeof value === 'string') {
+                            value = value.replace(/"/g, '""'); // Escape double quotes
+                        }
+                        return `${value}`;
+                    });
+                    excelRows.push(values.join('\t'));
                 });
-                excelRows.push(values.join('\t'));
-            });
 
-            const excelString = excelRows.join('\n');
-            const blob = new Blob([excelString], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'sensor_data.xls'; // Use .xls for basic Excel opening
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            displayMessage(document.getElementById('raw-data-table').nextElementSibling.nextElementSibling, 'Excel export successful!', 'success');
+                const excelString = excelRows.join('\n');
+                const blob = new Blob([excelString], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'sensor_data.xls'; // Use .xls for basic Excel opening
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href); // Clean up URL object after use
+
+                displayMessage(exportStatusContainer, 'Excel export successful!', 'success', 2000);
+            } catch (error) {
+                console.error("Error exporting Excel:", error);
+                displayMessage(exportStatusContainer, 'Error during Excel export.', 'error', 2000);
+            } finally {
+                // Re-enable buttons immediately after the file is prompted/downloaded
+                exportCsvButton.disabled = false;
+                exportExcelButton.disabled = false;
+                exportExcelButton.innerHTML = `<i class="fas fa-file-excel mr-2"></i> Export Excel`;
+                exportCsvButton.innerHTML = `<i class="fas fa-file-csv mr-2"></i> Export CSV`;
+            }
         }
 
 
@@ -2307,13 +2400,13 @@
                     const rainfallUpdate = document.getElementById('rainfall-update');
                     if(rainfallUpdate) rainfallUpdate.textContent = `Updated: N/A`;
 
-                    displayMessage('sensor-trends-status', 'Not enough complete data available for plotting sensor trends. Check if sensors are reporting data for these features.', 'warning');
+                    displayMessage('sensor-trends-status', "⚠️ Not enough complete data available for plotting sensor trends. Check if sensors are reporting data for these features.", 'warning', 0); // No auto-clear for this one
                     Plotly.purge('sensor-trends-chart');
                     renderRawDataTable([]);
-                    displayMessage('care-tips', 'Select a crop to get recommendations.', 'info');
-                    displayMessage('growth-prediction', 'Select a crop to view growth predictions.', 'info');
-                    displayMessage('market-price-forecast', 'Select a crop to view market price forecast.', 'info');
-                    displayMessage('crop-suggestion', 'Predicted soil moisture data is unusual or unavailable for crop suggestion.', 'info');
+                    displayMessage('care-tips', 'Select a crop to get recommendations.', 'info', 0);
+                    displayMessage('growth-prediction', 'Select a crop to view growth predictions.', 'info', 0);
+                    displayMessage('market-price-forecast', 'Select a crop to view market price forecast.', 'info', 0);
+                    displayMessage('crop-suggestion', 'Predicted soil moisture data is unusual or unavailable for crop suggestion.', 'info', 0);
                     populateCropSelect(data.crop_labels);
                     currentRawData = []; // Clear raw data on no data status
                     return;
@@ -2356,10 +2449,10 @@
                 if (cropSelect && cropSelect.value) {
                     cropSelect.dispatchEvent(new Event('change'));
                 } else {
-                    displayMessage('care-tips', 'Select a crop to get recommendations.', 'info');
-                    displayMessage('growth-prediction', 'Select a crop to view growth predictions.', 'info');
-                    displayMessage('market-price-forecast', 'Select a crop to view market price forecast.', 'info');
-                    displayMessage('crop-suggestion', 'Predicted soil moisture data is unusual or unavailable for crop suggestion.', 'info');
+                    displayMessage('care-tips', 'Select a crop to get recommendations.', 'info', 0);
+                    displayMessage('growth-prediction', 'Select a crop to view growth predictions.', 'info', 0);
+                    displayMessage('market-price-forecast', 'Select a crop to view market price forecast.', 'info', 0);
+                    displayMessage('crop-suggestion', 'Predicted soil moisture data is unusual or unavailable for crop suggestion.', 'info', 0);
                 }
 
                 const cameraFeedContainer = document.getElementById('camera-feed-container');
@@ -2431,20 +2524,20 @@
 
             } catch (error) {
                 console.error("Error fetching dashboard data:", error);
-                displayMessage('soil-moisture-update', 'Error loading data.', 'error');
-                displayMessage('temperature-update', 'Error loading data.', 'error');
-                displayMessage('humidity-update', 'Error loading data.', 'error');
-                displayMessage('ph-update', 'Error loading data.', 'error');
-                displayMessage('light-intensity-update', 'Error loading data.', 'error');
-                displayMessage('rainfall-update', 'Error loading data.', 'error');
-                displayMessage('sensor-trends-status', 'Error loading trends.', 'error');
+                displayMessage('soil-moisture-update', 'Error loading data.', 'error', 0);
+                displayMessage('temperature-update', 'Error loading data.', 'error', 0);
+                displayMessage('humidity-update', 'Error loading data.', 'error', 0);
+                displayMessage('ph-update', 'Error loading data.', 'error', 0);
+                displayMessage('light-intensity-update', 'Error loading data.', 'error', 0);
+                displayMessage('rainfall-update', 'Error loading data.', 'error', 0);
+                displayMessage('sensor-trends-status', 'Error loading trends.', 'error', 0);
                 Plotly.purge('sensor-trends-chart'); // Ensure chart is purged on error
                 renderRawDataTable([]); // Clear table on error
-                displayMessage('raw-data-table', 'Error loading raw data.', 'error');
-                displayMessage('care-tips', 'Error loading recommendations.', 'error');
-                displayMessage('growth-prediction', 'Error loading predictions.', 'error');
-                displayMessage('market-price-forecast', 'Error loading forecast.', 'error');
-                displayMessage('crop-suggestion', 'Error loading suggestions.', 'error');
+                displayMessage('raw-data-table', 'Error loading raw data.', 'error', 0);
+                displayMessage('care-tips', 'Error loading recommendations.', 'error', 0);
+                displayMessage('growth-prediction', 'Error loading predictions.', 'error', 0);
+                displayMessage('market-price-forecast', 'Error loading forecast.', 'error', 0);
+                displayMessage('crop-suggestion', 'Error loading suggestions.', 'error', 0);
             } finally {
                 if (refreshButton) {
                     refreshButton.disabled = false;
@@ -2458,10 +2551,10 @@
             const selectedCropType = document.getElementById('crop-select')?.value;
 
             if (!selectedCropType) {
-                displayMessage('care-tips', 'Select a crop to get recommendations.', 'info');
-                displayMessage('growth-prediction', 'Select a crop to view growth predictions.', 'info');
-                displayMessage('market-price-forecast', 'Select a crop to view market price forecast.', 'info');
-                displayMessage('crop-suggestion', 'Predicted soil moisture data is unusual or unavailable for crop suggestion.', 'info');
+                displayMessage('care-tips', 'Select a crop to get recommendations.', 'info', 0);
+                displayMessage('growth-prediction', 'Select a crop to view growth predictions.', 'info', 0);
+                displayMessage('market-price-forecast', 'Select a crop to view market price forecast.', 'info', 0);
+                displayMessage('crop-suggestion', 'Predicted soil moisture data is unusual or unavailable for crop suggestion.', 'info', 0);
                 return;
             }
 
@@ -2469,7 +2562,7 @@
                 const response = await fetch(`${API_BASE_URL}/api/care_advice`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ selected_crop_type: selectedCropType })
+                    body: JSON.stringify({ selected_crop_type: selectedCropType, lang: currentLanguage }) // Pass language
                 });
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -2480,12 +2573,12 @@
                     if (data.advice && data.advice.length > 0) {
                         careTipsDiv.innerHTML = data.advice.map(tip => `<p class="mb-1.5 last:mb-0">${renderMarkdown(tip)}</p>`).join('');
                     } else {
-                        displayMessage('care-tips', 'No specific care recommendations available.', 'info');
+                        displayMessage('care-tips', 'No specific care recommendations available.', 'info', 0);
                     }
                 }
             } catch (error) {
                 console.error("Error fetching crop care advice:", error);
-                displayMessage('care-tips', 'Error loading recommendations.', 'error');
+                displayMessage('care-tips', 'Error loading recommendations.', 'error', 0);
             }
 
             let predictedSoilMoisture = null;
@@ -2503,7 +2596,7 @@
                 const growthPredictionDiv = document.getElementById('growth-prediction');
                 if (growthPredictionDiv) {
                     if (data.error) {
-                        displayMessage('growth-prediction', `Error: ${data.error}`, 'error');
+                        displayMessage('growth-prediction', `Error: ${data.error}`, 'error', 0);
                     } else {
                         predictedSoilMoisture = data.soil_moisture_pred;
                         let soilMoistureMsg = `Predicted Soil Moisture: <b>${data.soil_moisture_pred.toFixed(2)}%</b>`;
@@ -2519,7 +2612,7 @@
                 }
             } catch (error) {
                 console.error("Error fetching growth prediction:", error);
-                displayMessage('growth-prediction', 'Error loading predictions.', 'error');
+                displayMessage('growth-prediction', 'Error loading predictions.', 'error', 0);
             }
 
             try {
@@ -2535,21 +2628,21 @@
                 const marketPriceDiv = document.getElementById('market-price-forecast');
                 if (marketPriceDiv) {
                     if (data.error) {
-                        displayMessage('market-price-forecast', `Error: ${data.error}`, 'error');
+                        displayMessage('market-price-forecast', `Error: ${data.error}`, 'error', 0);
                     } else {
                         marketPriceDiv.innerHTML = `<p class="text-green-400"><i class="fas fa-money-bill-wave mr-2"></i> Estimated Market Price for ${selectedCropType}: <b>$${data.predicted_price.toFixed(2)}</b></p>`;
                     }
                 }
             } catch (error) {
                 console.error("Error fetching market price forecast:", error);
-                displayMessage('market-price-forecast', 'Error loading forecast.', 'error');
+                displayMessage('market-price-forecast', 'Error loading forecast.', 'error', 0);
             }
 
             try {
                 const response = await fetch(`${API_BASE_URL}/api/seed_recommendations`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ soil_moisture_pred: predictedSoilMoisture })
+                    body: JSON.stringify({ soil_moisture_pred: predictedSoilMoisture, lang: currentLanguage }) // Pass language
                 });
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -2558,14 +2651,14 @@
                 const cropSuggestionDiv = document.getElementById('crop-suggestion');
                 if (cropSuggestionDiv) {
                     if (data.error) {
-                        displayMessage('crop-suggestion', `Error: ${data.error}`, 'error');
+                        displayMessage('crop-suggestion', `Error: ${data.error}`, 'error', 0);
                     } else {
                         cropSuggestionDiv.innerHTML = `<p class="text-gray-300">${renderMarkdown(data.recommendation)}</p>`;
                     }
                 }
             } catch (error) {
                 console.error("Error fetching crop suggestion:", error);
-                displayMessage('crop-suggestion', 'Error loading suggestions.', 'error');
+                displayMessage('crop-suggestion', 'Error loading suggestions.', 'error', 0);
             }
         }
 
@@ -2586,12 +2679,14 @@
                 doGTranslate(selectedLang);
             }
         });
+
         document.getElementById('play-alerts-button')?.addEventListener('click', async () => {
+            const playButton = document.getElementById('play-alerts-button');
             const careTipsDiv = document.getElementById('care-tips');
             const audioStatusDiv = document.getElementById('audio-status');
 
-            if (!careTipsDiv || !audioStatusDiv) {
-                console.error("Care tips or audio status div not found.");
+            if (!careTipsDiv || !audioStatusDiv || !playButton) {
+                console.error("Care tips, audio status, or play button div not found.");
                 return;
             }
 
@@ -2606,14 +2701,25 @@
                 return;
             }
 
-            audioStatusDiv.textContent = 'Playing alerts...';
-            const topAlerts = tips.slice(0, 2);
+            playButton.disabled = true;
+            playButton.innerHTML = `<span class="loading-spinner"></span> Playing...`;
 
-            for (let i = 0; i < topAlerts.length; i++) {
-                let tip = topAlerts[i];
-                const cleanTip = tip.replace(/\*\*/g, '').replace(/[🌱🌡️💨�☀️🌧️✅⚠️❌ℹ️]/g, '').trim();
-                if (cleanTip) {
-                    try {
+            try {
+                // Filter out empty or placeholder tips and take the top 3 (or fewer if less available)
+                const relevantTips = tips.filter(tip => tip.trim() !== '' && !tip.includes(loadingRecText) && !tip.includes(noSpecificRecText)).slice(0, 3);
+
+                if (relevantTips.length === 0) {
+                    audioStatusDiv.textContent = noAlertsText;
+                    return;
+                }
+
+                for (let i = 0; i < relevantTips.length; i++) {
+                    let tip = relevantTips[i];
+                    // Clean up markdown (**) and unicode icons (🌱🌡️💨🧪☀️🌧️✅⚠️❌ℹ️)
+                    const cleanTip = tip.replace(/\*\*/g, '').replace(/[🌱🌡️💨🧪☀️🌧️✅⚠️❌ℹ️]/g, '').trim();
+                    
+                    if (cleanTip) {
+                        audioStatusDiv.textContent = `🔊 Playing alert ${i + 1} of ${relevantTips.length}...`;
                         const response = await fetch(`${API_BASE_URL}/api/voice_alert`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -2627,18 +2733,25 @@
 
                         const audioBlob = await response.blob();
                         const audio = new Audio(URL.createObjectURL(audioBlob));
-                        audio.play().catch(e => console.error("Error playing audio:", e));
 
-                        audioStatusDiv.textContent = `🔊 Playing alert ${i + 1}: "${cleanTip}"`;
-                        await new Promise(resolve => setTimeout(resolve, cleanTip.length * 50 + 1000));
-                    } catch (error) {
-                        console.error("Error playing voice alert:", error);
-                        audioStatusDiv.textContent = `Error playing alert ${i + 1}: ${error.message}`;
-                        break;
+                        await new Promise((resolve, reject) => {
+                            audio.onended = resolve;
+                            audio.onerror = reject;
+                            audio.play().catch(e => {
+                                console.error("Error playing audio:", e);
+                                reject(e);
+                            });
+                        });
                     }
                 }
+                audioStatusDiv.textContent = 'Alerts finished.';
+            } catch (error) {
+                console.error("Error playing voice alert sequence:", error);
+                audioStatusDiv.textContent = `Error playing alerts: ${error.message}`;
+            } finally {
+                playButton.disabled = false;
+                playButton.innerHTML = `<i class="fas fa-volume-up mr-2"></i> Play Top Alerts`;
             }
-            audioStatusDiv.textContent = 'Alerts finished.';
         });
 
         // Function to set the simulation mode via API
