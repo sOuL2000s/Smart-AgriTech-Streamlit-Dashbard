@@ -1,4 +1,4 @@
-code : 1
+code:1
 
 <!DOCTYPE html>
 <html lang="en">
@@ -2613,9 +2613,9 @@ code : 1
 </body>
 </html>
 
----------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
 
-code : 2 
+code:2
 
 <!DOCTYPE html>
 <html lang="en">
@@ -5336,6 +5336,8 @@ code : 2
     </script>
 </body>
 </html>
-----------------------------------------------------------------------------------------------------
 
-can you tell me why in the second code the play top alerts is not working?
+
+---------------------------------------------------------------------------------------------------------------------
+
+find the difference why the play top alerts works on code:1 but not in the code:2? instead what happens on code:2 is that clicking the button redirects me to download something, which was not happenning in the code:1.

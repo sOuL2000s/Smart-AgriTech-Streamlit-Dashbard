@@ -2094,7 +2094,7 @@ def api_voice_alert(request):
             return JsonResponse({'error': error_msg}, status=500)
 
         response = HttpResponse(audio_bytes, content_type='audio/mpeg')
-        response['Content-Disposition'] = 'attachment; filename="alert.mp3"'
+        #response['Content-Disposition'] = 'attachment; filename="alert.mp3"'
         return response
     except json.JSONDecodeError:
         return JsonResponse({"status": "error", "message": "Invalid JSON in request body."}, status=400)
