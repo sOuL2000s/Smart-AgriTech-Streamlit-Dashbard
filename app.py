@@ -288,7 +288,7 @@ ADVICE_MESSAGES = {
         'pomegranate_sm_high': "Evite el riego excesivo de la granada.",
         'melon_sm_low': "Los melones necesitan riego constante, especialmente durante la fructificación.",
         'coconut_sm_low': "Las palmas de coco necesitan altos niveles de humedad.",
-        'mothbeans_sm_low': "Las judías polilla son tolerantes a la sequía pero necesitan riego mínimo durante la floración.",
+        'mothbeans_sm_low': "Las judías polilla son tolerantes a la sequía but necesitan riego mínimo durante la floración.",
         'mungbean_sm_low': "Asegure un riego regular durante la floración y la formación de vainas.",
         'blackgram_sm_low': "Mantenga una humedad moderada especialmente durante la floración.",
         'lentil_sm_low': "Las lentejas necesitan humedad baja a moderada.",
@@ -365,12 +365,12 @@ ADVICE_MESSAGES = {
         'mango_sm_high': "Évitez l'engorgement. La mangue a besoin d'un sol bien drainé.",
         'grapes_sm_high': "Les raisins préfèrent un sol plus sec – évitez le sur-arrosage.",
         'cotton_sm_low': "Le coton nécessite une humidité modérée pendant la floraison.",
-        'millet_sorghum_sm_low': "Ce sont des cultures résistantes à la sécheresse mais nécessitent tout de même une humidité minimale.",
+        'millet_sorghum_sm_low': "Ce sont des cultures résistantes à la sécheresse but nécessitent tout de même une humidité minimale.",
         'jute_sm_low': "Le jute nécessite une humidité abondante pendant la croissance.",
         'pomegranate_sm_high': "Évitez de trop arroser la grenade.",
         'melon_sm_low': "Les melons ont besoin d'un arrosage constant, surtout pendant la fructification.",
         'coconut_sm_low': "Les cocotiers ont besoin de niveaux d'humidité élevés.",
-        'mothbeans_sm_low': "Les haricots papillons sont tolérants à la sécheresse mais nécessitent une irrigation minimale pendant la floraison.",
+        'mothbeans_sm_low': "Les haricots papillons sont tolérants à la sécheresse but nécessitent une irrigation minimale pendant la floraison.",
         'mungbean_sm_low': "Assurez un arrosage régulier pendant la floraison et la formation des gousses.",
         'blackgram_sm_low': "Maintenez une humidité modérée, surtout pendant la floraison.",
         'lentil_sm_low': "Les lentilles ont besoin d'une humidité faible à modérée.",
@@ -755,36 +755,499 @@ SEED_RECOMMENDATIONS_MESSAGES = {
         'no_specific': "لا توجد توصيات محددة، حيث أن الظروف الحالية غير عادية أو عامة."
     },
     'ja': {  # Japanese
-        'intro': "現在の状況に基づいて、以下を検討する場合があります： ",
-        'outro': "。正確な推奨事項については、地域の農業専門家にご相談ください。",
-        'acid_tolerant': "ブルーベリー、ジャガイモ、特定のイネの品種など、酸性土壌に強い作物",
-        'alkリントレラント': "アスパラガス、ほうれん草、特定のアルファルファの品種など、アルカリ性土壌に強い作物",
-        'neutral_ph': "小麦、トウモロコシ、ほとんどの野菜など、中性から弱酸性のpH（5.5-7.5）で育つ幅広い作物",
-        'heat_tolerant': "キビ、ソルガム、綿、一部のマメ類など、暑さに強い作物",
-        'cold_hardy': "小麦（冬小麦）、大麦、オート麦、エンドウ豆など、寒さに強い作物",
-        'warm_season': "トウモロコシ、イネ（熱帯）、ほとんどの野菜、果物など、暖かい季節の作物",
-        'drought_resistant': "キビ、ソルガム、ヒヨコ豆、特定のマメ類（例：モース豆）など、干ばつに強い作物",
-        'water_loving': "イネ、サトウキビ、ジュート、一時的な水はけの悪さに耐える作物など、水を好む作物",
-        'moderate_rainfall': "小麦、トウモロコシ、多くの野菜など、適度な降水量に適した作物",
-        'very_dry': "非常に乾燥に強い作物（例：砂漠に適応したメロンや一部のハーブ）",
-        'very_wet': "半水生作物、または水浸しに非常に強い作物（例：タロ芋、排水が悪い場合の特定のイネの品種）",
-        'no_specific': "現在の状況が異常または一般的であるため、具体的な推奨事項はありません。"
+        'no_data': "アドバイスを提供するためのセンサーデータがありません。",
+        'npk_low': "🌱 **{nutrient}が低い ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient}が高い ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **土壌水分が低い ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **土壌水分が高い ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **温度が低い ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **温度が高い ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **湿度が低い ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **湿度が高い ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **pHが低い ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **pHが高い ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **pHが適切ではありません ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **光強度が低い ({light:.1f} ルクス)**: {message}",
+        'light_high': "☀️ **光強度が高い ({light:.1f} ルクス)**: {message}",
+        'rainfall_low_msg': "🌧️ **降水量が少ない ({rain:.1f} mm)**: {message}",
+        'rainfall_high_msg': "🌧️ **降水量が多い ({rain:.1f} mm)**: {message}",
+        'all_good': "✅ すべての主要なパラメーターは良好です！最適な成長のために定期的に監視を続けてください。",
+        'npk_n_low': "窒素が豊富な肥料の施用を検討してください。",
+        'npk_n_high': "過剰な窒素は、果実/花の成長よりも葉の成長を促進する可能性があります。",
+        'npk_p_low': "根の発育のためにリン酸肥料の施用を検討してください。",
+        'npk_p_high': "リン酸が高いと他の栄養素が吸収されにくくなることがあります。",
+        'npk_k_low': "植物全体の健康と果実の品質のためにカリウム肥料の施用を検討してください。",
+        'npk_k_high': "過剰なカリウムは、カルシウムとマグネシウムの吸収を妨げる可能性があります。",
+        'wheat_sm_low': "軽く灌漑してください – 小麦は35-50%の土壌水分が必要です。",
+        'rice_sm_low': "イネは高い水分が必要です。適切な灌漑を確保してください。",
+        'maize_sm_low': "トウモロコシは中程度の土壌水分レベルが必要です。",
+        'banana_sm_low': "バナナには土壌を常に湿らせておいてください。",
+        'mango_sm_high': "水浸しを避けてください。マンゴーは水はけの良い土壌が必要です。",
+        'grapes_sm_high': "ブドウは乾燥した土壌を好みます – 水のやりすぎを避けてください。",
+        'cotton_sm_low': "綿は開花中に中程度の水分が必要です。",
+        'millet_sorghum_sm_low': "これらは干ばつに強い作物ですが、それでも最小限の水分が必要です。",
+        'jute_sm_low': "ジュートは成長中に十分な水分が必要です。",
+        'pomegranate_sm_high': "ザクロの水のやりすぎを避けてください。",
+        'melon_sm_low': "メロンは、特に結実中に継続的な水やりが必要です。",
+        'coconut_sm_low': "ココヤシは高い水分レベルが必要です。",
+        'mothbeans_sm_low': "モース豆は干ばつに強いですが、開花中に最小限の灌漑が必要です。",
+        'mungbean_sm_low': "開花および莢形成中に定期的な灌漑を確保してください。",
+        'blackgram_sm_low': "特に開花中に中程度の水分を維持してください。",
+        'lentil_sm_low': "レンズ豆は低から中程度の水分が必要です。",
+        'general_sm_low': "一般的なアドバイス：干ばつストレスを防ぐために灌漑を検討してください。",
+        'general_sm_high': "一般的なアドバイス：水浸しを防ぐために良好な排水を確保してください。",
+        'wheat_temp_high': "日陰を提供するか、夕方に灌漑してください – 小麦には温度が高すぎます。",
+        'rice_temp_high': "イネには暑すぎます。夕方の灌漑または日陰を検討してください。",
+        'maize_temp_low': "トウモロコシは暖かい気候（20-30°C）を好みます。",
+        'banana_temp_low': "バナナは寒さに敏感です – 暖かい条件を確保してください。",
+        'mango_temp_low': "マンゴーはより暖かい温度（>20°C）が必要です。",
+        'cotton_temp_low': "綿は暖かい温度で生育します。",
+        'millet_sorghum_temp_low': "暖かい気候はキビ/ソルガムに理想的です。",
+        'coffee_temp_low': "コーヒーは18-24°Cの範囲で生育します。",
+        'jute_temp_low': "ジュートは25-30°Cでよく育ちます。",
+        'papaya_temp_low': "パパイヤは21-33°Cの範囲を好みます。",
+        'pomegranate_temp_low': "理想的な温度は20°C以上です。",
+        'melon_temp_low': "温度が暖かい（>25°C）ことを確認してください。",
+        'coconut_temp_low': "ココヤシは高い水分レベルが必要です。",
+        'mothbeans_temp_low': "温度は22°C以上である必要があります。",
+        'mungbean_temp_low': "緑豆は最適な成長のために暖かい条件が必要です。",
+        'blackgram_temp_low': "理想的な温度範囲は25-35°Cです。",
+        'lentil_temp_low': "レンズ豆は18-30°Cでよく育ちます。",
+        'general_temp_low': "一般的なアドバイス：低温は成長を妨げる可能性があります。保護対策を検討してください。",
+        'general_temp_high': "一般的なアドバイス：高温は熱ストレスを引き起こす可能性があります。十分な水と日陰を確保してください。",
+        'wheat_hum_high': "真菌感染症に注意してください – 空気循環を確保してください。",
+        'rice_hum_low': "周囲の湿度を上げるか、マルチを使用してください。",
+        'banana_hum_low': "バナナは高い湿度が必要です。ミストまたはマルチングを検討してください。",
+        'grapes_hum_high': "高湿度は真菌感染症につながる可能性があります。",
+        'coffee_hum_low': "コーヒーは高い湿度を好みます。",
+        'orange_hum_high': "空気循環を改善し、真菌の問題を防ぐために木を剪定してください。",
+        'general_hum_low': "一般的なアドバイス：低湿度はしおれを引き起こす可能性があります。ミストまたは土壌水分の増加を検討してください。",
+        'general_hum_high': "一般的なアドバイス：高湿度は真菌性疾患のリスクを高めます。換気を良くしてください。",
+        'wheat_ph_low': "わずかに酸性 – pHを上げるために石灰の施用を検討してください。",
+        'rice_ph_off': "イネにはわずかに酸性の土壌を維持してください（pH 5.5-6.5）。",
+        'maize_ph_off': "土壌pHを5.8-7.0の間に維持してください。",
+        'papaya_ph_low': "パパイヤにはわずかに酸性から中性の土壌が最適です。",
+        'orange_ph_off': "オレンジの理想的な土壌pHは6.0-7.5です。",
+        'general_ph_very_low': "一般的なアドバイス：土壌が酸性すぎます。pHを上げ、栄養素の利用可能性を改善するために石灰を施用してください。",
+        'general_ph_very_high': "一般的なアドバイス：土壌がアルkaline है। पीएच कम करने के लिए सल्फर या जैविक पदार्थ डालें।",
+        'general_ph_off': "सामान्य सलाह: अधिकांश फसलों के लिए इष्टतम पीएच रेंज 5.5-7.5 है। आवश्यकतानुसार समायोजित करें।"
+    }
+}
+
+# Multilingual Seed Recommendation Messages
+SEED_RECOMMENDATIONS_MESSAGES = {
+    'en': {
+        'intro': "Based on current conditions, you might consider: ",
+        'outro': ". Please consult local agricultural experts for precise recommendations.",
+        'acid_tolerant': "acid-tolerant crops like blueberries, potatoes, or specific rice varieties",
+        'alkaline_tolerant': "alkaline-tolerant crops such as asparagus, spinach, or specific varieties of alfalfa",
+        'neutral_ph': "a wide range of crops thrive in neutral to slightly acidic pH (5.5-7.5), including wheat, maize, and most vegetables",
+        'heat_tolerant': "heat-tolerant crops like millet, sorghum, cotton, or some varieties of beans",
+        'cold_hardy': "cold-hardy crops such as wheat (winter varieties), barley, oats, or peas",
+        'warm_season': "warm-season crops like maize, rice (tropical), most vegetables, and fruits",
+        'drought_resistant': "drought-resistant crops like millet, sorghum, chickpeas, or certain types of beans (e.g., mothbeans)",
+        'water_loving': "water-loving crops such as rice, sugarcane, jute, or crops that tolerate temporary waterlogging",
+        'moderate_rainfall': "crops suitable for moderate rainfall, including wheat, maize, and many vegetables",
+        'very_dry': "very drought-tolerant crops (e.g., desert-adapted melons or some herbs)",
+        'very_wet': "semi-aquatic crops or those highly tolerant to waterlogging (e.g., taro, some rice varieties if poorly drained)",
+        'no_specific': "No specific recommendations, as current conditions are unusual or general."
     },
-    'bn': {  # Bengali
-        'intro': "বর্তমান অবস্থার উপর ভিত্তি করে, আপনি নিম্নলিখিতগুলি বিবেচনা করতে পারেন: ",
-        'outro': "। সঠিক সুপারিশের জন্য অনুগ্রহ করে স্থানীয় কৃষি বিশেষজ্ঞদের সাথে পরামর্শ করুন।",
-        'acid_tolerant': "ব্লুবেরি, আলু, বা ধানের নির্দিষ্ট জাতের মতো অ্যাসিড-সহনশীল ফসল",
-        'alkaline_tolerant': "শতমূলী, পালং শাক, বা আলফালফার নির্দিষ্ট জাতের মতো ক্ষার-সহনশীল ফসল",
-        'neutral_ph': "গম, ভুট্টা এবং বেশিরভাগ শাকসবজি সহ নিরপেক্ষ থেকে সামান্য অম্লীয় পিএইচ (5.5-7.5) তে বিভিন্ন ধরণের ফসল ভালো জন্মায়",
-        'heat_tolerant': "বাজরা, জোয়ার, তুলা, বা কিছু জাতের ডালের মতো তাপ-সহনশীল ফসল",
-        'cold_hardy': "গম (শীতকালীন জাত), বার্লি, ওটস, বা মটরশুঁটির মতো ঠান্ডা-সহনশীল ফসল",
-        'warm_season': "ভুট্টা, ধান (ক্রান্তীয়), বেশিরভাগ শাকসবজি, এবং ফলের মতো উষ্ণ-মৌসুমী ফসল",
-        'drought_resistant': "বাজরা, জোয়ার, ছোলা, বা নির্দিষ্ট ধরণের ডালের মতো (যেমন মোথবীন) খরা-প্রতিরোধী ফসল",
-        'water_loving': "ধান, আখ, পাট, বা অস্থায়ী জলজমার প্রতি সহনশীল ফসলের মতো জল-প্রেমী ফসল",
-        'moderate_rainfall': "গম, ভুট্টা, এবং অনেক শাকসবজি সহ মাঝারি বৃষ্টিপাতের জন্য উপযুক্ত ফসল",
-        'very_dry': "খুব খরা-সহনশীল ফসল (যেমন মরুভূমি-উপযোগী তরমুজ বা কিছু ঔষধি)",
-        'very_wet': "অর্ধ-জলীয় ফসল বা যেগুলি জলজমার প্রতি অত্যন্ত সহনশীল (যেমন কচু, কিছু ধানের জাত যদি নিষ্কাশন খারাপ হয়)",
-        'no_specific': "বর্তমান পরিস্থিতি অস্বাভাবিক বা সাধারণ হওয়ায় কোনো নির্দিষ্ট সুপারিশ নেই।"
+    'hi': {
+        'intro': "वर्तमान परिस्थितियों के आधार पर, आप विचार कर सकते हैं: ",
+        'outro': ". सटीक सिफारिशों के लिए कृपया स्थानीय कृषि विशेषज्ञों से सलाह लें।",
+        'acid_tolerant': "अम्ल-सहिष्णु फसलें जैसे ब्लूबेरी, आलू, या चावल की विशिष्ट किस्में",
+        'alkaline_tolerant': "क्षार-सहिष्णु फसलें जैसे शतावरी, पालक, या अल्फाल्फा की विशिष्ट किस्में",
+        'neutral_ph': "गेहूं, मक्का, और अधिकांश सब्जियों सहित तटस्थ से थोड़े अम्लीय पीएच (5.5-7.5) में फसलों की एक विस्तृत श्रृंखला पनपती है",
+        'heat_tolerant': "गर्मी-सहिष्णु फसलें जैसे बाजरा, ज्वार, कपास, या कुछ प्रकार की फलियां",
+        'cold_hardy': "ठंड-सहिष्णु फसलें जैसे गेहूं (शीतकालीन किस्में), जौ, जई, या मटर",
+        'warm_season': "गर्मियों की फसलें जैसे मक्का, चावल (उष्णकटिबंधीय), अधिकांश सब्जियां, और फल",
+        'drought_resistant': "सूखे प्रतिरोधी फसलें जैसे बाजरा, ज्वार, चना, या कुछ प्रकार की फलियां (जैसे मोठबीन)",
+        'water_loving': "पानी पसंद करने वाली फसलें जैसे चावल, गन्ना, जूट, या वे फसलें जो अस्थायी जलभराव को सहन करती हैं",
+        'moderate_rainfall': "मध्यम वर्षा के लिए उपयुक्त फसलें, जिनमें गेहूं, मक्का, और कई सब्जियां शामिल हैं",
+        'very_dry': "बहुत सूखा-सहिष्णु फसलें (जैसे रेगिस्तान-अनुकूलित तरबूज या कुछ जड़ी-बूटियाँ)",
+        'very_wet': "अर्ध-जलीय फसलें या वे जो जलभराव के प्रति अत्यधिक सहिष्णु हैं (जैसे तारो, चावल की कुछ किस्में यदि खराब जल निकासी हो)",
+        'no_specific': "कोई विशिष्ट सिफारिश नहीं, क्योंकि वर्तमान परिस्थितियाँ असामान्य या सामान्य हैं।"
+    },
+    'es': {  # Spanish
+        'intro': "Basado en las condiciones actuales, podría considerar: ",
+        'outro': ". Consulte a expertos agrícolas locales para recomendaciones precisas.",
+        'acid_tolerant': "cultivos tolerantes a la acidez como arándanos, patatas o variedades específicas de arroz",
+        'alkaline_tolerant': "cultivos tolerantes a la alcalinidad como espárragos, espinacas o variedades específicas de alfalfa",
+        'neutral_ph': "una amplia gama de cultivos prosperan en pH neutro a ligeramente ácido (5.5-7.5), incluyendo trigo, maíz y la mayoría de las verduras",
+        'heat_tolerant': "cultivos tolerantes al calor como mijo, sorgo, algodón o algunas variedades de frijoles",
+        'cold_hardy': "cultivos resistentes al frío como trigo (variedades de invierno), cebada, avena o guisantes",
+        'warm_season': "cultivos de estación cálida como maíz, arroz (tropical), la mayoría de las verduras y frutas",
+        'drought_resistant': "cultivos resistentes a la sequía como mijo, sorgo, garbanzos o ciertos tipos de frijoles (por ejemplo, frijoles polilla)",
+        'water_loving': "cultivos amantes del agua como arroz, caña de azúcar, yute o cultivos que toleran el encharcamiento temporal",
+        'moderate_rainfall': "cultivos adecuados para precipitaciones moderadas, incluyendo trigo, maíz y muchas verduras",
+        'very_dry': "cultivos muy tolerantes a la sequía (por ejemplo, melones adaptados al desierto o algunas hierbas)",
+        'very_wet': "cultivos semiacuáticos o aquellos altamente tolerantes al encharcamiento (por ejemplo, taro, algunas variedades de arroz si están mal drenadas)",
+        'no_specific': "No hay recomendaciones específicas, ya que las condiciones actuales son inusuales o generales."
+    },
+    'fr': {  # French
+        'intro': "En fonction des conditions actuelles, vous pourriez envisager : ",
+        'outro': ". Veuillez consulter des experts agricoles locaux pour des recommandations précises.",
+        'acid_tolerant': "cultures tolérantes à l'acidité comme les myrtilles, les pommes de terre ou des variétés spécifiques de riz",
+        'alkaline_tolerant': "cultures tolérantes à l'alcalinité telles que les asperges, les épinards ou des variétés spécifiques de luzerne",
+        'neutral_ph': "une large gamme de cultures prospèrent dans un pH neutre à légèrement acide (5.5-7.5), y compris le blé, le maïs et la plupart des légumes",
+        'heat_tolerant': "cultures tolérantes à la chaleur comme le millet, le sorgho, le coton ou certaines variétés de haricots",
+        'cold_hardy': "cultures résistantes au froid comme le blé (variétés d'hiver), l'orge, l'avoine ou les pois",
+        'warm_season': "cultures de saison chaude comme le maïs, le riz (tropica), la plupart des légumes et des fruits",
+        'drought_resistant': "cultures résistantes à la sécheresse comme le millet, le sorgho, les pois chiches ou certains types de haricots (par exemple, les haricots papillons)",
+        'water_loving': "cultures aimant l'eau comme le riz, la canne à sucre, le jute ou les cultures qui tolèrent l'engorgement temporaire",
+        'moderate_rainfall': "cultures adaptées aux précipitations modérées, y compris le blé, le maïs et de nombreux légumes",
+        'very_dry': "cultures très tolérantes à la sécheresse (par exemple, les melons adaptés au désert ou certaines herbes)",
+        'very_wet': "cultures semi-aquatiques ou celles très tolérantes à l'engorgement (par exemple, le taro, certaines variétés de riz si mal drainées)",
+        'no_specific': "Aucune recommandation spécifique, car les conditions actuelles sont inhabituelles ou générales."
+    },
+    'de': {  # German
+        'intro': "Basierend auf den aktuellen Bedingungen könnten Sie Folgendes in Betracht ziehen: ",
+        'outro': ". Bitte konsultieren Sie lokale Landwirtschaftsexperten für präzise Empfehlungen.",
+        'acid_tolerant': "säuretolerante Kulturen wie Heidelbeeren, Kartoffeln oder spezifische Reissorten",
+        'alkaline_tolerant': "alkalitolerante Kulturen wie Spargel, Spinat oder spezifische Luzernesorten",
+        'neutral_ph': "eine breite Palette von Kulturen gedeiht in neutralem bis leicht saurem pH-Wert (5.5-7.5), einschließlich Weizen, Mais und den meisten Gemüsesorten",
+        'heat_tolerant': "hitzetolerante Kulturen wie Hirse, Sorghum, Baumwolle oder einige Bohnensorten",
+        'cold_hardy': "kälteresistente Kulturen wie Weizen (Winter сорта), Gerste, Hafer oder Erbsen",
+        'warm_season': "Warmwetterkulturen wie Mais, Reis (tropisch), die meisten Gemüsesorten und Früchte",
+        'drought_resistant': "trockenheitsresistente Kulturen wie Hirse, Sorghum, Kichererbsen oder bestimmte Bohnensorten (z.B. Mothbohnen)",
+        'water_loving': "wasserliebende Kulturen wie Reis, Zuckerrohr, Jute oder Kulturen, die vorübergehende Staunässe vertragen",
+        'moderate_rainfall': "Kulturen, die für moderate Niederschläge geeignet sind, einschließlich Weizen, Mais und viele Gemüsesorten",
+        'very_dry': "sehr trockenheitstolerante Kulturen (z.B. wüstenangepasste Melonen oder einige Kräuter)",
+        'very_wet': "semi-aquatische Kulturen oder solche, die sehr tolerant gegenüber Staunässe sind (z.B. Taro, einige Reissorten bei schlechter Drainage)",
+        'no_specific': "Keine spezifischen Empfehlungen, da die aktuellen Bedingungen ungewöhnlich oder allgemein sind."
+    },
+    'ar': {  # Arabic
+        'intro': "بناءً على الظروف الحالية، قد تفكر في: ",
+        'outro': ". يرجى استشارة الخبراء الزراعيين المحليين للحصول على توصيات دقيقة.",
+        'acid_tolerant': "المحاصيل التي تتحمل الحموضة مثل التوت الأزرق، البطاطس، أو أصناف معينة من الأرز",
+        'alkaline_tolerant': "المحاصيل التي تتحمل القلوية مثل الهليون، السبانخ، أو أصناف معينة من البرسيم",
+        'neutral_ph': "تزدهر مجموعة واسعة من المحاصيل في درجة حموضة محايدة إلى حمضية قليلاً (5.5-7.5)، بما في ذلك القمح، الذرة، ومعظم الخضروات",
+        'heat_tolerant': "المحاصيل التي تتحمل الحرارة مثل الدخن، الذرة الرفيعة، القطن، أو بعض أنواع الفول",
+        'cold_hardy': "المحاصيل المقاومة للبرد مثل القمح (أصناف الشتاء)، الشعير، الشوفان، أو البازلاء",
+        'warm_season': "محاصيل الموسم الدافئ مثل الذرة، الأرز (الاستوائي)، معظم الخضروات، والفواكه",
+        'drought_resistant': "المحاصيل المقاومة للجفاف مثل الدخن، الذرة الرفيعة، الحمص، أو أنواع معينة من البقوليات (مثل فول العثة)",
+        'water_loving': "المحاصيل التي تحب الماء مثل الأرز، قصب السكر، الجوت، أو المحاصيل التي تتحمل التشبع المؤقت بالماء",
+        'moderate_rainfall': "المحاصيل المناسبة للأمطار المعتدلة، بما في ذلك القمح، الذرة، والعديد من الخضروات",
+        'very_dry': "المحاصيل التي تتحمل الجفاف الشديد (مثل البطيخ المتكيف مع الصحراء أو بعض الأعشاب)",
+        'very_wet': "المحاصيل شبه المائية أو تلك التي تتحمل التشبع بالماء بدرجة عالية (مثل القلقاس، بعض أصناف الأرز إذا كان الصرف سيئًا)",
+        'no_specific': "لا توجد توصيات محددة، حيث أن الظروف الحالية غير عادية أو عامة."
+    },
+    'ja': {  # Japanese
+        'no_data': "アドバイスを提供するためのセンサーデータがありません。",
+        'npk_low': "🌱 **{nutrient}が低い ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient}が高い ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **土壌水分が低い ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **土壌水分が高い ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **温度が低い ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **温度が高い ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **湿度が低い ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **湿度が高い ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **pHが低い ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **pHが高い ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **pHが適切ではありません ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **光強度が低い ({light:.1f} ルクス)**: {message}",
+        'light_high': "☀️ **光強度が高い ({light:.1f} ルクス)**: {message}",
+        'rainfall_low_msg': "🌧️ **降水量が少ない ({rain:.1f} mm)**: {message}",
+        'rainfall_high_msg': "🌧️ **降水量が多い ({rain:.1f} mm)**: {message}",
+        'all_good': "✅ すべての主要なパラメーターは良好です！最適な成長のために定期的に監視を続けてください。",
+        'npk_n_low': "窒素が豊富な肥料の施用を検討してください。",
+        'npk_n_high': "過剰な窒素は、果実/花の成長よりも葉の成長を促進する可能性があります。",
+        'npk_p_low': "根の発育のためにリン酸肥料の施用を検討してください。",
+        'npk_p_high': "リン酸が高いと他の栄養素が吸収されにくくなることがあります。",
+        'npk_k_low': "植物全体の健康と果実の品質のためにカリウム肥料の施用を検討してください。",
+        'npk_k_high': "過剰なカリウムは、カルシウムとマグネシウムの吸収を妨げる可能性があります。",
+        'wheat_sm_low': "軽く灌漑してください – 小麦は35-50%の土壌水分が必要です。",
+        'rice_sm_low': "イネは高い水分が必要です。適切な灌漑を確保してください。",
+        'maize_sm_low': "トウモロコシは中程度の土壌水分レベルが必要です。",
+        'banana_sm_low': "バナナには土壌を常に湿らせておいてください。",
+        'mango_sm_high': "水浸しを避けてください。マンゴーは水はけの良い土壌が必要です。",
+        'grapes_sm_high': "ブドウは乾燥した土壌を好みます – 水のやりすぎを避けてください。",
+        'cotton_sm_low': "綿は開花中に中程度の水分が必要です。",
+        'millet_sorghum_sm_low': "これらは干ばつに強い作物ですが、それでも最小限の水分が必要です。",
+        'jute_sm_low': "ジュートは成長中に十分な水分が必要です。",
+        'pomegranate_sm_high': "ザクロの水のやりすぎを避けてください。",
+        'melon_sm_low': "メロンは、特に結実中に継続的な水やりが必要です。",
+        'coconut_sm_low': "ココヤシは高い水分レベルが必要です。",
+        'mothbeans_sm_low': "モース豆は干ばつに強いですが、開花中に最小限の灌漑が必要です。",
+        'mungbean_sm_low': "開花および莢形成中に定期的な灌漑を確保してください。",
+        'blackgram_sm_low': "特に開花中に中程度の水分を維持してください。",
+        'lentil_sm_low': "レンズ豆は低から中程度の水分が必要です。",
+        'general_sm_low': "一般的なアドバイス：干ばつストレスを防ぐために灌漑を検討してください。",
+        'general_sm_high': "一般的なアドバイス：水浸しを防ぐために良好な排水を確保してください。",
+        'wheat_temp_high': "日陰を提供するか、夕方に灌漑してください – 小麦には温度が高すぎます。",
+        'rice_temp_high': "イネには暑すぎます。夕方の灌漑または日陰を検討してください。",
+        'maize_temp_low': "トウモロコシは暖かい気候（20-30°C）を好みます。",
+        'banana_temp_low': "バナナは寒さに敏感です – 暖かい条件を確保してください。",
+        'mango_temp_low': "マンゴーはより暖かい温度（>20°C）が必要です。",
+        'cotton_temp_low': "綿は暖かい温度で生育します。",
+        'millet_sorghum_temp_low': "暖かい気候はキビ/ソルガムに理想的です。",
+        'coffee_temp_low': "コーヒーは18-24°Cの範囲で生育します。",
+        'jute_temp_low': "ジュートは25-30°Cでよく育ちます。",
+        'papaya_temp_low': "パパイヤは21-33°Cの範囲を好みます。",
+        'pomegranate_temp_low': "理想的な温度は20°C以上です。",
+        'melon_temp_low': "温度が暖かい（>25°C）ことを確認してください。",
+        'coconut_temp_low': "ココヤシは理想的な温度は25°C以上です。",
+        'mothbeans_temp_low': "温度は22°C以上である必要があります。",
+        'mungbean_temp_low': "緑豆は最適な成長のために暖かい条件が必要です。",
+        'blackgram_temp_low': "理想的な温度範囲は25-35°Cです。",
+        'lentil_temp_low': "レンズ豆は18-30°Cでよく育ちます。",
+        'general_temp_low': "一般的なアドバイス：低温は成長を妨げる可能性があります。保護対策を検討してください。",
+        'general_temp_high': "一般的なアドバイス：高温は熱ストレスを引き起こす可能性があります。十分な水と日陰を確保してください。",
+        'wheat_hum_high': "真菌感染症に注意してください – 空気循環を確保してください。",
+        'rice_hum_low': "周囲の湿度を上げるか、マルチを使用してください。",
+        'banana_hum_low': "バナナは高い湿度が必要です。ミストまたはマルチングを検討してください。",
+        'grapes_hum_high': "高湿度は真菌感染症につながる可能性があります。",
+        'coffee_hum_low': "コーヒーは高い湿度を好みます。",
+        'orange_hum_high': "空気循環を改善し、真菌の問題を防ぐために木を剪定してください。",
+        'general_hum_low': "一般的なアドバイス：低湿度はしおれを引き起こす可能性があります。ミストまたは土壌水分の増加を検討してください。",
+        'general_hum_high': "一般的なアドバイス：高湿度は真菌性疾患のリスクを高めます。換気を良くしてください。",
+        'wheat_ph_low': "わずかに酸性 – pHを上げるために石灰の施用を検討してください。",
+        'rice_ph_off': "イネにはわずかに酸性の土壌を維持してください（pH 5.5-6.5）。",
+        'maize_ph_off': "土壌pHを5.8-7.0の間に維持してください。",
+        'papaya_ph_low': "パパイヤにはわずかに酸性から中性の土壌が最適です。",
+        'orange_ph_off': "オレンジの理想的な土壌pHは6.0-7.5です。",
+        'general_ph_very_low': "一般的なアドバイス：土壌が酸性すぎます。pHを上げ、栄養素の利用可能性を改善するために石灰を施用してください。",
+        'general_ph_very_high': "一般的なアドバイス：土壌がアルカリ性すぎます。pHを下げるために硫黄または有機物を施用してください。",
+        'general_ph_off': "一般的なアドバイス：ほとんどの作物にとって最適なpH範囲は5.5-7.5です。必要に応じて調整してください。"
+    }
+}
+
+# Multilingual Seed Recommendation Messages
+SEED_RECOMMENDATIONS_MESSAGES = {
+    'en': {
+        'intro': "Based on current conditions, you might consider: ",
+        'outro': ". Please consult local agricultural experts for precise recommendations.",
+        'acid_tolerant': "acid-tolerant crops like blueberries, potatoes, or specific rice varieties",
+        'alkaline_tolerant': "alkaline-tolerant crops such as asparagus, spinach, or specific varieties of alfalfa",
+        'neutral_ph': "a wide range of crops thrive in neutral to slightly acidic pH (5.5-7.5), including wheat, maize, and most vegetables",
+        'heat_tolerant': "heat-tolerant crops like millet, sorghum, cotton, or some varieties of beans",
+        'cold_hardy': "cold-hardy crops such as wheat (winter varieties), barley, oats, or peas",
+        'warm_season': "warm-season crops like maize, rice (tropical), most vegetables, and fruits",
+        'drought_resistant': "drought-resistant crops like millet, sorghum, chickpeas, or certain types of beans (e.g., mothbeans)",
+        'water_loving': "water-loving crops such as rice, sugarcane, jute, or crops that tolerate temporary waterlogging",
+        'moderate_rainfall': "crops suitable for moderate rainfall, including wheat, maize, and many vegetables",
+        'very_dry': "very drought-tolerant crops (e.g., desert-adapted melons or some herbs)",
+        'very_wet': "semi-aquatic crops or those highly tolerant to waterlogging (e.g., taro, some rice varieties if poorly drained)",
+        'no_specific': "No specific recommendations, as current conditions are unusual or general."
+    },
+    'hi': {
+        'intro': "वर्तमान परिस्थितियों के आधार पर, आप विचार कर सकते हैं: ",
+        'outro': ". सटीक सिफारिशों के लिए कृपया स्थानीय कृषि विशेषज्ञों से सलाह लें।",
+        'acid_tolerant': "अम्ल-सहिष्णु फसलें जैसे ब्लूबेरी, आलू, या चावल की विशिष्ट किस्में",
+        'alkaline_tolerant': "क्षार-सहिष्णु फसलें जैसे शतावरी, पालक, या अल्फाल्फा की विशिष्ट किस्में",
+        'neutral_ph': "गेहूं, मक्का, और अधिकांश सब्जियों सहित तटस्थ से थोड़े अम्लीय पीएच (5.5-7.5) में फसलों की एक विस्तृत श्रृंखला पनपती है",
+        'heat_tolerant': "गर्मी-सहिष्णु फसलें जैसे बाजरा, ज्वार, कपास, या कुछ प्रकार की फलियां",
+        'cold_hardy': "ठंड-सहिष्णु फसलें जैसे गेहूं (शीतकालीन किस्में), जौ, जई, या मटर",
+        'warm_season': "गर्मियों की फसलें जैसे मक्का, चावल (उष्णकटिबंधीय), अधिकांश सब्जियां, और फल",
+        'drought_resistant': "सूखे प्रतिरोधी फसलें जैसे बाजरा, ज्वार, चना, या कुछ प्रकार की फलियां (जैसे मोठबीन)",
+        'water_loving': "पानी पसंद करने वाली फसलें जैसे चावल, गन्ना, जूट, या वे फसलें जो अस्थायी जलभराव को सहन करती हैं",
+        'moderate_rainfall': "मध्यम वर्षा के लिए उपयुक्त फसलें, जिनमें गेहूं, मक्का, और कई सब्जियां शामिल हैं",
+        'very_dry': "बहुत सूखा-सहिष्णु फसलें (जैसे रेगिस्तान-अनुकूलित तरबूज या कुछ जड़ी-बूटियाँ)",
+        'very_wet': "अर्ध-जलीय फसलें या वे जो जलभराव के प्रति अत्यधिक सहिष्णु हैं (जैसे तारो, चावल की कुछ किस्में यदि खराब जल निकासी हो)",
+        'no_specific': "कोई विशिष्ट सिफारिश नहीं, क्योंकि वर्तमान परिस्थितियाँ असामान्य या सामान्य हैं।"
+    },
+    'es': {  # Spanish
+        'intro': "Basado en las condiciones actuales, podría considerar: ",
+        'outro': ". Consulte a expertos agrícolas locales para recomendaciones precisas.",
+        'acid_tolerant': "cultivos tolerantes a la acidez como arándanos, patatas o variedades específicas de arroz",
+        'alkaline_tolerant': "cultivos tolerantes a la alcalinidad como espárragos, espinacas o variedades específicas de alfalfa",
+        'neutral_ph': "una amplia gama de cultivos prosperan en pH neutro a ligeramente ácido (5.5-7.5), incluyendo trigo, maíz y la mayoría de las verduras",
+        'heat_tolerant': "cultivos tolerantes al calor como mijo, sorgo, algodón o algunas variedades de frijoles",
+        'cold_hardy': "cultivos resistentes al frío como trigo (variedades de invierno), cebada, avena o guisantes",
+        'warm_season': "cultivos de estación cálida como maíz, arroz (tropical), la mayoría de las verduras y frutas",
+        'drought_resistant': "cultivos resistentes a la sequía como mijo, sorgo, garbanzos o ciertos tipos de frijoles (por ejemplo, frijoles polilla)",
+        'water_loving': "cultivos amantes del agua como arroz, caña de azúcar, yute o cultivos que toleran el encharcamiento temporal",
+        'moderate_rainfall': "cultivos adecuados para precipitaciones moderadas, incluyendo trigo, maíz y muchas verduras",
+        'very_dry': "cultivos muy tolerantes a la sequía (por ejemplo, melones adaptados al desierto o algunas hierbas)",
+        'very_wet': "cultivos semiacuáticos o aquellos altamente tolerantes al encharcamiento (por ejemplo, taro, algunas variedades de arroz si están mal drenadas)",
+        'no_specific': "No hay recomendaciones específicas, ya que las condiciones actuales son inusuales o generales."
+    },
+    'fr': {  # French
+        'intro': "En fonction des conditions actuelles, vous pourriez envisager : ",
+        'outro': ". Veuillez consulter des experts agricoles locaux pour des recommandations précises.",
+        'acid_tolerant': "cultures tolérantes à l'acidité comme les myrtilles, les pommes de terre ou des variétés spécifiques de riz",
+        'alkaline_tolerant': "cultures tolérantes à l'alcalinité telles que les asperges, les épinards ou des variétés spécifiques de luzerne",
+        'neutral_ph': "une large gamme de cultures prospèrent dans un pH neutre à légèrement acide (5.5-7.5), y compris le blé, le maïs et la plupart des légumes",
+        'heat_tolerant': "cultures tolérantes à la chaleur comme le millet, le sorgho, le coton ou certaines variétés de haricots",
+        'cold_hardy': "cultures résistantes au froid comme le blé (variétés d'hiver), l'orge, l'avoine ou les pois",
+        'warm_season': "cultures de saison chaude comme le maïs, le riz (tropica), la plupart des légumes et des fruits",
+        'drought_resistant': "cultures résistantes à la sécheresse comme le millet, le sorgho, les pois chiches ou certains types de haricots (par exemple, les haricots papillons)",
+        'water_loving': "cultures aimant l'eau comme le riz, la canne à sucre, le jute ou les cultures qui tolèrent l'engorgement temporaire",
+        'moderate_rainfall': "cultures adaptées aux précipitations modérées, y compris le blé, le maïs et de nombreux légumes",
+        'very_dry': "cultures très tolérantes à la sécheresse (par exemple, les melons adaptés au désert ou certaines herbes)",
+        'very_wet': "cultures semi-aquatiques ou celles très tolérantes à l'engorgement (par exemple, le taro, certaines variétés de riz si mal drainées)",
+        'no_specific': "Aucune recommandation spécifique, car les conditions actuelles sont inhabituelles ou générales."
+    },
+    'de': {  # German
+        'intro': "Basierend auf den aktuellen Bedingungen könnten Sie Folgendes in Betracht ziehen: ",
+        'outro': ". Bitte konsultieren Sie lokale Landwirtschaftsexperten für präzise Empfehlungen.",
+        'acid_tolerant': "säuretolerante Kulturen wie Heidelbeeren, Kartoffeln oder spezifische Reissorten",
+        'alkaline_tolerant': "alkalitolerante Kulturen wie Spargel, Spinat oder spezifische Luzernesorten",
+        'neutral_ph': "eine breite Palette von Kulturen gedeiht in neutralem bis leicht saurem pH-Wert (5.5-7.5), einschließlich Weizen, Mais und den meisten Gemüsesorten",
+        'heat_tolerant': "hitzetolerante Kulturen wie Hirse, Sorghum, Baumwolle oder einige Bohnensorten",
+        'cold_hardy': "kälteresistente Kulturen wie Weizen (Winter сорта), Gerste, Hafer oder Erbsen",
+        'warm_season': "Warmwetterkulturen wie Mais, Reis (tropisch), die meisten Gemüsesorten und Früchte",
+        'drought_resistant': "trockenheitsresistente Kulturen wie Hirse, Sorghum, Kichererbsen oder bestimmte Bohnensorten (z.B. Mothbohnen)",
+        'water_loving': "wasserliebende Kulturen wie Reis, Zuckerrohr, Jute oder Kulturen, die vorübergehende Staunässe vertragen",
+        'moderate_rainfall': "Kulturen, die für moderate Niederschläge geeignet sind, einschließlich Weizen, Mais und viele Gemüsesorten",
+        'very_dry': "sehr trockenheitstolerante Kulturen (z.B. wüstenangepasste Melonen oder einige Kräuter)",
+        'very_wet': "semi-aquatische Kulturen oder solche, die sehr tolerant gegenüber Staunässe sind (z.B. Taro, einige Reissorten bei schlechter Drainage)",
+        'no_specific': "Keine spezifischen Empfehlungen, da die aktuellen Bedingungen ungewöhnlich oder allgemein sind."
+    },
+    'ar': {  # Arabic
+        'intro': "بناءً على الظروف الحالية، قد تفكر في: ",
+        'outro': ". يرجى استشارة الخبراء الزراعيين المحليين للحصول على توصيات دقيقة.",
+        'acid_tolerant': "المحاصيل التي تتحمل الحموضة مثل التوت الأزرق، البطاطس، أو أصناف معينة من الأرز",
+        'alkaline_tolerant': "المحاصيل التي تتحمل القلوية مثل الهليون، السبانخ، أو أصناف معينة من البرسيم",
+        'neutral_ph': "تزدهر مجموعة واسعة من المحاصيل في درجة حموضة محايدة إلى حمضية قليلاً (5.5-7.5)، بما في ذلك القمح، الذرة، ومعظم الخضروات",
+        'heat_tolerant': "المحاصيل التي تتحمل الحرارة مثل الدخن، الذرة الرفيعة، القطن، أو بعض أنواع الفول",
+        'cold_hardy': "المحاصيل المقاومة للبرد مثل القمح (أصناف الشتاء)، الشعير، الشوفان، أو البازلاء",
+        'warm_season': "محاصيل الموسم الدافئ مثل الذرة، الأرز (الاستوائي)، معظم الخضروات، والفواكه",
+        'drought_resistant': "المحاصيل المقاومة للجفاف مثل الدخن، الذرة الرفيعة، الحمص، أو أنواع معينة من البقوليات (مثل فول العثة)",
+        'water_loving': "المحاصيل التي تحب الماء مثل الأرز، قصب السكر، الجوت، أو المحاصيل التي تتحمل التشبع المؤقت بالماء",
+        'moderate_rainfall': "المحاصيل المناسبة للأمطار المعتدلة، بما في ذلك القمح، الذرة، والعديد من الخضروات",
+        'very_dry': "المحاصيل التي تتحمل الجفاف الشديد (مثل البطيخ المتكيف مع الصحراء أو بعض الأعشاب)",
+        'very_wet': "المحاصيل شبه المائية أو تلك التي تتحمل التشبع بالماء بدرجة عالية (مثل القلقاس، بعض أصناف الأرز إذا كان الصرف سيئًا)",
+        'no_specific': "لا توجد توصيات محددة، حيث أن الظروف الحالية غير عادية أو عامة."
+    },
+    'ja': {  # Japanese
+        'no_data': "アドバイスを提供するためのセンサーデータがありません。",
+        'npk_low': "🌱 **{nutrient}が低い ({value:.1f})**: {message}",
+        'npk_high': "🌱 **{nutrient}が高い ({value:.1f})**: {message}",
+        'soil_moisture_low': "💧 **土壌水分が低い ({sm:.1f}%)**: {message}",
+        'soil_moisture_high': "💧 **土壌水分が高い ({sm:.1f}%)**: {message}",
+        'temp_low': "🌡️ **温度が低い ({temp:.1f}°C)**: {message}",
+        'temp_high': "🌡️ **温度が高い ({temp:.1f}°C)**: {message}",
+        'humidity_low': "💨 **湿度が低い ({hum:.1f}%)**: {message}",
+        'humidity_high': "💨 **湿度が高い ({hum:.1f}%)**: {message}",
+        'ph_low': "🧪 **pHが低い ({ph_val:.1f})**: {message}",
+        'ph_high': "🧪 **pHが高い ({ph_val:.1f})**: {message}",
+        'ph_off': "🧪 **pHが適切ではありません ({ph_val:.1f})**: {message}",
+        'light_low': "☀️ **光強度が低い ({light:.1f} ルクス)**: {message}",
+        'light_high': "☀️ **光強度が高い ({light:.1f} ルクス)**: {message}",
+        'rainfall_low_msg': "🌧️ **降水量が少ない ({rain:.1f} mm)**: {message}",
+        'rainfall_high_msg': "🌧️ **降水量が多い ({rain:.1f} mm)**: {message}",
+        'all_good': "✅ すべての主要なパラメーターは良好です！最適な成長のために定期的に監視を続けてください。",
+        'npk_n_low': "窒素が豊富な肥料の施用を検討してください。",
+        'npk_n_high': "過剰な窒素は、果実/花の成長よりも葉の成長を促進する可能性があります。",
+        'npk_p_low': "根の発育のためにリン酸肥料の施用を検討してください。",
+        'npk_p_high': "リン酸が高いと他の栄養素が吸収されにくくなることがあります。",
+        'npk_k_low': "植物全体の健康と果実の品質のためにカリウム肥料の施用を検討してください。",
+        'npk_k_high': "過剰なカリウムは、カルシウムとマグネシウムの吸収を妨げる可能性があります。",
+        'wheat_sm_low': "軽く灌漑してください – 小麦は35-50%の土壌水分が必要です。",
+        'rice_sm_low': "イネは高い水分が必要です。適切な灌漑を確保してください。",
+        'maize_sm_low': "トウモロコシは中程度の土壌水分レベルが必要です。",
+        'banana_sm_low': "バナナには土壌を常に湿らせておいてください。",
+        'mango_sm_high': "水浸しを避けてください。マンゴーは水はけの良い土壌が必要です。",
+        'grapes_sm_high': "ブドウは乾燥した土壌を好みます – 水のやりすぎを避けてください。",
+        'cotton_sm_low': "綿は開花中に中程度の水分が必要です。",
+        'millet_sorghum_sm_low': "これらは干ばつに強い作物ですが、それでも最小限の水分が必要です。",
+        'jute_sm_low': "ジュートは成長中に十分な水分が必要です。",
+        'pomegranate_sm_high': "ザクロの水のやりすぎを避けてください。",
+        'melon_sm_low': "メロンは、特に結実中に継続的な水やりが必要です。",
+        'coconut_sm_low': "ココヤシは高い水分レベルが必要です。",
+        'mothbeans_sm_low': "モース豆は干ばつに強いですが、開花中に最小限の灌漑が必要です。",
+        'mungbean_sm_low': "開花および莢形成中に定期的な灌漑を確保してください。",
+        'blackgram_sm_low': "特に開花中に中程度の水分を維持してください。",
+        'lentil_sm_low': "レンズ豆は低から中程度の水分が必要です。",
+        'general_sm_low': "一般的なアドバイス：干ばつストレスを防ぐために灌漑を検討してください。",
+        'general_sm_high': "一般的なアドバイス：水浸しを防ぐために良好な排水を確保してください。",
+        'wheat_temp_high': "日陰を提供するか、夕方に灌漑してください – 小麦には温度が高すぎます。",
+        'rice_temp_high': "イネには暑すぎます。夕方の灌漑または日陰を検討してください。",
+        'maize_temp_low': "トウモロコシは暖かい気候（20-30°C）を好みます。",
+        'banana_temp_low': "バナナは寒さに敏感です – 暖かい条件を確保してください。",
+        'mango_temp_low': "マンゴーはより暖かい温度（>20°C）が必要です。",
+        'cotton_temp_low': "綿は暖かい温度で生育します。",
+        'millet_sorghum_temp_low': "暖かい気候はキビ/ソルガムに理想的です。",
+        'coffee_temp_low': "コーヒーは18-24°Cの範囲で生育します。",
+        'jute_temp_low': "ジュートは25-30°Cでよく育ちます。",
+        'papaya_temp_low': "パパイヤは21-33°Cの範囲を好みます。",
+        'pomegranate_temp_low': "理想的な温度は20°C以上です。",
+        'melon_temp_low': "温度が暖かい（>25°C）ことを確認してください。",
+        'coconut_temp_low': "ココヤシは理想的な温度は25°C以上です。",
+        'mothbeans_temp_low': "温度は22°C以上である必要があります。",
+        'mungbean_temp_low': "緑豆は最適な成長のために暖かい条件が必要です。",
+        'blackgram_temp_low': "理想的な温度範囲は25-35°Cです。",
+        'lentil_temp_low': "レンズ豆は18-30°Cでよく育ちます。",
+        'general_temp_low': "一般的なアドバイス：低温は成長を妨げる可能性があります。保護対策を検討してください。",
+        'general_temp_high': "一般的なアドバイス：高温は熱ストレスを引き起こす可能性があります。十分な水と日陰を確保してください。",
+        'wheat_hum_high': "真菌感染症に注意してください – 空気循環を確保してください。",
+        'rice_hum_low': "周囲の湿度を上げるか、マルチを使用してください。",
+        'banana_hum_low': "バナナは高い湿度が必要です。ミストまたはマルチングを検討してください。",
+        'grapes_hum_high': "高湿度は真菌感染症につながる可能性があります。",
+        'coffee_hum_low': "コーヒーは高い湿度を好みます。",
+        'orange_hum_high': "空気循環を改善し、真菌の問題を防ぐために木を剪定してください。",
+        'general_hum_low': "一般的なアドバイス：低湿度はしおれを引き起こす可能性があります。ミストまたは土壌水分の増加を検討してください。",
+        'general_hum_high': "一般的なアドバイス：高湿度は真菌性疾患のリスクを高めます。換気を良くしてください。",
+        'wheat_ph_low': "わずかに酸性 – pHを上げるために石灰の施用を検討してください。",
+        'rice_ph_off': "イネにはわずかに酸性の土壌を維持してください（pH 5.5-6.5）。",
+        'maize_ph_off': "土壌pHを5.8-7.0の間に維持してください。",
+        'papaya_ph_low': "パパイヤにはわずかに酸性から中性の土壌が最適です。",
+        'orange_ph_off': "オレンジの理想的な土壌pHは6.0-7.5です。",
+        'general_ph_very_low': "一般的なアドバイス：土壌が酸性すぎます。pHを上げ、栄養素の利用可能性を改善するために石灰を施用してください。",
+        'general_ph_very_high': "一般的なアドバイス：土壌がアルカリ性すぎます。pHを下げるために硫黄または有機物を施用してください。",
+        'general_ph_off': "一般的なアドバイス：ほとんどの作物にとって最適なpH範囲は5.5-7.5です。必要に応じて調整してください。"
+    }
+}
+
+
+# --- New: Camera ML Detection Messages (simulated) ---
+CAMERA_ML_MESSAGES = {
+    'en': {
+        'detected_crop': "Detected Crop: {crop_name} ({confidence:.2f}% Confidence)",
+        'detection_status': "Last Scan: {timestamp}",
+        'no_detection': "No clear crop detected. Please ensure good lighting.",
+        'scan_initiated': "Initiating scan...",
+        'scan_complete': "Scan complete.",
+        'scan_failed': "Scan failed: {error}"
+    },
+    'hi': {
+        'detected_crop': "पहचानी गई फसल: {crop_name} ({confidence:.2f}% आत्मविश्वास)",
+        'detection_status': "पिछला स्कैन: {timestamp}",
+        'no_detection': "कोई स्पष्ट फसल नहीं पहचानी गई। कृपया सुनिश्चित करें कि रोशनी अच्छी हो।",
+        'scan_initiated': "स्कैन शुरू हो रहा है...",
+        'scan_complete': "स्कैन पूरा हुआ।",
+        'scan_failed': "स्कैन विफल: {error}"
+    },
+    'es': {
+        'detected_crop': "Cultivo detectado: {crop_name} ({confidence:.2f}% de confianza)",
+        'detection_status': "Último escaneo: {timestamp}",
+        'no_detection': "No se detectó ningún cultivo claro. Asegúrese de que haya buena iluminación.",
+        'scan_initiated': "Iniciando escaneo...",
+        'scan_complete': "Escaneo completado.",
+        'scan_failed': "Escaneo fallido: {error}"
+    },
+    'fr': {
+        'detected_crop': "Culture détectée: {crop_name} ({confidence:.2f}% de confiance)",
+        'detection_status': "Dernière analyse: {timestamp}",
+        'no_detection': "Aucune culture claire détectée. Veuillez assurer un bon éclairage.",
+        'scan_initiated': "Lancement de l'analyse...",
+        'scan_complete': "Analyse terminée.",
+        'scan_failed': "Échec de l'analyse: {error}"
+    },
+    'de': {
+        'detected_crop': "Erkannte Pflanze: {crop_name} ({confidence:.2f}% Konfidenz)",
+        'detection_status': "Letzter Scan: {timestamp}",
+        'no_detection': "Keine klare Pflanze erkannt. Bitte sorgen Sie für gute Beleuchtung.",
+        'scan_initiated': "Scan wird gestartet...",
+        'scan_complete': "Scan abgeschlossen.",
+        'scan_failed': "Scan fehlgeschlagen: {error}"
+    },
+    'ar': {
+        'detected_crop': "المحصول المكتشف: {crop_name} ({confidence:.2f}% ثقة)",
+        'detection_status': "آخر فحص: {timestamp}",
+        'no_detection': "لم يتم اكتشاف محصول واضح. يرجى التأكد من الإضاءة الجيدة.",
+        'scan_initiated': "بدء الفحص...",
+        'scan_complete': "اكتمل الفحص.",
+        'scan_failed': "فشل الفحص: {error}"
+    },
+    'ja': {
+        'detected_crop': "検出された作物: {crop_name} (信頼度 {confidence:.2f}%)",
+        'detection_status': "最終スキャン: {timestamp}",
+        'no_detection': "明確な作物は検出されませんでした。良好な照明を確保してください。",
+        'scan_initiated': "スキャンを開始しています...",
+        'scan_complete': "スキャン完了。",
+        'scan_failed': "スキャン失敗: {error}"
     }
 }
 
@@ -975,11 +1438,21 @@ def generate_dummy_sensor_data_values():
 def generate_dummy_camera_data():
     """Generates dummy camera data for demonstration."""
     advisories = ["Healthy Growth", "Low Leaf Color Index", "Possible Disease Detected", "Needs Fertilizer", "Check Irrigation"]
+    detected_crops = all_crop_labels if all_crop_labels else ["Wheat", "Rice", "Maize"]
+    
+    # Simulate a detection result
+    detected_crop_name = random.choice(detected_crops)
+    confidence = round(random.uniform(0.6, 0.99), 2) if random.random() > 0.1 else 0.0 # Sometimes no detection
+    
     return {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "stage": random.choice(growth_stages),
         "alert": random.choice(advisories),
-        "image_url": "https://placehold.co/150x150/E0E0E0/333333?text=Camera+Feed"  # Placeholder image
+        "image_url": "https://placehold.co/150x150/E0E0E0/333333?text=Camera+Feed",  # Placeholder image
+        "detection_result": {
+            "crop_name": detected_crop_name,
+            "confidence": confidence
+        } if confidence > 0.5 else None # Only return detection if confidence is good
     }
 
 def generate_dummy_weather_data():
@@ -1276,6 +1749,7 @@ def get_historical_sensor_data(days=7):
 
                 dummy_fill_values = generate_dummy_sensor_data_values()
                 for field in ['N', 'P', 'K', 'ph', 'rainfall', 'ds18b20_temperature', 'crop_stage', 'growth_factor']:
+                    # Prioritize real data if available, otherwise use dummy
                     if field not in value or value[field] is None:
                         value[field] = dummy_fill_values.get(field)
 
@@ -1288,12 +1762,12 @@ def get_historical_sensor_data(days=7):
             return []
 
         numeric_cols = ['N', 'P', 'K', 'ph', 'rainfall', 'temperature', 'humidity',
-                        'soil_moisture', 'light_intensity', 'ds18b20_temperature', 'growth_factor']  # Added ds18b20_temperature
+                        'soil_moisture', 'light_intensity', 'ds18b20_temperature', 'growth_factor']
         for col in numeric_cols:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
             else:
-                df[col] = np.nan  # Ensure column exists even if all NaNs
+                df[col] = np.nan
 
         df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
         df = df.dropna(subset=['timestamp'])
@@ -1320,10 +1794,34 @@ def fetch_camera_feed_data_backend():
             return generate_dummy_camera_data()
 
         latest_camera_entry = list(snapshot.values())[0]
+        # Ensure detection_result is included, even if None
+        if 'detection_result' not in latest_camera_entry:
+            latest_camera_entry['detection_result'] = None
         return latest_camera_entry
     except Exception as e:
         print(f"Error fetching camera feed data from Firebase: {e}")
         return generate_dummy_camera_data()  # Fallback to dummy on error
+
+# --- New: Simulated ML Model for Camera ---
+def detect_crop_from_image(base64_image_data, crop_labels):
+    """
+    Simulates a machine learning model that detects a crop from an image.
+    In a real scenario, this would involve a trained deep learning model.
+    :param base64_image_data: Base64 string of the image. (Not actually used, just for signature)
+    :param crop_labels: List of possible crop labels to choose from.
+    :return: dict: {'crop_name': str, 'confidence': float} or None if no detection.
+    """
+    # Simulate processing time
+    time.sleep(1) # simulate a short delay for ML inference
+
+    if random.random() < 0.2: # 20% chance of no detection or low confidence
+        return {'crop_name': 'Unknown/No clear crop', 'confidence': round(random.uniform(0.1, 0.4), 2)}
+    
+    detected_crop = random.choice(crop_labels) if crop_labels else "Generic Plant"
+    confidence = round(random.uniform(0.7, 0.99), 2)
+    
+    return {'crop_name': detected_crop, 'confidence': confidence}
+
 
 def predict_growth_backend(historical_df, selected_crop_type):
     """
@@ -1455,7 +1953,8 @@ def crop_care_advice_backend(latest_data, crop_type, lang='en'):
     # NPK Advice (using values from latest_data, which are filled with dummies if real are missing)
     npk_advice_thresholds = {
         'N': {'min': 50, 'max': 150, 'low_msg': messages['npk_n_low'], 'high_msg': messages['npk_n_high']},
-        'P': {'min': 20, 'max': 60, 'low_msg': messages['npp_n_low'], 'high_msg': messages['npk_p_high']},
+        # CORRECTED TYPO: 'npp_n_low' changed to 'npk_p_low'
+        'P': {'min': 20, 'max': 60, 'low_msg': messages['npk_p_low'], 'high_msg': messages['npk_p_high']},
         'K': {'min': 50, 'max': 200, 'low_msg': messages['npk_k_low'], 'high_msg': messages['npk_k_high']},
     }
     for nutrient, thresholds in npk_advice_thresholds.items():
@@ -1778,15 +2277,21 @@ def get_dashboard_data(request):
         existing_plot_features = [f for f in plot_features if f in df_hist.columns]
 
         if not df_hist.empty and len(existing_plot_features) > 0:
-            plot_df_melted = df_hist.dropna(subset=existing_plot_features + ['timestamp']).melt(
-                id_vars=['timestamp'],
-                value_vars=existing_plot_features,
-                var_name='Sensor Metric',
-                value_name='Reading'
-            )
-            plot_df_melted['timestamp'] = plot_df_melted['timestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S')
-            plot_df_melted['Reading'] = plot_df_melted['Reading'].apply(lambda x: None if pd.isna(x) else x)
-            plot_data_list = plot_df_melted.to_dict(orient='records')
+            # Drop rows where all existing_plot_features are NaN
+            df_hist_clean = df_hist.dropna(subset=existing_plot_features, how='all')
+            if not df_hist_clean.empty:
+                plot_df_melted = df_hist_clean.melt(
+                    id_vars=['timestamp'],
+                    value_vars=existing_plot_features,
+                    var_name='Sensor Metric',
+                    value_name='Reading'
+                )
+                plot_df_melted['timestamp'] = plot_df_melted['timestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S')
+                plot_df_melted['Reading'] = plot_df_melted['Reading'].apply(lambda x: None if pd.isna(x) else x)
+                plot_data_list = plot_df_melted.to_dict(orient='records')
+            else:
+                print("No valid sensor data after dropping NaNs for plotting.")
+
 
     # Prepare raw data table (latest 10 entries)
     raw_data_list = []
@@ -1869,6 +2374,7 @@ def api_quick_action(request):
     except json.JSONDecodeError:
         return JsonResponse({"status": "error", "message": "Invalid JSON in request body."}, status=400)
     except Exception as e:
+        print(f"Error receiving sensor data: {e}")
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 @csrf_exempt
@@ -1998,6 +2504,57 @@ def api_voice_alert(request):
 def get_crop_labels(request):
     return JsonResponse({'crop_labels': all_crop_labels})
 
+@csrf_exempt
+def api_camera_detect_crop(request):
+    """
+    Endpoint for simulated camera-based crop detection.
+    Expects a base64 encoded image string.
+    """
+    if request.method == 'OPTIONS':
+        return HttpResponse(status=200) # Handle preflight OPTIONS request
+
+    try:
+        data = json.loads(request.body)
+        image_data = data.get('image_data') # Base64 encoded image string
+        lang = data.get('lang', 'en') # Language for messages
+
+        messages = CAMERA_ML_MESSAGES.get(lang, CAMERA_ML_MESSAGES['en'])
+
+        if not image_data:
+            return JsonResponse({'error': messages['scan_failed'].format(error="No image data provided.")}, status=400)
+
+        # Simulate ML detection
+        detection_result = detect_crop_from_image(image_data, all_crop_labels)
+        
+        if detection_result and detection_result['confidence'] > 0.5:
+            response_message = messages['detected_crop'].format(
+                crop_name=detection_result['crop_name'],
+                confidence=detection_result['confidence'] * 100
+            )
+            return JsonResponse({
+                'status': 'success',
+                'message': response_message,
+                'detected_crop': detection_result['crop_name'],
+                'confidence': detection_result['confidence'],
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            })
+        else:
+            return JsonResponse({
+                'status': 'no_detection',
+                'message': messages['no_detection'],
+                'detected_crop': detection_result['crop_name'] if detection_result else None,
+                'confidence': detection_result['confidence'] if detection_result else 0.0,
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            })
+
+    except json.JSONDecodeError:
+        return JsonResponse({"status": "error", "message": "Invalid JSON in request body."}, status=400)
+    except Exception as e:
+        print(f"Error during crop detection simulation: {e}")
+        messages = CAMERA_ML_MESSAGES.get(lang, CAMERA_ML_MESSAGES['en'])
+        return JsonResponse({"status": "error", "message": messages['scan_failed'].format(error=str(e))}, status=500)
+
+
 # --- URL Patterns (equivalent to Flask routes) ---
 # This list defines how URLs are mapped to view functions.
 urlpatterns = [
@@ -2019,6 +2576,7 @@ urlpatterns = [
     path('api/seed_recommendations', api_seed_recommendations),
     path('api/voice_alert', api_voice_alert),
     path('api/crop_labels', get_crop_labels),
+    path('api/camera/detect_crop', api_camera_detect_crop), # New ML endpoint
 ]
 
 # --- Middleware for CORS (Manual Implementation for single file) ---
