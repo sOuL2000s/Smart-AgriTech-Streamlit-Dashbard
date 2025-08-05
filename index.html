@@ -298,7 +298,7 @@
             appearance: none !important;
             -webkit-appearance: none !important;
             -moz-appearance: none !important;
-            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='292.4' height='292.4'%3E%3Cpath fill='%23e2e8f0' d='M287 69.4a17.6 17.6 0 0 0-13.2-6.4H18.2c-4.8 0-9.3 1.8-13.2 6.4-4.2 4.4-6.4 10.2-6.4 16.3 0 6.1 2.2 11.9 6.4 16.3l127.4 127.3c4.2 4.4 10.2 6.4 16.3 6.4s11.9-2.2 16.3-6.4L287 102c4.2-4.4 6.4-10.2 6.4-16.3S291.2 73.8 287 69.4z'/%3E%3C/svg%3E") !important;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='292.4' height='292.4'%3E%3Cpath fill='%23e2e8f0' d='M287 69.4a17.6 17.6 0 0 0-13.2-6.4H18.2c-4.8 0-9.3 1.8-13.2 6.4-4.2 4.4-6.4 10.2-6.4 16.3 0 6.1 2.2 11.9 6.4 16.3l127.4 127.3c4.2 4.4 10.2 6.4 16.3 6.4s11.9-2.2 16.3-6.4L287 102c4.2-4.4 6.4-10.2 6.4-16.3S291.2 73.8 287 69.4z'/%3E%3C%2Fsvg%3E") !important;
             background-repeat: no-repeat !important;
             background-position: right 0.8rem center !important;
             background-size: 0.8em !important;
@@ -489,9 +489,10 @@
             transition: stroke-dasharray 0.5s ease-in-out;
         }
 
+        /* Adjusted font size for progress values */
         .progress-value {
             position: absolute; /* Position value absolutely within the container */
-            font-size: clamp(0.8rem, 2vw, 1.1rem); /* Adjusted font size for better fit and responsiveness */
+            font-size: clamp(0.7rem, 1.8vw, 1rem); /* Adjusted font size for better fit and responsiveness */
             font-weight: bold;
             color: #e2e8f0;
             z-index: 2; /* Ensure text is above circles */
@@ -1164,10 +1165,12 @@
                 </div>
                 <!-- OUTSIDE the feed box -->
                 <div id="camera-details-external" class="camera-details-external text-xs text-gray-300">
-                    <span id="camera-resolution" data-translate-key="growth_stage_na">Growth Stage: N/A</span>
-                    <span id="camera-fps" data-translate-key="advisory_na">Advisory: N/A</span>
-                    <span id="camera-signal" data-translate-key="timestamp_na">Timestamp: N/A</span>
-                    <span id="last-frame-time" data-translate-key="last_frame_time_na">Last Frame: N/A</span>
+                    <span id="camera-growth-stage" data-translate-key="growth_stage_na">Growth Stage: N/A</span>
+                    <span id="camera-advisory" data-translate-key="advisory_na">Advisory: N/A</span>
+                    <span id="camera-timestamp" data-translate-key="timestamp_na">Timestamp: N/A</span>
+                    <span id="detected-crop-info" class="text-green-400"><i class="fas fa-leaf mr-1"></i> Detected Crop: N/A</span>
+                    <span id="detected-crop-confidence" class="text-gray-400 ml-4">Confidence: N/A</span>
+                    <span id="ml-status" class="text-gray-400"><i class="fas fa-robot mr-1"></i> ML Status: Ready</span>
                 </div>
 
                 <div class="flex flex-col sm:flex-row justify-center space-y-2 sm:space-y-0 sm:space-x-2 mt-2">
@@ -1191,9 +1194,9 @@
                 <!-- New: Quick Actions -->
                 <h3 class="text-base font-medium text-gray-200 mb-2 border-t border-gray-700 pt-3" data-translate-key="quick_actions_title"><i class="fas fa-bolt mr-2"></i> Quick Actions</h3>
                 <div class="grid grid-cols-1 gap-1.5">
-                    <button class="button-primary w-full text-xs" data-translate-key="initiate_irrigation"><i class="fas fa-water mr-2"></i> Initiate Irrigation</button>
-                    <button class="button-secondary w-full text-xs" data-translate-key="apply_nutrients"><i class="fas fa-seedling mr-2"></i> Apply Nutrients</button>
-                    <button class="button-primary w-full text-xs" data-translate-key="send_alert"><i class="fas fa-bell mr-2"></i> Send Alert</button>
+                    <button class="button-primary w-full text-xs" data-action-type="irrigation" data-translate-key="initiate_irrigation"><i class="fas fa-water mr-2"></i> Initiate Irrigation</button>
+                    <button class="button-secondary w-full text-xs" data-action-type="nutrients" data-translate-key="apply_nutrients"><i class="fas fa-seedling mr-2"></i> Apply Nutrients</button>
+                    <button class="button-primary w-full text-xs" data-action-type="alert" data-translate-key="send_alert"><i class="fas fa-bell mr-2"></i> Send Alert</button>
                 </div>
             </div>
 
@@ -1470,7 +1473,7 @@
             container.dataset.value = value;
         }
 
-        // Function to render sensor trends chart
+        // Function to render sensor trends chart (UPDATED FOR TIME SERIES VISUALIZATION)
         function renderSensorTrendsChart(plotData, timeRange = 'all') {
             const chartDiv = document.getElementById('sensor-trends-chart');
             const statusDiv = document.getElementById('sensor-trends-status');
@@ -1515,29 +1518,49 @@
             const uniqueMetrics = [...new Set(filteredData.map(d => d['Sensor Metric']))];
 
             const colors = {
-                'Soil Moisture': '#68D391',
-                'Temperature': '#F6AD55',
-                'Humidity': '#63B3ED',
-                'pH': '#A78BFA',
-                'Light Intensity': '#ECC94B',
+                'soil_moisture': '#68D391',
+                'temperature': '#F6AD55',
+                'humidity': '#63B3ED',
+                'ph': '#A78BFA',
+                'light_intensity': '#ECC94B',
                 'N': '#FC8181',
                 'P': '#81E6D9',
                 'K': '#B794F4',
-                'Rainfall': '#4299E1',
+                'rainfall': '#4299E1',
                 'ds18b20_temperature': '#E53E3E',
-                'Growth Factor': '#38A169'
+                'growth_factor': '#38A169'
             };
+
+            const displayNames = {
+                'soil_moisture': 'Soil Moisture (%)',
+                'temperature': 'Temperature (°C)',
+                'humidity': 'Humidity (%)',
+                'ph': 'pH Level',
+                'light_intensity': 'Light Intensity (lux)',
+                'N': 'Nitrogen (N)',
+                'P': 'Phosphorus (P)',
+                'K': 'Potassium (K)',
+                'rainfall': 'Rainfall (mm)',
+                'ds18b20_temperature': 'DS18B20 Temp (°C)',
+                'growth_factor': 'Growth Factor'
+            };
+
 
             uniqueMetrics.forEach((metric) => {
                 const dataForMetric = filteredData.filter(d => d['Sensor Metric'] === metric);
-                traces.push({
-                    x: dataForMetric.map(d => d.timestamp),
-                    y: dataForMetric.map(d => d.Reading),
-                    mode: 'lines',
-                    name: metric,
-                    line: { color: colors[metric] || '#cbd5e0', width: 2 },
-                    hovertemplate: `<b>%{fullData.name}</b><br>Time: %{x}<br>Reading: %{y:.2f}<extra></extra>`
-                });
+                // Filter out null/undefined 'Reading' values
+                const validDataForMetric = dataForMetric.filter(d => d.Reading !== null && d.Reading !== undefined);
+
+                if (validDataForMetric.length > 1) { // Only plot if there's enough valid data for a line
+                    traces.push({
+                        x: validDataForMetric.map(d => d.timestamp),
+                        y: validDataForMetric.map(d => d.Reading),
+                        mode: 'lines',
+                        name: displayNames[metric] || metric, // Use display name or original
+                        line: { color: colors[metric] || '#cbd5e0', width: 2 },
+                        hovertemplate: `<b>%{fullData.name}</b><br>Time: %{x}<br>Reading: %{y:.2f}<extra></extra>`
+                    });
+                }
             });
 
             const layout = {
@@ -1590,7 +1613,12 @@
                 margin: { l: 40, r: 20, t: 60, b: 40 }
             };
 
-            Plotly.newPlot(chartDiv, traces, layout, { responsive: true });
+            if (traces.length > 0) {
+                Plotly.newPlot(chartDiv, traces, layout, { responsive: true });
+            } else {
+                displayMessage(statusDiv, "No sufficient data to display for the selected metrics and time range.", 'info');
+                Plotly.purge(chartDiv);
+            }
         }
 
         // Function to populate crop selectbox
@@ -1744,7 +1772,7 @@
                     break;
             }
             // Store original content only if it's the target for temporary messages
-            const isTemporaryTarget = element.id === 'export-status-container';
+            const isTemporaryTarget = element.id === 'export-status-container' || element.id === 'ml-status'; // Added ml-status
             const originalContent = isTemporaryTarget ? element.innerHTML : null;
 
             element.innerHTML = `<p class="${colorClass}"><i class="${iconClass} mr-2"></i> ${messageText}</p>`;
@@ -2221,27 +2249,79 @@
             }
         }
 
-        // Function to capture an image from the video feed
-        function captureImage() {
+        // Function to capture an image from the video feed and send for ML detection
+        async function captureImage() {
             const videoElement = document.getElementById('live-camera-feed');
-            if (videoElement && mediaStream) {
+            const mlStatus = document.getElementById('ml-status');
+            const captureButton = document.getElementById('capture-image-button');
+            const detectedCropInfo = document.getElementById('detected-crop-info');
+            const detectedCropConfidence = document.getElementById('detected-crop-confidence');
+            const cameraGrowthStage = document.getElementById('camera-growth-stage'); // Corrected ID
+            const cameraAdvisory = document.getElementById('camera-advisory'); // Corrected ID
+            const cameraTimestamp = document.getElementById('camera-timestamp'); // Corrected ID
+
+
+            if (!videoElement || !mediaStream || !mlStatus || !captureButton || !detectedCropInfo || !detectedCropConfidence || !cameraGrowthStage || !cameraAdvisory || !cameraTimestamp) {
+                displayMessage(mlStatus, 'Camera is not active or elements missing for ML scan.', 'warning', 3000);
+                return;
+            }
+
+            captureButton.disabled = true;
+            captureButton.innerHTML = `<span class="loading-spinner"></span> Scanning...`;
+            displayMessage(mlStatus, 'Initiating crop detection scan...', 'info', 0); // No auto-clear
+
+            try {
                 const canvas = document.createElement('canvas');
                 canvas.width = videoElement.videoWidth;
                 canvas.height = videoElement.videoHeight;
                 const context = canvas.getContext('2d');
                 context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
 
-                canvas.toBlob((blob) => {
-                    const imageUrl = URL.createObjectURL(blob);
-                    // For demonstration, open in a new tab. In a real app, you might upload it or display it.
-                    window.open(imageUrl, '_blank');
-                    // Clean up URL object after use
-                    URL.revokeObjectURL(imageUrl);
-                }, 'image/png');
-            } else {
-                displayMessage(document.getElementById('camera-details-external'), 'Camera is not active to capture image.', 'warning');
+                const imageDataUrl = canvas.toDataURL('image/png'); // Get image as data URL
+                const base64Image = imageDataUrl.split(',')[1]; // Extract base64 part
+
+                // Send image data to backend ML endpoint
+                const response = await fetch(`${API_BASE_URL}/api/camera/detect_crop`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image_data: base64Image, lang: currentLanguage })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    displayMessage(mlStatus, result.message, 'success', 3000);
+                    detectedCropInfo.innerHTML = `<i class="fas fa-leaf mr-1"></i> Detected Crop: <b>${result.detected_crop}</b>`;
+                    detectedCropConfidence.textContent = `Confidence: ${(result.confidence * 100).toFixed(2)}%`;
+                } else if (result.status === 'no_detection') {
+                    displayMessage(mlStatus, result.message, 'warning', 3000);
+                    detectedCropInfo.innerHTML = `<i class="fas fa-leaf mr-1"></i> Detected Crop: <b>N/A</b>`;
+                    detectedCropConfidence.textContent = `Confidence: N/A`;
+                } else {
+                    displayMessage(mlStatus, result.message, 'error', 3000);
+                    detectedCropInfo.innerHTML = `<i class="fas fa-leaf mr-1"></i> Detected Crop: <b>Error</b>`;
+                    detectedCropConfidence.textContent = `Confidence: Error`;
+                }
+                
+                // Update timestamp based on ML result
+                cameraTimestamp.textContent = `Timestamp: ${new Date(result.timestamp).toLocaleTimeString()}`;
+
+            } catch (error) {
+                console.error("Error during ML detection:", error);
+                displayMessage(mlStatus, `ML Scan failed: ${error.message}`, 'error', 3000);
+                detectedCropInfo.innerHTML = `<i class="fas fa-leaf mr-1"></i> Detected Crop: <b>Error</b>`;
+                detectedCropConfidence.textContent = `Confidence: Error`;
+            } finally {
+                captureButton.disabled = false;
+                captureButton.innerHTML = `<i class="fas fa-camera-retro mr-2"></i> Capture Image`;
             }
         }
+
 
         // Function to export raw data to CSV
         async function exportToCSV() {
@@ -2363,6 +2443,54 @@
             }
         }
 
+        // --- Quick Actions Functions ---
+        async function performQuickAction(actionType) {
+            const actionButton = document.querySelector(`[data-action-type="${actionType}"]`);
+            if (!actionButton) {
+                console.error(`Button for action type ${actionType} not found.`);
+                return;
+            }
+
+            actionButton.disabled = true;
+            const originalButtonHtml = actionButton.innerHTML;
+            actionButton.innerHTML = `<span class="loading-spinner"></span> Performing...`;
+
+            try {
+                let message = '';
+                if (actionType === 'irrigation') {
+                    message = 'Initiating irrigation...';
+                } else if (actionType === 'nutrients') {
+                    message = 'Applying nutrients...';
+                } else if (actionType === 'alert') {
+                    message = prompt('Enter alert message:', 'Urgent attention required in Sector A!');
+                    if (!message) { // User cancelled
+                        displayMessage(document.getElementById('recent-events'), 'Alert action cancelled.', 'info', 2000);
+                        return;
+                    }
+                }
+
+                const response = await fetch(`${API_BASE_URL}/api/action`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action_type: actionType, message: message })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                displayMessage(document.getElementById('recent-events'), result.message, 'success', 3000);
+            } catch (error) {
+                console.error(`Error performing ${actionType} action:`, error);
+                displayMessage(document.getElementById('recent-events'), `Failed to perform ${actionType}: ${error.message}`, 'error', 3000);
+            } finally {
+                actionButton.disabled = false;
+                actionButton.innerHTML = originalButtonHtml;
+            }
+        }
+
 
         // Main data fetching and rendering function
         async function fetchDataAndRender() {
@@ -2480,16 +2608,25 @@
                          cameraFeedContainer.querySelector('.camera-overlay-text').textContent = 'Last Frame: N/A';
                     }
 
+                    const cameraGrowthStage = cameraDetailsExternal.querySelector('#camera-growth-stage');
+                    const cameraAdvisory = cameraDetailsExternal.querySelector('#camera-advisory');
+                    const cameraTimestamp = cameraDetailsExternal.querySelector('#camera-timestamp');
+                    const detectedCropInfo = document.getElementById('detected-crop-info');
+                    const detectedCropConfidence = document.getElementById('detected-crop-confidence');
 
-                    const cameraResolution = cameraDetailsExternal.querySelector('#camera-resolution');
-                    const cameraFps = cameraDetailsExternal.querySelector('#camera-fps');
-                    const cameraSignal = cameraDetailsExternal.querySelector('#camera-signal');
-                    const lastFrameTime = cameraDetailsExternal.querySelector('#last-frame-time');
+                    if (cameraGrowthStage) cameraGrowthStage.textContent = `Growth Stage: ${cameraData.stage || 'N/A'}`;
+                    if (cameraAdvisory) cameraAdvisory.textContent = `Advisory: ${cameraData.alert || 'N/A'}`;
+                    if (cameraTimestamp) cameraTimestamp.textContent = `Timestamp: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
+                    
+                    // Update ML detection display from cameraData
+                    if (cameraData.detection_result && cameraData.detection_result.crop_name) {
+                        detectedCropInfo.innerHTML = `<i class="fas fa-leaf mr-1"></i> Detected Crop: <b>${cameraData.detection_result.crop_name}</b>`;
+                        detectedCropConfidence.textContent = `Confidence: ${(cameraData.detection_result.confidence * 100).toFixed(2)}%`;
+                    } else {
+                        detectedCropInfo.innerHTML = `<i class="fas fa-leaf mr-1"></i> Detected Crop: <b>N/A</b>`;
+                        detectedCropConfidence.textContent = `Confidence: N/A`;
+                    }
 
-                    if (cameraResolution) cameraResolution.textContent = `Growth Stage: ${cameraData.stage || 'N/A'}`;
-                    if (cameraFps) cameraFps.textContent = `Advisory: ${cameraData.alert || 'N/A'}`;
-                    if (cameraSignal) cameraSignal.textContent = `Timestamp: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
-                    if (lastFrameTime) lastFrameTime.textContent = `Last Frame: ${new Date(cameraData.timestamp).toLocaleTimeString() || 'N/A'}`;
 
                 } else if (cameraFeedContainer && cameraDetailsExternal) {
                     const connectionStatusSpan = cameraFeedContainer.querySelector('.connection-status');
@@ -2498,15 +2635,18 @@
                         connectionStatusSpan.style.backgroundColor = '#e53e3e';
                     }
 
-                    const cameraResolution = cameraDetailsExternal.querySelector('#camera-resolution');
-                    const cameraFps = cameraDetailsExternal.querySelector('#camera-fps');
-                    const cameraSignal = cameraDetailsExternal.querySelector('#camera-signal');
-                    const lastFrameTime = cameraDetailsExternal.querySelector('#last-frame-time');
+                    const cameraGrowthStage = cameraDetailsExternal.querySelector('#camera-growth-stage');
+                    const cameraAdvisory = cameraDetailsExternal.querySelector('#camera-advisory');
+                    const cameraTimestamp = cameraDetailsExternal.querySelector('#camera-timestamp');
+                    const detectedCropInfo = document.getElementById('detected-crop-info');
+                    const detectedCropConfidence = document.getElementById('detected-crop-confidence');
 
-                    if (cameraResolution) cameraResolution.textContent = `Growth Stage: N/A`;
-                    if (cameraFps) cameraFps.textContent = `Advisory: N/A`;
-                    if (cameraSignal) cameraSignal.textContent = `Timestamp: N/A`;
-                    if (lastFrameTime) lastFrameTime.textContent = `Last Frame: N/A`;
+
+                    if (cameraGrowthStage) cameraGrowthStage.textContent = `Growth Stage: N/A`;
+                    if (cameraAdvisory) cameraAdvisory.textContent = `Advisory: N/A`;
+                    if (cameraTimestamp) cameraTimestamp.textContent = `Timestamp: N/A`;
+                    if (detectedCropInfo) detectedCropInfo.innerHTML = `<i class="fas fa-leaf mr-1"></i> Detected Crop: <b>N/A</b>`;
+                    if (detectedCropConfidence) detectedCropConfidence.textContent = `Confidence: N/A`;
 
                     // Ensure placeholder elements are visible if no camera data or stream
                     cameraFeedContainer.querySelector('.camera-icon').style.display = 'block';
@@ -2672,6 +2812,14 @@
         document.getElementById('export-csv-button')?.addEventListener('click', exportToCSV);
         document.getElementById('export-excel-button')?.addEventListener('click', exportToExcel);
         document.getElementById('capture-image-button')?.addEventListener('click', captureImage);
+
+        // Quick Actions listeners
+        document.querySelectorAll('[data-action-type]').forEach(button => {
+            button.addEventListener('click', (event) => {
+                performQuickAction(event.target.dataset.actionType);
+            });
+        });
+
         // Event listener for the custom language selector
         document.getElementById('customLanguageSelect')?.addEventListener('change', (event) => {
             const selectedLang = event.target.value;
@@ -2773,10 +2921,13 @@
                 } else {
                     console.error("Failed to set backend mode:", data.message);
                 }
-            } catch (error) {
+            }
+            catch (error) {
                 console.error("Error setting simulation mode:", error);
+                alert("Failed to change simulation mode. Please check the backend server and network connection.");
             }
         }
+
 
         // Function to get the current simulation mode from API and update toggle
         async function getAndSetInitialMode() {
